@@ -1,5 +1,7 @@
 import { getToken, signOut } from './auth';
 
+const JAONAICHAN_API_URL = import.meta.env.JAONAICHAN_API_URL;
+
 interface RequestOptions extends RequestInit {
     headers?: Record<string, string>;
 }
@@ -7,7 +9,7 @@ interface RequestOptions extends RequestInit {
 export async function apiRequest<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const token = getToken();
 
-    const res = await fetch(`https://yoursite.com/wp-json${endpoint}`, {
+    const res = await fetch(`${JAONAICHAN_API_URL}${endpoint}`, {
         ...options,
         headers: {
             'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-import { getToken, getUser, isLoggedIn, signOut, BigBossUser } from '../apis/auth';
+import { getToken, getUser, isLoggedIn, signOut, BigBossUser } from '../api/auth';
 
 interface UseAuthReturn {
     user: BigBossUser | null;

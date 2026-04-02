@@ -18,6 +18,8 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Order from "./pages/Jaonaichan/Order";
 
 export default function App() {
   return (
@@ -27,30 +29,33 @@ export default function App() {
         <Routes>
           {/* Dashboard Layout */}
           <Route element={<AppLayout />}>
-            <Route index path="/" element={<Home />} />
+            <Route index path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+
+            {/* Jaonaichan */}
+            <Route path="/order-jaonaichan" element={<ProtectedRoute><Order /></ProtectedRoute>} />
 
             {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
+            <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />
+            <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+            <Route path="/blank" element={<ProtectedRoute><Blank /></ProtectedRoute>} />
 
             {/* Forms */}
-            <Route path="/form-elements" element={<FormElements />} />
+            <Route path="/form-elements" element={<ProtectedRoute><FormElements /></ProtectedRoute>} />
 
             {/* Tables */}
-            <Route path="/basic-tables" element={<BasicTables />} />
+            <Route path="/basic-tables" element={<ProtectedRoute><BasicTables /></ProtectedRoute>} />
 
             {/* Ui Elements */}
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
+            <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+            <Route path="/avatars" element={<ProtectedRoute><Avatars /></ProtectedRoute>} />
+            <Route path="/badge" element={<ProtectedRoute><Badges /></ProtectedRoute>} />
+            <Route path="/buttons" element={<ProtectedRoute><Buttons /></ProtectedRoute>} />
+            <Route path="/images" element={<ProtectedRoute><Images /></ProtectedRoute>} />
+            <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
 
             {/* Charts */}
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
+            <Route path="/line-chart" element={<ProtectedRoute><LineChart /></ProtectedRoute>} />
+            <Route path="/bar-chart" element={<ProtectedRoute><BarChart /></ProtectedRoute>} />
           </Route>
 
           {/* Auth Layout */}

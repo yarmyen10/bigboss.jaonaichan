@@ -5,17 +5,8 @@ import MonthlyTarget from "../../components/ecommerce/MonthlyTarget";
 import RecentOrders from "../../components/ecommerce/RecentOrders";
 import DemographicCard from "../../components/ecommerce/DemographicCard";
 import PageMeta from "../../components/common/PageMeta";
-import { Navigate } from "react-router";
 
 export default function Home() {
-
-  const isLoggedIn = false; // เอาจริงค่อยเปลี่ยนเป็น token / auth state
-
-  if (!isLoggedIn) {
-    return <Navigate to="/signin" replace />;
-  }
-
-
   return (
     <>
       <PageMeta
