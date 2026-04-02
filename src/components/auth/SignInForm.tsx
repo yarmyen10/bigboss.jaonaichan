@@ -5,10 +5,28 @@ import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
+import { signIn } from '../../apis/auth';
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: any) {
+    e.preventDefault();
+    setError('');
+
+    const data = await signIn(form.username, form.password);
+
+    if (data.token) {
+      window.location.href = '/';
+    } else {
+      setError(data.message || 'Login ไม่สำเร็จ');
+    }
+  }
+
   return (
     <div className="flex flex-col flex-1">
       <div className="w-full max-w-md pt-10 mx-auto">
@@ -83,13 +101,17 @@ export default function SignInForm() {
                 </span>
               </div>
             </div>
-            <form>
+            <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com" />
+                  <Input 
+                    value={form.username} 
+                    onChange={e => setForm({ ...form, username: e.target.value })}
+                    placeholder="info@gmail.com" 
+                  />
                 </div>
                 <div>
                   <Label>
@@ -97,6 +119,8 @@ export default function SignInForm() {
                   </Label>
                   <div className="relative">
                     <Input
+                      value={form.password}
+                      onChange={e => setForm({ ...form, password: e.target.value })}
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                     />
