@@ -19,15 +19,16 @@ export default function AuthLayout({
             <div className="flex flex-col items-center max-w-xs">
               <Link to="/" className="block mb-4">
                 <img
-                  width={231}
-                  height={48}
-                  src="/images/logo/logo.png"
+                  // width={231}
+                  // height={48}
+                  src="/images/logo/Hungry Cats Sticker by Pusheen.gif"
                   alt="Logo"
                 />
               </Link>
-              <p className="text-center text-gray-400 dark:text-white/60">
+              <p className="text-center text-4xl text-gray-400 dark:text-white/60">Big Boss</p>
+              {/* <p className="text-center text-gray-400 dark:text-white/60">
                 Free and Open-Source Tailwind CSS Admin Dashboard Template
-              </p>
+              </p> */}
             </div>
           </div>
         </div>

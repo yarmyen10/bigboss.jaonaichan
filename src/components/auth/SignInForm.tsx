@@ -6,6 +6,7 @@ import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { signIn } from '../../api/auth';
+import DOMPurify from "dompurify";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -44,12 +45,24 @@ export default function SignInForm() {
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
               Sign In
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in!
-            </p>
+
+            { error ? (
+              <p className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-lg"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(String(error)),
+                }}
+              >
+              </p>
+            )
+              : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Enter your email and password to sign in!
+              </p>
+            ) }
+
           </div>
           <div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
+            {/* <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
               <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
                 <svg
                   width="20"
@@ -100,12 +113,12 @@ export default function SignInForm() {
                   Or
                 </span>
               </div>
-            </div>
+            </div> */}
             <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
                   <Label>
-                    Email <span className="text-error-500">*</span>{" "}
+                    Username or Email <span className="text-error-500">*</span>{" "}
                   </Label>
                   <Input 
                     value={form.username} 
@@ -158,7 +171,7 @@ export default function SignInForm() {
               </div>
             </form>
 
-            <div className="mt-5">
+            {/* <div className="mt-5">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
                 Don&apos;t have an account? {""}
                 <Link
@@ -168,7 +181,7 @@ export default function SignInForm() {
                   Sign Up
                 </Link>
               </p>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

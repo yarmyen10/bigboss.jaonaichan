@@ -54,6 +54,10 @@ export default tseslint.config(
           format: ['camelCase', 'PascalCase'],
         },
         {
+          selector: 'interface ',
+          format: ['camelCase', 'snake_case'],
+        },
+        {
           selector: 'function',
           format: ['camelCase', 'PascalCase'],
         },

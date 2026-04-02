@@ -5,6 +5,8 @@ export interface BigBossUser {
     username: string | undefined;
     email: string | undefined;
     displayName: string | undefined;
+    roles: string[] | undefined;
+    role: string | undefined;
 }
 
 export interface SignInResponse {
@@ -30,6 +32,8 @@ export async function signIn(username: string, password: string): Promise<SignIn
             username: data.user_nicename,
             email: data.user_email,
             displayName: data.user_display_name,
+            roles: data.roles,
+            role: data.role,
         } satisfies BigBossUser));
     }
 
