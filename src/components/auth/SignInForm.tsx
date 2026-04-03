@@ -19,12 +19,16 @@ export default function SignInForm() {
     e.preventDefault();
     setError('');
 
-    const data = await signIn(form.username, form.password);
-
-    if (data.token) {
-      window.location.href = '/';
-    } else {
-      setError(data.message || 'Login ไม่สำเร็จ');
+    try {
+      const data = await signIn(form.username, form.password);
+  
+      if (data.token) {
+        window.location.href = '/';
+      } else {
+        setError(data.message || 'Login ไม่สำเร็จ');
+      }
+    } catch (error) {
+      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
     }
   }
 

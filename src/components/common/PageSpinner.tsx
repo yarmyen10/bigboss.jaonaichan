@@ -9,8 +9,8 @@ export default function PageSpinner() {
         <div className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black/80">
             <img
                 src={loadingGif}
-                alt="Loading"
-                className="h-100 w-100 object-contain"
+                alt="Loading..."
+                className="h-[20%] w-[20%] object-contain"
             />
             {/* <p className="mt-4 text-sm text-gray-600">Loading...</p> */}
         </div>

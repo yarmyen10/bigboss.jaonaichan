@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children }: Props) {
             };
 
             checkAuth();
-        }, 10000);
+        }, 100);
 
         return () => clearTimeout(timer);
     }, []);
