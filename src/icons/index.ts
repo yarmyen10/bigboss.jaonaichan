@@ -55,6 +55,8 @@ import { ReactComponent as MoreDotIcon } from "./moredot.svg?react";
 import { ReactComponent as AlertHexaIcon } from "./alert-hexa.svg?react";
 import { ReactComponent as ErrorHexaIcon } from "./info-hexa.svg?react";
 import { ReactComponent as CatIcon } from "./cat-svgrepo-com.svg?react";
+import { ReactComponent as SearchAltIcon } from "./search-alt.svg?react";
+import { ReactComponent as SearchOneIcon } from "./search-one.svg?react";
 
 export {
   ErrorHexaIcon,
@@ -114,4 +116,6 @@ export {
   AngleLeftIcon,
   AngleRightIcon,
   CatIcon,
+  SearchAltIcon,
+  SearchOneIcon,
 };

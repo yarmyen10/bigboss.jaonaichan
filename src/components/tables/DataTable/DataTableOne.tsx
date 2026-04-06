@@ -1,0 +1,589 @@
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+} from "../../ui/table";
+import Badge from "../../ui/badge/Badge";
+import Input from "../../form/input/InputField";
+import { SearchOneIcon } from "../../../icons";
+import Select from "../../form/Select";
+import Checkbox from "../../form/input/Checkbox";
+
+export type SortDir = "asc" | "desc";
+
+export interface ColumnDef<T> {
+    /** dot-notation path เช่น "billing.first_name" หรือ field ตรงๆ */
+    key: string;
+    label: string;
+    sortable?: boolean;
+    width?: string;
+    align?: "left" | "center" | "right";
+    /** custom render — ถ้าไม่ระบุจะแสดง row[key] */
+    render?: (value: unknown, row: T, index: number) => ReactNode;
+    /** ซ่อน column นี้ใน CSV */
+    noExport?: boolean;
+}
+
+export interface FilterOption {
+    label: string;
+    value: string;
+}
+
+export interface FilterConfig {
+    label: string;
+    /** query param key ที่ส่งไป fetchFn และใช้ filter client-side */
+    paramKey: string;
+    options: FilterOption[];
+}
+
+export interface RowAction<T> {
+    label: string;
+    icon?: ReactNode;
+    variant?: "default" | "danger";
+    onClick: (row: T) => void;
+}
+
+export interface FetchParams {
+    page: number;
+    pageSize: number;
+    search: string;
+    sortKey: string;
+    sortDir: SortDir;
+    filters: Record<string, string>;
+}
+
+export interface FetchResult<T> {
+    data: T[];
+    total: number;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function useDebounce<T>(val: T, ms = 400) {
+    const [d, setD] = useState(val);
+    useEffect(() => {
+        const t = setTimeout(() => setD(val), ms);
+        return () => clearTimeout(t);
+    }, [val, ms]);
+    return d;
+}
+
+function getNestedValue(obj: object, key: string): unknown {
+    return key.split(".").reduce((acc: unknown, k) => {
+        if (acc != null && typeof acc === "object") return (acc as Record<string, unknown>)[k];
+        return undefined;
+    }, obj);
+}
+
+function exportCsv<T extends object>(cols: ColumnDef<T>[], rows: T[], filename: string) {
+    const exportCols = cols.filter((c) => !c.noExport);
+    const headers = exportCols.map((c) => `"${c.label}"`).join(",");
+    const body = rows.map((row) =>
+        exportCols.map((c) => {
+            const v = getNestedValue(row, c.key);
+            return `"${String(v ?? "").replace(/"/g, '""')}"`;
+        }).join(",")
+    );
+    const csv = [headers, ...body].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Spinner() {
+    return (
+        <div className="flex items-center justify-center py-20">
+            <div className="h-9 w-9 animate-spin rounded-full border-4 border-stroke border-t-primary" />
+        </div>
+    );
+}
+
+function ActionDropdown<T extends object>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const fn = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", fn);
+        return () => document.removeEventListener("mousedown", fn);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative flex justify-end">
+            <button
+                onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-body transition hover:bg-stroke hover:text-black dark:hover:bg-strokedark dark:hover:text-white"
+            >
+                <Ico.Dots />
+            </button>
+
+            {open && (
+                <div className="absolute right-0 top-9 z-50 min-w-[150px] rounded-md border border-stroke bg-white py-1 shadow-md dark:border-strokedark dark:bg-boxdark">
+                    {actions.map((action, i) => (
+                        <button
+                            key={i}
+                            onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick(row); }}
+                            className={`flex w-full items-center gap-2.5 px-4 py-2 text-sm transition ${action.variant === "danger"
+                                ? "text-danger hover:bg-danger/5"
+                                : "text-black hover:bg-gray-1 dark:text-white dark:hover:bg-meta-4"
+                                }`}
+                        >
+                            {action.icon}
+                            {action.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function FilterPanel({
+    filters,
+    values,
+    onChange,
+}: {
+    filters: FilterConfig[];
+    values: Record<string, string>;
+    onChange: (key: string, val: string) => void;
+}) {
+    const activeCount = Object.values(values).filter(Boolean).length;
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const fn = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", fn);
+        return () => document.removeEventListener("mousedown", fn);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                onClick={() => setOpen((v) => !v)}
+                className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition ${activeCount > 0
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-stroke bg-white text-black hover:bg-gray-1 dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+                    }`}
+            >
+                <Ico.Filter />
+                Filter
+                {activeCount > 0 && (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white">
+                        {activeCount}
+                    </span>
+                )}
+            </button>
+
+            {open && (
+                <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white p-4 shadow-md dark:border-strokedark dark:bg-boxdark">
+                    {filters.map((f) => (
+                        <div key={f.paramKey} className="mb-4 last:mb-0">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-body dark:text-bodydark">
+                                {f.label}
+                            </p>
+                            {f.options.map((opt) => (
+                                <label key={opt.value} className="flex cursor-pointer items-center gap-2.5 py-1.5">
+                                    <input
+                                        type="radio"
+                                        name={f.paramKey}
+                                        value={opt.value}
+                                        checked={(values[f.paramKey] ?? "") === opt.value}
+                                        onChange={() => onChange(f.paramKey, opt.value)}
+                                        className="accent-primary"
+                                    />
+                                    <span className="text-sm text-black dark:text-white">{opt.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    ))}
+                    {activeCount > 0 && (
+                        <button
+                            onClick={() => filters.forEach((f) => onChange(f.paramKey, ""))}
+                            className="mt-2 w-full rounded border border-stroke py-1.5 text-xs text-body transition hover:border-danger hover:text-danger dark:border-strokedark"
+                        >
+                            Clear all
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export interface DataTableProps<T extends object> {
+    // ── Data ──────────────────────────────────────────────────────────────────
+    columns: ColumnDef<T>[];
+    /** Static data — client-side sort/filter/page */
+    data?: T[];
+    /** Async fetch — server-side, ใช้อย่างใดอย่างหนึ่ง */
+    fetchFn?: (params: FetchParams) => Promise<FetchResult<T>>;
+    rowKey: keyof T;
+
+    // ── Header ────────────────────────────────────────────────────────────────
+    title?: string;
+    subtitle?: string;
+    /** Buttons ฝั่งขวา header (Add Product ฯลฯ) */
+    headerActions?: ReactNode;
+    /** แสดงเมื่อมี row ถูก select */
+    bulkActions?: (selectedRows: T[]) => ReactNode;
+
+    // ── Toolbar ───────────────────────────────────────────────────────────────
+    searchable?: boolean;
+    searchPlaceholder?: string;
+    filters?: FilterConfig[];
+    exportable?: boolean;
+    exportFilename?: string;
+    pageSizeOptions?: number[];
+    defaultPageSize?: number;
+
+    // ── Rows ──────────────────────────────────────────────────────────────────
+    selectable?: boolean;
+    rowActions?: RowAction<T>[];
+    onRowClick?: (row: T) => void;
+
+    // ── Misc ──────────────────────────────────────────────────────────────────
+    loading?: boolean;
+    emptyText?: string;
+    className?: string;
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
+const Ico = {
+    Search: () => (
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+        </svg>
+    ),
+    Download: () => (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+        </svg>
+    ),
+    Filter: () => (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+    ),
+    SortAsc: () => (
+        <svg className="h-3.5 w-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path d="M7 15l5 5 5-5" />
+        </svg>
+    ),
+    SortDesc: () => (
+        <svg className="h-3.5 w-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path d="M7 9l5-5 5 5" />
+        </svg>
+    ),
+    SortNone: () => (
+        <svg className="h-3.5 w-3.5 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+        </svg>
+    ),
+    Dots: () => (
+        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+        </svg>
+    ),
+    ChevLeft: () => (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <polyline points="15 18 9 12 15 6" />
+        </svg>
+    ),
+    ChevRight: () => (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <polyline points="9 18 15 12 9 6" />
+        </svg>
+    ),
+};
+
+export default function DataTableOne<T extends object>({
+    columns,
+    data: staticData,
+    fetchFn,
+    rowKey,
+    title,
+    subtitle,
+    headerActions,
+    bulkActions,
+    searchable = true,
+    searchPlaceholder = "Search...",
+    filters: filterConfigs,
+    exportable = true,
+    exportFilename = "export.csv",
+    pageSizeOptions = [10, 25, 50],
+    defaultPageSize = 10,
+    selectable = true,
+    rowActions = [],
+    onRowClick,
+    loading: loadingProp,
+    emptyText = "No data found",
+    className = "",
+}: DataTableProps<T>) {
+    const isAsync = !!fetchFn;
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    const [asyncData, setAsyncData] = useState<T[]>([]);
+    const [asyncTotal, setAsyncTotal] = useState(0);
+    const [asyncLoading, setAsyncLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const [search, setSearch] = useState("");
+    const dSearch = useDebounce(search);
+
+    const [sortKey, setSortKey] = useState("");
+    const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(defaultPageSize);
+
+    const [selectedIds, setSelectedIds] = useState<Set<unknown>>(new Set());
+    const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+
+    const abortRef = useRef<AbortController | null>(null);
+    const loading = loadingProp ?? asyncLoading;
+
+    // ── Client-side data ───────────────────────────────────────────────────────
+    const clientRows = useMemo(() => {
+        if (isAsync) return asyncData;
+        let rows = [...(staticData ?? [])];
+
+        if (dSearch) {
+            const q = dSearch.toLowerCase();
+            rows = rows.filter((row) =>
+                columns.some((col) => String(getNestedValue(row, col.key) ?? "").toLowerCase().includes(q))
+            );
+        }
+
+        filterConfigs?.forEach((fc) => {
+            const val = filterValues[fc.paramKey];
+            if (val) rows = rows.filter((row) => String(getNestedValue(row, fc.paramKey) ?? "") === val);
+        });
+
+        if (sortKey) {
+            rows.sort((a, b) => {
+                const av = getNestedValue(a, sortKey);
+                const bv = getNestedValue(b, sortKey);
+                const cmp = typeof av === "number" && typeof bv === "number"
+                    ? av - bv
+                    : String(av ?? "").localeCompare(String(bv ?? ""), "th");
+                return sortDir === "asc" ? cmp : -cmp;
+            });
+        }
+        return rows;
+    }, [isAsync, asyncData, staticData, dSearch, sortKey, sortDir, filterValues, filterConfigs, columns]);
+
+    const total = isAsync ? asyncTotal : clientRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    const visibleRows = useMemo(() => {
+        if (isAsync) return clientRows;
+        return clientRows.slice((page - 1) * pageSize, page * pageSize);
+    }, [isAsync, clientRows, page, pageSize]);
+
+    // ── Sort ───────────────────────────────────────────────────────────────────
+    const handleSort = (key: string) => {
+        if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        else { setSortKey(key); setSortDir("asc"); }
+    };
+
+    const SortIcon = ({ k }: { k: string }) =>
+        sortKey !== k ? <Ico.SortNone /> : sortDir === "asc" ? <Ico.SortAsc /> : <Ico.SortDesc />;
+
+    // ── Selection ──────────────────────────────────────────────────────────────
+    const getId = (row: T) => (row as Record<string, unknown>)[rowKey as string];
+    const allSelected = visibleRows.length > 0 && visibleRows.every((r) => selectedIds.has(getId(r)));
+
+    const toggleAll = () =>
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            allSelected
+                ? visibleRows.forEach((r) => next.delete(getId(r)))
+                : visibleRows.forEach((r) => next.add(getId(r)));
+            return next;
+        });
+    
+    const toggleRow = (id: unknown) =>
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+
+    const selectedRows = useMemo(
+        () => (isAsync ? asyncData : clientRows).filter((r) => selectedIds.has(getId(r))),
+        [selectedIds, isAsync, asyncData, clientRows]
+    );
+
+    // ── Pagination ─────────────────────────────────────────────────────────────
+    const pageButtons = useMemo(() => {
+        const pages: (number | "...")[] = [1];
+        const left = Math.max(2, page - 1);
+        const right = Math.min(totalPages - 1, page + 1);
+        if (left > 2) pages.push("...");
+        for (let i = left; i <= right; i++) pages.push(i);
+        if (right < totalPages - 1) pages.push("...");
+        if (totalPages > 1) pages.push(totalPages);
+        return pages;
+    }, [page, totalPages]);
+
+    const startRow = total === 0 ? 0 : (page - 1) * pageSize + 1;
+    const endRow = Math.min(page * pageSize, total);
+
+    const alignClass = (a?: string) =>
+        a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
+
+    const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
+
+    return (
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+            {/* Header */}
+            {(title || headerActions) && (
+                <div className="flex items-start justify-between px-6 py-5">
+                    {title && (
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h3>
+                            {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
+                        </div>
+                    )}
+                    {headerActions && <div className="flex items-center gap-3">{headerActions}</div>}
+                </div>
+            )}
+
+            {/* Toolbar */}
+            <div className="flex items-center justify-between gap-3 border-b border-t border-stroke px-6 py-3.5 dark:border-gray-800">
+                {/* Search */}
+                <div className="flex flex-1 items-center gap-2">
+                    {searchable && (
+                        <div className="relative max-w-xs flex-1">
+                            <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                                <SearchOneIcon />
+                            </span>
+                            <Input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={searchPlaceholder}
+                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Right controls */}
+                <div className="flex items-center gap-3">
+                    {pageSizeOptions.length > 1 && (
+                        <>
+                            <span className="text-gray-500 dark:text-gray-400"> Show </span>
+                            <Select
+                                defaultValue={'' + pageSize}
+                                options={pageSizeOptions.map((s) => { return { value: '' + s, label: '' + s } })}
+                                placeholder={null}
+                                onChange={(value) => setPageSize(Number(value))}
+
+                            />
+                            <span className="text-gray-500 dark:text-gray-400"> entries </span>
+                        </>
+                    )}
+
+                    {filterConfigs && filterConfigs.length > 0 && (
+                        <FilterPanel
+                            filters={filterConfigs}
+                            values={filterValues}
+                            onChange={(key, val) => setFilterValues((prev) => ({ ...prev, [key]: val }))}
+                        />
+                    )}
+
+                    {exportable && (
+                        <button
+                            onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:border-gray-800 dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+                        >
+                            Export <Ico.Download />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="max-w-full overflow-x-auto">
+                <Table>
+                    {/* Table Header */}
+                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+                        <TableRow>
+                            {/* {selectable && (
+                                <TableCell isHeader className="w-12 px-2">
+                                    <Checkbox
+                                        checked={allSelected}
+                                        onChange={toggleAll}
+                                    />
+                                </TableCell>
+                            )} */}
+                            {columns.map((col, idx) => (
+                                <TableCell
+                                    isHeader
+                                    key={col.key}
+                                    onClick={() => col.sortable && handleSort(col.key)}
+                                    className={`p-4 whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 ${alignClass(col.align)} ${col.sortable ? "cursor-pointer select-none" : ""}`}
+                                >
+                                    <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                        { selectable && idx === 0 
+                                            && (
+                                                <Checkbox
+                                                    className="!rounded-sm"
+                                                    checked={allSelected}
+                                                    onChange={toggleAll}
+                                                />
+                                            )
+                                        }
+                                        <p className="text-theme-xs">{col.label}</p>
+                                        {col.sortable && <SortIcon k={col.key} />}
+                                    </div>
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    </TableHeader>
+                    {/* Table Body */}
+                    <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                        { loading ? (
+                                <TableRow>
+                                    <TableCell className="px-5 py-4 sm:px-6 text-start">
+                                        <Spinner />
+                                    </TableCell>
+                                </TableRow>
+                        ) : visibleRows.length === 0 ? (
+                                <TableRow>
+                                    <TableCell className="px-5 py-4 sm:px-6 text-start">
+                                        <Spinner />
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                    visibleRows.map((row, rowIndex) => {
+                                        const id = getId(row);
+                                        const isSelected = selectedIds.has(id);
+                                        return (
+                                            <TableRow 
+                                                key={String(id)} 
+                                                onClick={() => onRowClick?.(row)}>
+                                                null
+                                            </TableRow>
+                                        )
+                                    })
+                            )
+                        }
+                    </TableBody> 
+                </Table>
+            </div>
+        </div>
+    )
+}

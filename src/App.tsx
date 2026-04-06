@@ -21,6 +21,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Order from "./pages/Jaonaichan/Order";
+import { CustomersPage, OrdersPage } from "./components/tables/DataTable/DataTableExample";
 
 export default function App() {
   return (
@@ -45,6 +46,8 @@ export default function App() {
 
             {/* Tables */}
             <Route path="/basic-tables" element={<ProtectedRoute><BasicTables /></ProtectedRoute>} />
+            <Route path="/customers-tables-ex" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
+            <Route path="/orders-tables-ex" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
 
             {/* Ui Elements */}
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
