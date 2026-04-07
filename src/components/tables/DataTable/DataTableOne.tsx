@@ -520,15 +520,7 @@ export default function DataTableOne<T extends object>({
                 <Table>
                     {/* Table Header */}
                     <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                        <TableRow>
-                            {/* {selectable && (
-                                <TableCell isHeader className="w-12 px-2">
-                                    <Checkbox
-                                        checked={allSelected}
-                                        onChange={toggleAll}
-                                    />
-                                </TableCell>
-                            )} */}
+                        <TableRow >
                             {columns.map((col, idx) => (
                                 <TableCell
                                     isHeader
@@ -543,6 +535,7 @@ export default function DataTableOne<T extends object>({
                                                     className="!rounded-sm"
                                                     checked={allSelected}
                                                     onChange={toggleAll}
+                                                    onClick={(e) => e.stopPropagation()}
                                                 />
                                             )
                                         }
@@ -574,8 +567,35 @@ export default function DataTableOne<T extends object>({
                                         return (
                                             <TableRow 
                                                 key={String(id)} 
-                                                onClick={() => onRowClick?.(row)}>
-                                                null
+                                                onClick={() => onRowClick?.(row)}
+                                                className={`border-b border-stroke last:border-0 transition-colors dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                                            >
+                                                {columns.map((col, idx) => {
+                                                    const val = getNestedValue(row, col.key);
+                                                    return ( 
+                                                        <TableCell 
+                                                            key={col.key} 
+                                                            className={`p-4 text-sm ${alignClass(col.align)}`}
+                                                        >
+                                                            <div className="group flex items-center gap-3">
+                                                                { selectable && idx === 0 
+                                                                    && (
+                                                                        <Checkbox
+                                                                            className="!rounded-sm"
+                                                                            checked={isSelected}
+                                                                            onChange={() => toggleRow(id)}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        />
+                                                                    )
+                                                                }
+                                                                { col.render
+                                                                    ? col.render(val, row, rowIndex)
+                                                                    : <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">{String(val ?? "—")}</span>
+                                                                }
+                                                            </div>
+                                                        </TableCell>
+                                                    );
+                                                })}
                                             </TableRow>
                                         )
                                     })

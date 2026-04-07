@@ -5,9 +5,10 @@ import PageMeta from "../../components/common/PageMeta";
 import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataTableOne";
 import { OrdersResponse, Order as OrderIF } from "../../interfaces/order.jaonaichan"
 import { apiRequest } from '../../api/client';
+import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 
 
-type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded";
+type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded" | "failed" | "checkout-draft" | "waiting-transfer";
 
 interface WCOrder {
   id: number;
@@ -19,31 +20,39 @@ interface WCOrder {
   payment_method_title: string;
 }
 
-const STATUS_STYLE: Record<OrderStatus, string> = {
-  pending: "bg-warning/10 text-warning",
-  processing: "bg-primary/10 text-primary",
-  "on-hold": "bg-meta-6/10 text-meta-6",
-  completed: "bg-success/10 text-success",
-  cancelled: "bg-danger/10 text-danger",
-  refunded: "bg-stroke text-body",
+interface OrderStatusDetails {
+  color: BadgeColor;
+  text: string;
+}
+
+const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, OrderStatusDetails> = {
+  "pending": { color: "primary", text: "Pending payment" },
+  "processing": { color: "warning", text: "Processing" },
+  "on-hold": { color: "dark", text: "On hold" },
+  "completed": { color: "success", text: "Completed" },
+  "cancelled": { color: "light", text: "Cancelled" },
+  "refunded": { color: "light", text: "Refunded" },
+  "failed": { color: "error", text: "Failed" },
+  "checkout-draft": { color: "light", text: "Draft" },
+  "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
 };
 
 const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
   {
-    key: "number",
+    key: "id",
     label: "Order #",
     sortable: true,
     width: "110px",
-    render: (val) => <span className="font-medium text-black dark:text-white">#{val as string}</span>,
+    render: (val) => <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">#{val as string}</span>,
   },
   {
-    key: "date_created",
+    key: "date",
     label: "Date",
     sortable: true,
     width: "130px",
     render: (val) => (
-      <span className="text-body dark:text-bodydark">
-        {new Date(val as string).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
+        {new Date(val as string).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" })}
       </span>
     ),
   },
@@ -67,9 +76,9 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     render: (val) => {
       const s = val as OrderStatus;
       return (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLE[s]}`}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />{s}
-        </span>
+        <Badge variant="light" color={(STATUS_DETAILS_AND_STYLE[s].color as BadgeColor)}>
+          { STATUS_DETAILS_AND_STYLE[s].text }
+        </Badge>
       );
     },
   },
@@ -82,7 +91,7 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     key: "total",
     label: "Total",
     sortable: true,
-    align: "right",
+    align: "left",
     render: (val) => (
       <span className="font-semibold text-black dark:text-white">
         ฿{Number(val).toLocaleString()}

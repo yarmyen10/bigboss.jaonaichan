@@ -7,6 +7,7 @@ interface CheckboxProps {
   id?: string;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
 }
 
 const Checkbox: React.FC<CheckboxProps> = ({
@@ -16,6 +17,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
   onChange,
   className = "",
   disabled = false,
+  onClick,
 }) => {
   return (
     <label
@@ -32,6 +34,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
           disabled={disabled}
+          onClick={onClick}
         />
         {checked && (
           <svg

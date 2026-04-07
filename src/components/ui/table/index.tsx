@@ -23,7 +23,7 @@ interface TableRowProps {
   children: ReactNode; // Cells (th or td)
   className?: string; // Optional className for styling
   key?: any;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
 }
 
 // Props for TableCell
@@ -32,7 +32,7 @@ interface TableCellProps {
   isHeader?: boolean; // If true, renders as <th>, otherwise <td>
   className?: string; // Optional className for styling
   key?: string;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
 }
 
 // Table Component
