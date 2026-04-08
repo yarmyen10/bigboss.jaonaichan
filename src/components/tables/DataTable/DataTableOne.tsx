@@ -12,6 +12,7 @@ import { SearchOneIcon, FileIcon } from "../../../icons";
 import Select from "../../form/Select";
 import Checkbox from "../../form/input/Checkbox";
 import Button from "../../ui/button/Button";
+import ComponentCard from "../../common/ComponentCard";
 
 export type SortDir = "asc" | "desc";
 
@@ -448,9 +449,9 @@ export default function DataTableOne<T extends object>({
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
 
     return (
-        <>
+        <ComponentCard title={title} desc={subtitle} classNameBody={`sm:!p-0`}>
             {/* Header */}
-            {(title || headerActions) && (
+            {/* {(title || headerActions) && (
                 <div className="flex items-start justify-between px-6 py-5">
                     {title && (
                         <div>
@@ -460,10 +461,10 @@ export default function DataTableOne<T extends object>({
                     )}
                     {headerActions && <div className="flex items-center gap-3">{headerActions}</div>}
                 </div>
-            )}
+            )} */}
 
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-3 border-b border-t border-stroke px-6 py-3.5 dark:border-gray-800">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 !mb-0">
                 {/* Search */}
                 <div className="flex flex-1 items-center gap-2">
                     {searchable && (
@@ -476,7 +477,7 @@ export default function DataTableOne<T extends object>({
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={searchPlaceholder}
-                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-100 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                             />
                         </div>
                     )}
@@ -613,6 +614,6 @@ export default function DataTableOne<T extends object>({
                     </TableBody> 
                 </Table>
             </div>
-        </>
+        </ComponentCard>
     )
 }

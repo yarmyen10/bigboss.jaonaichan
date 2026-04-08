@@ -51,7 +51,7 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     sortable: true,
     width: "130px",
     render: (val) => (
-      <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
+      <span className="text-sm font-light text-gray-700 dark:text-gray-400">
         {new Date(val as string).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" })}
       </span>
     ),
@@ -65,7 +65,7 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
         <p className="text-sm font-medium text-black dark:text-white">
           {row.customer.name}
         </p>
-        <p className="text-xs text-body dark:text-gray-500">{row.customer.email}</p>
+        <p className="text-xs text-body text-gray-400 dark:text-gray-500">{row.customer.email}</p>
       </div>
     ),
   },
@@ -73,6 +73,7 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     key: "status",
     label: "Status",
     sortable: true,
+    // width: "150px",
     render: (val) => {
       const s = val as OrderStatus;
       return (

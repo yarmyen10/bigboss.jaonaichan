@@ -37,7 +37,7 @@ interface TableCellProps {
 }
 
 // Table Component
-const Table: React.FC<TableProps> = ({ children, className }) => {
+const Table: React.FC<TableProps> = ({ children, className = "" }) => {
   return <table className={`min-w-full  ${className}`}>{children}</table>;
 };
 

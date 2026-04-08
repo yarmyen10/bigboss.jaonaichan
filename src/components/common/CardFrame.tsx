@@ -18,7 +18,7 @@ export default function CardFrame({ children, isLoading }: Props) {
                                 src="/images/stickers/Hungry Cat Food Sticker by Lord Tofu Animation.gif"
                                 alt="Loading..."
                             />
-                            <p >Loading...</p>
+                            {/* <p >Loading...</p> */}
                         </div>
                     </div>
                     // <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-10 xl:py-12 animate-pulse">
