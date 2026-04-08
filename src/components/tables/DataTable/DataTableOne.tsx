@@ -8,9 +8,10 @@ import {
 } from "../../ui/table";
 import Badge from "../../ui/badge/Badge";
 import Input from "../../form/input/InputField";
-import { SearchOneIcon } from "../../../icons";
+import { SearchOneIcon, FileIcon } from "../../../icons";
 import Select from "../../form/Select";
 import Checkbox from "../../form/input/Checkbox";
+import Button from "../../ui/button/Button";
 
 export type SortDir = "asc" | "desc";
 
@@ -447,7 +448,7 @@ export default function DataTableOne<T extends object>({
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
 
     return (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+        <>
             {/* Header */}
             {(title || headerActions) && (
                 <div className="flex items-start justify-between px-6 py-5">
@@ -506,12 +507,19 @@ export default function DataTableOne<T extends object>({
                     )}
 
                     {exportable && (
-                        <button
-                            onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:border-gray-800 dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            startIcon={<FileIcon className="size-5" />}
                         >
-                            Export <Ico.Download />
-                        </button>
+                            Export
+                        </Button>
+                        // <button
+                        //     onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
+                        //     className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:border-gray-800 dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+                        // >
+                        //     Export <Ico.Download />
+                        // </button>
                     )}
                 </div>
             </div>
@@ -526,6 +534,7 @@ export default function DataTableOne<T extends object>({
                                     isHeader
                                     key={col.key}
                                     onClick={() => col.sortable && handleSort(col.key)}
+                                    style={{ width: col.width }}
                                     className={`p-4 whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 ${alignClass(col.align)} ${col.sortable ? "cursor-pointer select-none" : ""}`}
                                 >
                                     <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
@@ -604,6 +613,6 @@ export default function DataTableOne<T extends object>({
                     </TableBody> 
                 </Table>
             </div>
-        </div>
+        </>
     )
 }

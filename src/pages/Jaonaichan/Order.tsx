@@ -10,15 +10,15 @@ import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 
 type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded" | "failed" | "checkout-draft" | "waiting-transfer";
 
-interface WCOrder {
-  id: number;
-  number: string;
-  status: OrderStatus;
-  date_created: string;
-  billing: { first_name: string; last_name: string; email: string };
-  total: string;
-  payment_method_title: string;
-}
+// interface WCOrder {
+//   id: number;
+//   number: string;
+//   status: OrderStatus;
+//   date_created: string;
+//   billing: { first_name: string; last_name: string; email: string };
+//   total: string;
+//   payment_method_title: string;
+// }
 
 interface OrderStatusDetails {
   color: BadgeColor;
@@ -42,7 +42,7 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     key: "id",
     label: "Order #",
     sortable: true,
-    width: "110px",
+    width: "80px",
     render: (val) => <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">#{val as string}</span>,
   },
   {
@@ -57,17 +57,17 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     ),
   },
   {
-    key: "billing",
+    key: "customer",
     label: "Customer",
     noExport: true,
-    // render: (_, row) => (
-    //   <div>
-    //     <p className="text-sm font-medium text-black dark:text-white">
-    //       {row.billing.first_name} {row.billing.last_name}
-    //     </p>
-    //     <p className="text-xs text-body dark:text-bodydark">{row.billing.email}</p>
-    //   </div>
-    // ),
+    render: (_, row) => (
+      <div>
+        <p className="text-sm font-medium text-black dark:text-white">
+          {row.customer.name}
+        </p>
+        <p className="text-xs text-body dark:text-gray-500">{row.customer.email}</p>
+      </div>
+    ),
   },
   {
     key: "status",

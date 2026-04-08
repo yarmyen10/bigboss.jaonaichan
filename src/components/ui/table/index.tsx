@@ -30,6 +30,7 @@ interface TableRowProps {
 interface TableCellProps {
   children: ReactNode; // Cell content
   isHeader?: boolean; // If true, renders as <th>, otherwise <td>
+  style?: React.CSSProperties; // Optional style for styling
   className?: string; // Optional className for styling
   key?: string;
   onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
@@ -59,6 +60,7 @@ const TableRow: React.FC<TableRowProps> = ({ children, className, key }) => {
 const TableCell: React.FC<TableCellProps> = ({
   children,
   isHeader = false,
+  style,
   className,
   key,
   onClick,
@@ -66,6 +68,7 @@ const TableCell: React.FC<TableCellProps> = ({
   const CellTag = isHeader ? "th" : "td";
   return <CellTag 
     key={`${key}`} 
+    style={style}
     className={`${className}`}
     onClick={onClick}
   >
