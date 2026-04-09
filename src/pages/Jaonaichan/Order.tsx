@@ -134,7 +134,7 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
       }
 
       return (
-        <div className="relative">
+        <div className="absolute">
           <button className="dropdown-toggle" onClick={toggleDropdown}>
             <MoreDotIcon className="rotate-90 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 size-6" />
           </button>
