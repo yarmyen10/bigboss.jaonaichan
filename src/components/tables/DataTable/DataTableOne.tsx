@@ -27,6 +27,7 @@ export interface ColumnDef<T> {
     render?: (value: unknown, row: T, index: number) => ReactNode;
     /** ซ่อน column นี้ใน CSV */
     noExport?: boolean;
+    classNameTableCell?: string;
 }
 
 export interface FilterOption {
@@ -585,7 +586,7 @@ export default function DataTableOne<T extends object>({
                                                     return ( 
                                                         <TableCell 
                                                             key={col.key} 
-                                                            className={`p-4 text-sm ${alignClass(col.align)}`}
+                                                            className={`p-4 text-sm ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
                                                         >
                                                             <div className="group flex items-center gap-3">
                                                                 { selectable && idx === 0 

@@ -6,10 +6,14 @@ import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataT
 import { OrdersResponse, Order as OrderIF } from "../../interfaces/order.jaonaichan"
 import { apiRequest } from '../../api/client';
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
+import { PromptPayLogo, MoreDotIcon } from "../../icons";
+import { Dropdown } from "../../components/ui/dropdown/Dropdown";
+import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
+
 
 
 type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded" | "failed" | "checkout-draft" | "waiting-transfer";
-
+type PaymentMethod = "promptpay_qr" | "bank_transfer" | "cod";
 // interface WCOrder {
 //   id: number;
 //   number: string;
@@ -20,12 +24,13 @@ type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancell
 //   payment_method_title: string;
 // }
 
-interface OrderStatusDetails {
+interface Details {
   color: BadgeColor;
   text: string;
+  icon?: React.ReactNode;
 }
 
-const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, OrderStatusDetails> = {
+const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
   "pending": { color: "primary", text: "Pending payment" },
   "processing": { color: "warning", text: "Processing" },
   "on-hold": { color: "dark", text: "On hold" },
@@ -35,6 +40,12 @@ const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, OrderStatusDetails> = {
   "failed": { color: "error", text: "Failed" },
   "checkout-draft": { color: "light", text: "Draft" },
   "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
+};
+
+const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
+  "promptpay_qr": { color: "primary", text: "PromptPay QR", icon: <PromptPayLogo className="size-15" /> },
+  "bank_transfer": { color: "info", text: "Bank Transfer" },
+  "cod": { color: "light", text: "Cash on Delivery" },
 };
 
 const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
@@ -77,16 +88,25 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
     render: (val) => {
       const s = val as OrderStatus;
       return (
-        <Badge variant="light" color={(STATUS_DETAILS_AND_STYLE[s].color as BadgeColor)}>
-          { STATUS_DETAILS_AND_STYLE[s].text }
+        <Badge variant="light" color={((STATUS_DETAILS_AND_STYLE[s]?.color ?? 'light') as BadgeColor)}>
+          { STATUS_DETAILS_AND_STYLE[s]?.text ?? s }
         </Badge>
       );
     },
   },
   {
-    key: "payment_method_title",
-    label: "Payment",
-    render: (val) => <span className="text-body dark:text-bodydark">{val as string}</span>,
+    key: "payment_method",
+    label: "Payment Method",
+    classNameTableCell: "py-0",
+    render: (val) => {
+      const pm = val as PaymentMethod;
+      return (
+        <span title={PAYMENT_METHOD_DETAILS[pm]?.text ?? pm}>{PAYMENT_METHOD_DETAILS[pm]?.icon ?? pm}</span>
+        // <Badge variant="light" color={((PAYMENT_METHOD_DETAILS[pm]?.color ?? 'light') as BadgeColor)}>
+        //   { PAYMENT_METHOD_DETAILS[pm]?.text ?? pm }
+        // </Badge>
+      );
+    },
   },
   {
     key: "total",
@@ -99,7 +119,50 @@ const ORDER_COLUMNS: ColumnDef<OrderIF>[] = [
       </span>
     ),
   },
+  {
+    key: "action",
+    label: "",
+    render: (val) => {
+      const[isOpen, setIsOpen] = useState(false);
+
+      function toggleDropdown() {
+        setIsOpen(!isOpen);
+      }
+
+      function closeDropdown() {
+        setIsOpen(false);
+      }
+
+      return (
+        <div className="relative">
+          <button className="dropdown-toggle" onClick={toggleDropdown}>
+            <MoreDotIcon className="rotate-90 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 size-6" />
+          </button>
+          <Dropdown
+            isOpen={isOpen}
+            onClose={closeDropdown}
+            className="w-40 p-2"
+          >
+            <DropdownItem
+              onItemClick={closeDropdown}
+              className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+            >
+              View More
+            </DropdownItem>
+            <DropdownItem
+              onItemClick={closeDropdown}
+              className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+            >
+              Delete
+            </DropdownItem>
+          </Dropdown>
+        </div>
+      );
+    },
+  },
 ]
+
+
 
 export default function Order() {
   const [isLoading, setIsLoading] = useState(false);

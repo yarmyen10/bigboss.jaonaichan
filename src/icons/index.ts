@@ -57,6 +57,8 @@ import { ReactComponent as ErrorHexaIcon } from "./info-hexa.svg?react";
 import { ReactComponent as CatIcon } from "./cat-svgrepo-com.svg?react";
 import { ReactComponent as SearchAltIcon } from "./search-alt.svg?react";
 import { ReactComponent as SearchOneIcon } from "./search-one.svg?react";
+import { ReactComponent as ThaiQRLogo } from "./Thai_QR_Logo.svg?react";
+import { ReactComponent as PromptPayLogo } from "./prompt-pay-logo.svg?react";
 
 export {
   ErrorHexaIcon,
@@ -118,4 +120,6 @@ export {
   CatIcon,
   SearchAltIcon,
   SearchOneIcon,
+  ThaiQRLogo,
+  PromptPayLogo,
 };
