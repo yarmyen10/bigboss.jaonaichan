@@ -6,13 +6,12 @@ import {
     TableHeader,
     TableRow,
 } from "../../ui/table";
-import Badge from "../../ui/badge/Badge";
 import Input from "../../form/input/InputField";
 import { SearchOneIcon, FileIcon } from "../../../icons";
 import Select from "../../form/Select";
 import Checkbox from "../../form/input/Checkbox";
 import Button from "../../ui/button/Button";
-import ComponentCard from "../../common/ComponentCard";
+import ComponentTableCard from "../../common/ComponentTableCard";
 
 export type SortDir = "asc" | "desc";
 
@@ -102,7 +101,12 @@ function exportCsv<T extends object>(cols: ColumnDef<T>[], rows: T[], filename: 
 function Spinner() {
     return (
         <div className="flex items-center justify-center py-20">
-            <div className="h-9 w-9 animate-spin rounded-full border-4 border-stroke border-t-primary" />
+            {/* <div className="h-9 w-9 animate-spin rounded-full border-4 border-stroke border-t-primary" /> */}
+            <img
+                className="h-[8%] w-[8%] object-contain"
+                src="/images/stickers/Shocked Cat Sticker.gif"
+                alt="Loading..."
+            />
         </div>
     );
 }
@@ -189,7 +193,7 @@ function FilterPanel({
             </button>
 
             {open && (
-                <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white p-4 shadow-md dark:border-strokedark dark:bg-boxdark">
+                <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white mt-2 p-4 shadow-md dark:border-strokedark dark:bg-boxdark">
                     {filters.map((f) => (
                         <div key={f.paramKey} className="mb-4 last:mb-0">
                             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-body dark:text-bodydark">
@@ -243,6 +247,7 @@ export interface DataTableProps<T extends object> {
 
     // ── Toolbar ───────────────────────────────────────────────────────────────
     searchable?: boolean;
+    searchablePosition?: "toolbar" | "header";
     searchPlaceholder?: string;
     filters?: FilterConfig[];
     exportable?: boolean;
@@ -321,6 +326,7 @@ export default function DataTableOne<T extends object>({
     headerActions,
     bulkActions,
     searchable = true,
+    searchablePosition = "toolbar",
     searchPlaceholder = "Search...",
     filters: filterConfigs,
     exportable = true,
@@ -416,7 +422,7 @@ export default function DataTableOne<T extends object>({
                 : visibleRows.forEach((r) => next.add(getId(r)));
             return next;
         });
-    
+
     const toggleRow = (id: unknown) =>
         setSelectedIds((prev) => {
             const next = new Set(prev);
@@ -450,7 +456,70 @@ export default function DataTableOne<T extends object>({
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
 
     return (
-        <ComponentCard title={title} desc={subtitle} classNameBody={`sm:!p-0`}>
+        <ComponentTableCard
+            title={title}
+            desc={subtitle}
+            classNameBody={`sm:!p-0`}
+            divider={(
+                <div className="flex items-center gap-3 px-6 py-5">
+                    {searchable && searchablePosition === 'header' && (
+                        <div className="relative max-w-xs flex-1">
+                            <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                                <SearchOneIcon />
+                            </span>
+                            <Input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={searchPlaceholder}
+                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-100 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                            />
+                        </div>
+                    )}
+                    <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                        <svg
+                            className="stroke-current fill-white dark:fill-gray-800"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M2.29004 5.90393H17.7067"
+                                stroke=""
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <path
+                                d="M17.7075 14.0961H2.29085"
+                                stroke=""
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <path
+                                d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z"
+                                fill=""
+                                stroke=""
+                                strokeWidth="1.5"
+                            />
+                            <path
+                                d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z"
+                                fill=""
+                                stroke=""
+                                strokeWidth="1.5"
+                            />
+                        </svg>
+                        Filter
+                    </button>
+                    <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                        See all
+                    </button>
+                </div>
+            )}
+        >
             {/* Header */}
             {/* {(title || headerActions) && (
                 <div className="flex items-start justify-between px-6 py-5">
@@ -466,9 +535,11 @@ export default function DataTableOne<T extends object>({
 
             {/* Toolbar */}
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 !mb-0">
-                {/* Search */}
+
+                {/* Right controls */}
                 <div className="flex flex-1 items-center gap-2">
-                    {searchable && (
+                    {/* Search */}
+                    {searchable && searchablePosition === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
                             <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                                 <SearchOneIcon />
@@ -482,6 +553,7 @@ export default function DataTableOne<T extends object>({
                             />
                         </div>
                     )}
+                    {/* Tab */}
                 </div>
 
                 {/* Right controls */}
@@ -513,6 +585,8 @@ export default function DataTableOne<T extends object>({
                             size="sm"
                             variant="outline"
                             startIcon={<FileIcon className="size-5" />}
+                            onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
+                            className="relative"
                         >
                             Export
                         </Button>
@@ -540,7 +614,7 @@ export default function DataTableOne<T extends object>({
                                     className={`p-4 whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 ${alignClass(col.align)} ${col.sortable ? "cursor-pointer select-none" : ""}`}
                                 >
                                     <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                        { selectable && idx === 0 
+                                        {selectable && idx === 0
                                             && (
                                                 <Checkbox
                                                     className="!rounded-sm"
@@ -559,62 +633,62 @@ export default function DataTableOne<T extends object>({
                     </TableHeader>
                     {/* Table Body */}
                     <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                        { loading ? (
-                                <TableRow>
-                                    <TableCell className="px-5 py-4 sm:px-6 text-start">
-                                        <Spinner />
-                                    </TableCell>
-                                </TableRow>
+                        {loading ? (
+                            <TableRow>
+                                <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
+                                    <Spinner />
+                                </TableCell>
+                            </TableRow>
                         ) : visibleRows.length === 0 ? (
-                                <TableRow>
-                                    <TableCell className="px-5 py-4 sm:px-6 text-start">
-                                        <Spinner />
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                    visibleRows.map((row, rowIndex) => {
-                                        const id = getId(row);
-                                        const isSelected = selectedIds.has(id);
-                                        return (
-                                            <TableRow 
-                                                key={String(id)} 
-                                                onClick={() => onRowClick?.(row)}
-                                                className={`border-b border-stroke last:border-0 transition-colors dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
-                                            >
-                                                {columns.map((col, idx) => {
-                                                    const val = getNestedValue(row, col.key);
-                                                    return ( 
-                                                        <TableCell 
-                                                            key={col.key} 
-                                                            className={`p-4 text-sm ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
-                                                        >
-                                                            <div className="group flex items-center gap-3">
-                                                                { selectable && idx === 0 
-                                                                    && (
-                                                                        <Checkbox
-                                                                            className="!rounded-sm"
-                                                                            checked={isSelected}
-                                                                            onChange={() => toggleRow(id)}
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                        />
-                                                                    )
-                                                                }
-                                                                { col.render
-                                                                    ? col.render(val, row, rowIndex)
-                                                                    : <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">{String(val ?? "—")}</span>
-                                                                }
-                                                            </div>
-                                                        </TableCell>
-                                                    );
-                                                })}
-                                            </TableRow>
-                                        )
-                                    })
-                            )
+                            <TableRow>
+                                <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
+                                    <Spinner />
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            visibleRows.map((row, rowIndex) => {
+                                const id = getId(row);
+                                const isSelected = selectedIds.has(id);
+                                return (
+                                    <TableRow
+                                        key={String(id)}
+                                        onClick={() => onRowClick?.(row)}
+                                        className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                                    >
+                                        {columns.map((col, idx) => {
+                                            const val = getNestedValue(row, col.key);
+                                            return (
+                                                <TableCell
+                                                    key={col.key}
+                                                    className={`p-4 text-sm ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
+                                                >
+                                                    <div className="group flex items-center gap-3">
+                                                        {selectable && idx === 0
+                                                            && (
+                                                                <Checkbox
+                                                                    className="!rounded-sm"
+                                                                    checked={isSelected}
+                                                                    onChange={() => toggleRow(id)}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                            )
+                                                        }
+                                                        {col.render
+                                                            ? col.render(val, row, rowIndex)
+                                                            : <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">{String(val ?? "—")}</span>
+                                                        }
+                                                    </div>
+                                                </TableCell>
+                                            );
+                                        })}
+                                    </TableRow>
+                                )
+                            })
+                        )
                         }
-                    </TableBody> 
+                    </TableBody>
                 </Table>
             </div>
-        </ComponentCard>
+        </ComponentTableCard>
     )
 }

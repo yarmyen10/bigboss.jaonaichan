@@ -34,6 +34,7 @@ interface TableCellProps {
   className?: string; // Optional className for styling
   key?: string;
   onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+  colSpan?: number;
 }
 
 // Table Component
@@ -64,6 +65,7 @@ const TableCell: React.FC<TableCellProps> = ({
   className,
   key,
   onClick,
+  colSpan,
 }) => {
   const CellTag = isHeader ? "th" : "td";
   return <CellTag 
@@ -71,6 +73,7 @@ const TableCell: React.FC<TableCellProps> = ({
     style={style}
     className={`${className}`}
     onClick={onClick}
+    colSpan={colSpan}
   >
     {children}
   </CellTag>;
