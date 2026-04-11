@@ -7,11 +7,12 @@ import {
     TableRow,
 } from "../../ui/table";
 import Input from "../../form/input/InputField";
-import { SearchOneIcon, FileIcon } from "../../../icons";
+import { SearchOneIcon, FileIcon, AngleLeftIcon, AngleRightIcon } from "../../../icons";
 import Select from "../../form/Select";
 import Checkbox from "../../form/input/Checkbox";
 import Button from "../../ui/button/Button";
 import ComponentTableCard from "../../common/ComponentTableCard";
+import { TabDefault, TabOption } from "../../ui/tabs";
 
 export type SortDir = "asc" | "desc";
 
@@ -251,6 +252,7 @@ export interface DataTableProps<T extends object> {
     searchable?: LayoutPlan;
     searchPlaceholder?: string;
     filters?: FilterConfig[];
+    tabs?: TabOption[];
     exportable?: LayoutPlan;
     exportFilename?: string;
     pageSizeOptions?: number[];
@@ -329,6 +331,7 @@ export default function DataTableOne<T extends object>({
     searchable = "",
     searchPlaceholder = "Search...",
     filters: filterConfigs,
+    tabs = [],
     exportable = "",
     exportFilename = "export.csv",
     pageSizeOptions = [10, 25, 50],
@@ -546,7 +549,12 @@ export default function DataTableOne<T extends object>({
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 !mb-0">
 
                 {/* Right controls */}
-                <div className="flex flex-1 items-center gap-2">
+                <div className="flex flex-1 items-center gap-3">
+                    {tabs?.length && (
+                        <div className="relative max-w-xs flex-1">
+                            <TabDefault options={tabs} />
+                        </div>
+                    )}
                     {/* Search */}
                     {searchable === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
@@ -715,27 +723,53 @@ export default function DataTableOne<T extends object>({
                     )}
                 </p>
 
-                <div className="flex items-center gap-1">
-                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        startIcon={<AngleLeftIcon className="size-5" />}
+                        className="h-10 w-10 disabled:opacity-50"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1 || loading}
+                    >
+                        <></>
+                    </Button>
+                    {/* <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}
                         className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
                         <Ico.ChevLeft />
-                    </button>
+                    </button> */}
 
                     {pageButtons.map((p, i) =>
                         p === "..." ? (
                             <span key={`e${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-body">…</span>
                         ) : (
-                            <button key={p} onClick={() => setPage(p as number)}
-                                className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition ${page === p ? "border-primary bg-primary text-white" : "border-stroke text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"}`}>
+                            <Button
+                                key={p}
+                                variant={page === p ? 'primary' : 'outline'}
+                                className="flex h-10 w-10 text-gray-800 dark:text-white/90"
+                                onClick={() => setPage(p as number)}
+                            >
                                 {p}
-                            </button>
+                            </Button>
+                            // <button key={p} onClick={() => setPage(p as number)}
+                            //     className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition ${page === p ? "border-primary bg-primary text-white" : "border-stroke text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"}`}>
+                            //     {p}
+                            // </button>
                         )
                     )}
 
-                    <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}
+                    <Button
+                        variant="outline"
+                        endIcon={<AngleRightIcon className="size-5" />}
+                        className="h-10 w-10 disabled:opacity-50"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages || loading}
+                    >
+                        <></>
+                    </Button>
+                    {/* <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}
                         className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
                         <Ico.ChevRight />
-                    </button>
+                    </button> */}
                 </div>
             </div>
         </ComponentTableCard>

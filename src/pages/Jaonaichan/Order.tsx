@@ -6,10 +6,11 @@ import PageMeta from "../../components/common/PageMeta";
 import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataTableOne";
 import { OrdersResponse, Order as OrderIF } from "../../interfaces/order.jaonaichan"
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
-import { PromptPayLogo, MoreDotIcon } from "../../icons";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrders } from "../../services/jaonaichan";
+import { TabOption } from "../../components/ui/tabs";
+import { MoreDotIcon } from "../../icons";
 
 
 
@@ -48,7 +49,7 @@ const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
   "promptpay_qr": {
     color: "primary", 
     text: "PromptPay QR", 
-    icon: <img src="/images/order/prompt-pay-logo.jpg" className="h-10 object-cover"/> 
+    icon: <img src="/images/order/prompt-pay-logo.jpg" className="object-cover"/> 
   },
   "bank_transfer": { color: "info", text: "Bank Transfer" },
   "cod": { color: "light", text: "Cash on Delivery" },
@@ -107,7 +108,8 @@ const getOrderColumns = (
     {
       key: "payment_method",
       label: "Payment Method",
-      classNameTableCell: "py-0",
+      // classNameTableCell: "py-0",
+      width: "0",
       render: (val) => {
         const pm = val as PaymentMethod;
         return (
@@ -236,6 +238,11 @@ export default function Order() {
           rowKey="id"
           searchable="header"
           exportable="header"
+          tabs={[
+            { value: "all", label: "All Order" },
+            { value: "unpaid", label: "Unpaid" },
+            { value: "paid", label: "Paid" },
+          ] as TabOption[]}
           // filters={[{
           //   label: "Stock Status",
           //   paramKey: "stock_status",
