@@ -22,8 +22,7 @@ interface TableBodyProps {
 interface TableRowProps {
   children: ReactNode; // Cells (th or td)
   className?: string; // Optional className for styling
-  key?: any;
-  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+  onClick?: (e: React.MouseEvent<HTMLTableCellElement>) => void;
 }
 
 // Props for TableCell
@@ -32,8 +31,7 @@ interface TableCellProps {
   isHeader?: boolean; // If true, renders as <th>, otherwise <td>
   style?: React.CSSProperties; // Optional style for styling
   className?: string; // Optional className for styling
-  key?: string;
-  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+  onClick?: (e: React.MouseEvent<HTMLTableCellElement>) => void;
   colSpan?: number;
 }
 
@@ -53,8 +51,8 @@ const TableBody: React.FC<TableBodyProps> = ({ children, className }) => {
 };
 
 // TableRow Component
-const TableRow: React.FC<TableRowProps> = ({ children, className, key }) => {
-  return <tr key={key} className={className}>{children}</tr>;
+const TableRow: React.FC<TableRowProps> = ({ children, className }) => {
+  return <tr className={className}>{children}</tr>;
 };
 
 // TableCell Component
@@ -63,13 +61,11 @@ const TableCell: React.FC<TableCellProps> = ({
   isHeader = false,
   style,
   className,
-  key,
   onClick,
   colSpan,
 }) => {
   const CellTag = isHeader ? "th" : "td";
   return <CellTag 
-    key={`${key}`} 
     style={style}
     className={`${className}`}
     onClick={onClick}

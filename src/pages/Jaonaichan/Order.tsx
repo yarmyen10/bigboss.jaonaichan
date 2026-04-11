@@ -45,7 +45,11 @@ const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
 };
 
 const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
-  "promptpay_qr": { color: "primary", text: "PromptPay QR", icon: <PromptPayLogo className="size-15" /> },
+  "promptpay_qr": {
+    color: "primary", 
+    text: "PromptPay QR", 
+    icon: <img src="/images/order/prompt-pay-logo.jpg" className="h-10 object-cover"/> 
+  },
   "bank_transfer": { color: "info", text: "Bank Transfer" },
   "cod": { color: "light", text: "Cash on Delivery" },
 };
@@ -128,7 +132,8 @@ const getOrderColumns = (
     {
       key: "action",
       label: "",
-      render: (val, row) => {
+      width: "80px",
+      render: (_val, row) => {
         const isOpen = openDropdownId === String(row.id);
         const btnRect = buttonRefs.current[row.id]?.getBoundingClientRect();
         return (
@@ -144,7 +149,7 @@ const getOrderColumns = (
               <div
                 style={{
                   position: 'fixed',
-                  top: btnRect.bottom + 4,
+                  top: btnRect.bottom,
                   left: btnRect.right,
                   zIndex: 9999,
                 }}
@@ -229,7 +234,8 @@ export default function Order() {
           columns={columns}
           data={orders}
           rowKey="id"
-          searchablePosition="header"
+          searchable="header"
+          exportable="header"
           // filters={[{
           //   label: "Stock Status",
           //   paramKey: "stock_status",

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
     Table,
     TableBody,
@@ -14,6 +14,8 @@ import Button from "../../ui/button/Button";
 import ComponentTableCard from "../../common/ComponentTableCard";
 
 export type SortDir = "asc" | "desc";
+
+export type LayoutPlan = "toolbar" | "header" | unknown;
 
 export interface ColumnDef<T> {
     /** dot-notation path เช่น "billing.first_name" หรือ field ตรงๆ */
@@ -237,7 +239,7 @@ export interface DataTableProps<T extends object> {
     fetchFn?: (params: FetchParams) => Promise<FetchResult<T>>;
     rowKey: keyof T;
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    // ── Header or LayoutPlan ────────────────────────────────────────────────────────────────
     title?: string;
     subtitle?: string;
     /** Buttons ฝั่งขวา header (Add Product ฯลฯ) */
@@ -245,12 +247,11 @@ export interface DataTableProps<T extends object> {
     /** แสดงเมื่อมี row ถูก select */
     bulkActions?: (selectedRows: T[]) => ReactNode;
 
-    // ── Toolbar ───────────────────────────────────────────────────────────────
-    searchable?: boolean;
-    searchablePosition?: "toolbar" | "header";
+    // ── Toolbar or LayoutPlan ───────────────────────────────────────────────────────────────
+    searchable?: LayoutPlan;
     searchPlaceholder?: string;
     filters?: FilterConfig[];
-    exportable?: boolean;
+    exportable?: LayoutPlan;
     exportFilename?: string;
     pageSizeOptions?: number[];
     defaultPageSize?: number;
@@ -325,11 +326,10 @@ export default function DataTableOne<T extends object>({
     subtitle,
     headerActions,
     bulkActions,
-    searchable = true,
-    searchablePosition = "toolbar",
+    searchable = "",
     searchPlaceholder = "Search...",
     filters: filterConfigs,
-    exportable = true,
+    exportable = "",
     exportFilename = "export.csv",
     pageSizeOptions = [10, 25, 50],
     defaultPageSize = 10,
@@ -455,6 +455,7 @@ export default function DataTableOne<T extends object>({
 
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
 
+    // ─── Render ────────────────────────────────────────────────────────────────
     return (
         <ComponentTableCard
             title={title}
@@ -462,7 +463,7 @@ export default function DataTableOne<T extends object>({
             classNameBody={`sm:!p-0`}
             divider={(
                 <div className="flex items-center gap-3 px-6 py-5">
-                    {searchable && searchablePosition === 'header' && (
+                    {searchable === 'header' && (
                         <div className="relative max-w-xs flex-1">
                             <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                                 <SearchOneIcon />
@@ -514,9 +515,17 @@ export default function DataTableOne<T extends object>({
                         </svg>
                         Filter
                     </button>
-                    <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-                        See all
-                    </button>
+                    {exportable === "header" && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            startIcon={<FileIcon className="size-5" />}
+                            onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
+                            className="relative"
+                        >
+                            Export
+                        </Button>
+                    )}
                 </div>
             )}
         >
@@ -539,7 +548,7 @@ export default function DataTableOne<T extends object>({
                 {/* Right controls */}
                 <div className="flex flex-1 items-center gap-2">
                     {/* Search */}
-                    {searchable && searchablePosition === 'toolbar' && (
+                    {searchable === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
                             <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                                 <SearchOneIcon />
@@ -580,7 +589,7 @@ export default function DataTableOne<T extends object>({
                         />
                     )}
 
-                    {exportable && (
+                    {exportable === "toolbar" && (
                         <Button
                             size="sm"
                             variant="outline"
@@ -600,7 +609,8 @@ export default function DataTableOne<T extends object>({
                 </div>
             </div>
 
-            <div className="max-w-full overflow-x-auto">
+            {/* Table */}
+            <div className="max-w-full overflow-x-auto mb-0">
                 <Table>
                     {/* Table Header */}
                     <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
@@ -688,6 +698,45 @@ export default function DataTableOne<T extends object>({
                         }
                     </TableBody>
                 </Table>
+            </div>
+
+            {/* Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
+                <p className="text-sm text-body dark:text-bodydark">
+                    {total === 0 ? "No records" : (
+                        <span className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+                            Showing{" "}
+                            <span className="text-gray-800 dark:text-white/90">{startRow}</span>
+                            {" "}to{" "}
+                            <span className="text-gray-800 dark:text-white/90">{endRow}</span>
+                            {" "}of{" "}
+                            <span className="text-gray-800 dark:text-white/90">{total}</span>
+                        </span>
+                    )}
+                </p>
+
+                <div className="flex items-center gap-1">
+                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
+                        <Ico.ChevLeft />
+                    </button>
+
+                    {pageButtons.map((p, i) =>
+                        p === "..." ? (
+                            <span key={`e${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-body">…</span>
+                        ) : (
+                            <button key={p} onClick={() => setPage(p as number)}
+                                className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition ${page === p ? "border-primary bg-primary text-white" : "border-stroke text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"}`}>
+                                {p}
+                            </button>
+                        )
+                    )}
+
+                    <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
+                        <Ico.ChevRight />
+                    </button>
+                </div>
             </div>
         </ComponentTableCard>
     )
