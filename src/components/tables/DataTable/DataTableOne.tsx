@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
     Table,
     TableBody,
@@ -9,10 +9,10 @@ import {
 import Input from "../../form/input/InputField";
 import { SearchOneIcon, FileIcon, AngleLeftIcon, AngleRightIcon } from "../../../icons";
 import Select from "../../form/Select";
-import Checkbox from "../../form/input/Checkbox";
 import Button from "../../ui/button/Button";
 import ComponentTableCard from "../../common/ComponentTableCard";
 import { TabDefault, TabOption } from "../../ui/tabs";
+import CheckboxCustom from "../../form/input/CheckboxCustom";
 
 export type SortDir = "asc" | "desc";
 
@@ -110,48 +110,6 @@ function Spinner() {
                 src="/images/stickers/Shocked Cat Sticker.gif"
                 alt="Loading..."
             />
-        </div>
-    );
-}
-
-function ActionDropdown<T extends object>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const fn = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-        };
-        document.addEventListener("mousedown", fn);
-        return () => document.removeEventListener("mousedown", fn);
-    }, []);
-
-    return (
-        <div ref={ref} className="relative flex justify-end">
-            <button
-                onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-body transition hover:bg-stroke hover:text-black dark:hover:bg-strokedark dark:hover:text-white"
-            >
-                <Ico.Dots />
-            </button>
-
-            {open && (
-                <div className="absolute right-0 top-9 z-50 min-w-[150px] rounded-md border border-stroke bg-white py-1 shadow-md dark:border-strokedark dark:bg-boxdark">
-                    {actions.map((action, i) => (
-                        <button
-                            key={i}
-                            onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick(row); }}
-                            className={`flex w-full items-center gap-2.5 px-4 py-2 text-sm transition ${action.variant === "danger"
-                                ? "text-danger hover:bg-danger/5"
-                                : "text-black hover:bg-gray-1 dark:text-white dark:hover:bg-meta-4"
-                                }`}
-                        >
-                            {action.icon}
-                            {action.label}
-                        </button>
-                    ))}
-                </div>
-            )}
         </div>
     );
 }
@@ -260,6 +218,7 @@ export interface DataTableProps<T extends object> {
 
     // ── Rows ──────────────────────────────────────────────────────────────────
     selectable?: boolean;
+    onSelectableChange?: (selectedRows: T[]) => void;
     rowActions?: RowAction<T>[];
     onRowClick?: (row: T) => void;
 
@@ -337,6 +296,7 @@ export default function DataTableOne<T extends object>({
     pageSizeOptions = [10, 25, 50],
     defaultPageSize = 10,
     selectable = true,
+    onSelectableChange,
     rowActions = [],
     onRowClick,
     loading: loadingProp,
@@ -362,8 +322,6 @@ export default function DataTableOne<T extends object>({
 
     const [selectedIds, setSelectedIds] = useState<Set<unknown>>(new Set());
     const [filterValues, setFilterValues] = useState<Record<string, string>>({});
-
-    const abortRef = useRef<AbortController | null>(null);
     const loading = loadingProp ?? asyncLoading;
 
     // ── Client-side data ───────────────────────────────────────────────────────
@@ -550,11 +508,6 @@ export default function DataTableOne<T extends object>({
 
                 {/* Right controls */}
                 <div className="flex flex-1 items-center gap-3">
-                    {tabs?.length && (
-                        <div className="relative max-w-xs flex-1">
-                            <TabDefault options={tabs} />
-                        </div>
-                    )}
                     {/* Search */}
                     {searchable === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
@@ -571,6 +524,18 @@ export default function DataTableOne<T extends object>({
                         </div>
                     )}
                     {/* Tab */}
+                    {tabs?.length && (
+                        <div className="relative max-w-3xs flex-1">
+                            <TabDefault options={tabs} />
+                        </div>
+                    )}
+                    {/* Selected */}
+                    {selectedIds.size > 0 && (
+                        <div className="flex items-center gap-2 rounded bg-primary/10 px-3 py-1 text-sm text-primary">
+                            <p className="text-sm text-gray-800 dark:text-gray-200">{selectedIds.size} selected</p>
+                            {bulkActions && bulkActions(selectedRows)}
+                        </div>
+                    )}
                 </div>
 
                 {/* Right controls */}
@@ -634,8 +599,11 @@ export default function DataTableOne<T extends object>({
                                     <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
                                         {selectable && idx === 0
                                             && (
-                                                <Checkbox
-                                                    className="!rounded-sm"
+                                                <CheckboxCustom 
+                                                    className="!w-4 !h-4 !rounded-sm"
+                                                    width="15"
+                                                    height="15"
+                                                    viewBox="0 0 18 14"
                                                     checked={allSelected}
                                                     onChange={toggleAll}
                                                     onClick={(e) => e.stopPropagation()}
@@ -678,13 +646,16 @@ export default function DataTableOne<T extends object>({
                                             return (
                                                 <TableCell
                                                     key={col.key}
-                                                    className={`p-4 text-sm ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
+                                                    className={`p-4 ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
                                                 >
-                                                    <div className="group flex items-center gap-3">
+                                                    <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
                                                         {selectable && idx === 0
                                                             && (
-                                                                <Checkbox
-                                                                    className="!rounded-sm"
+                                                                <CheckboxCustom 
+                                                                    className="!w-4 !h-4 !rounded-sm"
+                                                                    width="15"
+                                                                    height="15"
+                                                                    viewBox="0 0 18 14"
                                                                     checked={isSelected}
                                                                     onChange={() => toggleRow(id)}
                                                                     onClick={(e) => e.stopPropagation()}

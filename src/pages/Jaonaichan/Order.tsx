@@ -8,9 +8,14 @@ import { OrdersResponse, Order as OrderIF } from "../../interfaces/order.jaonaic
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
-import { getOrders } from "../../services/jaonaichan";
-import { TabOption } from "../../components/ui/tabs";
+import { getOrders, getProductsBulk } from "../../services/jaonaichan";
+import { TabDefault, TabOption } from "../../components/ui/tabs";
 import { MoreDotIcon } from "../../icons";
+import Button from "../../components/ui/button/Button";
+import { Modal } from "../../components/ui/modal";
+import { useModal } from "../../hooks/useModal";
+import { useSpinner } from "../../hooks/useSpinner";
+import PageSpinner from "../../components/common/PageSpinner";
 
 
 
@@ -47,9 +52,9 @@ const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
 
 const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
   "promptpay_qr": {
-    color: "primary", 
-    text: "PromptPay QR", 
-    icon: <img src="/images/order/prompt-pay-logo.jpg" className="object-cover"/> 
+    color: "primary",
+    text: "PromptPay QR",
+    icon: <img src="/images/order/prompt-pay-logo.jpg" className="object-cover" />
   },
   "bank_transfer": { color: "info", text: "Bank Transfer" },
   "cod": { color: "light", text: "Cash on Delivery" },
@@ -184,6 +189,7 @@ const getOrderColumns = (
   ];
 
 export default function Order() {
+  const { spinning, withSpinner } = useSpinner(false);
   const [isLoading, setIsLoading] = useState(false);
   const hasInitialized = useRef(false);
   const [orders, setOrders] = useState<OrderIF[]>([]);
@@ -222,8 +228,26 @@ export default function Order() {
     init();
   }, []);
 
+  const { isOpen, openModal, closeModal } = useModal();
+  const handleSave = () => {
+    // Handle save logic here
+    console.log("Saving changes...");
+    closeModal();
+  };
+
+  const initialManageOrders = () => {
+    withSpinner(async () => {
+      await getProductsBulk();
+    });
+    openModal();
+  }
+
+  if (spinning) {
+    return <PageSpinner />;
+  }
+
   return (
-    <div>
+    <>
       <PageMeta
         title="React.js Order Dashboard | TailAdmin - Next.js Admin Dashboard Template"
         description="This is React.js Order Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
@@ -253,11 +277,88 @@ export default function Order() {
           //     { label: "Backorder", value: "onbackorder" },
           //   ],
           // }]}
+          bulkActions={(selected) => (
+            <>
+              <Button
+                className="!px-3 !py-1 text-sm"
+                variant="orange"
+                onClick={initialManageOrders}
+              >
+                Manage {selected.length} orders
+              </Button>
+
+              <Button
+                className="!px-3 !py-1 text-sm"
+                variant="outline"
+              >
+                Cancel {selected.length} orders
+              </Button>
+            </>
+          )}
         />
       </CardFrame>
-    </div>
-  );
+      <Modal
+        isOpen={isOpen}
+        onClose={closeModal}
+        isFullscreen={true}
+        className="max-w-[700px] m-4"
+      >
+        <div className="fixed inset-0 bg-white dark:bg-gray-900">
+          <div className="flex h-full flex-col p-6 lg:p-10">
+            {/* Header */}
+            <div className="shrink-0 px-2 pr-14">
+              <h4 className="mb-3 font-semibold text-gray-800 text-title-sm dark:text-white/90">
+                Manage Orders
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Update your details to keep your profile up-to-date.
+              </p>
+            </div>
 
+            {/* Content */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-6">
+              <div className="relative max-w-3xs flex-1">
+                <TabDefault />
+              </div>
+              {/* <p className="text-sm leading-6 text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque
+                euismod est quis mauris lacinia pharetra. Sed a ligula ac odio
+                condimentum aliquet a nec nulla. Aliquam bibendum ex sit amet ipsum
+                rutrum feugiat ultrices enim quam.
+              </p>
+
+              <p className="mt-5 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque
+                euismod est quis mauris lacinia pharetra. Sed a ligula ac odio
+                condimentum aliquet a nec nulla. Aliquam bibendum ex sit amet ipsum
+                rutrum feugiat ultrices enim quam odio condimentum aliquet a nec nulla
+                pellentesque euismod est quis mauris lacinia pharetra.
+              </p>
+
+              <p className="mt-5 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque
+                euismod est quis mauris lacinia pharetra.
+              </p> */}
+            </div>
+
+            {/* Footer */}
+            <div className="shrink-0 flex items-center justify-end gap-3 px-2 pt-6">
+              <button
+                onClick={closeModal}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] dark:hover:text-gray-300"
+              >
+                Close
+              </button>
+
+              <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300">
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
   // ดึง Orders
   // async function getOrders(page = 1, per_page = 10): Promise<OrdersResponse> {
   //   return apiRequest(`/jaonaichan/v1/orders?page=${page}&per_page=${per_page}`);

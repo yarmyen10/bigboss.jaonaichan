@@ -7,6 +7,8 @@ interface RequestOptions extends RequestInit {
 }
 
 export async function apiRequest<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+    console.log((window as any));
+    
     const token = getToken();
 
     const res = await fetch(`${JAONAICHAN_API_URL}${endpoint}`, {

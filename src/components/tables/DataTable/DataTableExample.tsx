@@ -6,7 +6,7 @@
  *  3. Customers — static data + bulk delete
  */
 
-import DataTable, { ColumnDef, FetchParams, FetchResult, RowAction } from "./DataTable";
+import DataTable, { ColumnDef, FetchParams, FetchResult } from "./DataTable";
 
 // ─── shared icons ─────────────────────────────────────────────────────────────
 
