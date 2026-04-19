@@ -1,11 +1,13 @@
 import { useState } from "react";
+import Badge from "../badge/Badge";
 
 interface TabOption {
     value: string;
     label: string;
+    [key: string]: any
 }
 
-interface ChartTabProps {
+interface TabProps {
     options?: TabOption[];
     defaultValue?: string;
     onChange?: (value: string) => void;
@@ -17,7 +19,7 @@ const DEFAULT_OPTIONS: TabOption[] = [
     { value: "annually", label: "Annually" },
 ];
 
-const TabDefault: React.FC<ChartTabProps> = ({
+const TabDefault: React.FC<TabProps> = ({
     options = DEFAULT_OPTIONS,
     defaultValue,
     onChange,
@@ -37,12 +39,13 @@ const TabDefault: React.FC<ChartTabProps> = ({
                 <button
                     key={option.value}
                     onClick={() => handleSelect(option.value)}
-                    className={`px-3 py-2 font-medium w-full rounded-md text-theme-sm hover:text-gray-900 dark:hover:text-white transition-colors ${selected === option.value
+                    className={`inline-flex items-center gap-2 px-4 py-2 font-medium rounded-md text-theme-sm hover:text-gray-900 dark:hover:text-white transition-colors ${selected === option.value
                             ? "shadow-theme-xs text-gray-900 dark:text-white bg-white dark:bg-gray-800"
                             : "text-gray-500 dark:text-gray-400"
                         }`}
                 >
                     {option.label}
+                    {option?.count && <Badge variant="light" color={option?.color || 'primary'} size="sm">{option.count}</Badge>}
                 </button>
             ))}
         </div>

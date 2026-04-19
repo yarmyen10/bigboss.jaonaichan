@@ -4,18 +4,21 @@ import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataTableOne";
-import { OrdersResponse, Order as OrderIF } from "../../interfaces/order.jaonaichan"
+import { OrderListResponse, Order as OrderIF, OrderProductsBulkResponse, OrderProductsBulkItem, OrderItemProduct } from "../../interfaces/order.jaonaichan"
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrders, getProductsBulk } from "../../services/jaonaichan";
-import { TabDefault, TabOption } from "../../components/ui/tabs";
+import { TabOption } from "../../components/ui/tabs";
 import { MoreDotIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
 import { useSpinner } from "../../hooks/useSpinner";
 import PageSpinner from "../../components/common/PageSpinner";
+import ComponentTabCard from "../../components/common/ComponentTabCard";
+import ComponentCard from "../../components/common/ComponentCard";
+import ResponsiveImage from "../../components/ui/images/ResponsiveImage";
 
 
 
@@ -188,6 +191,18 @@ const getOrderColumns = (
     },
   ];
 
+
+const getManageOrderColumns = (
+): ColumnDef<OrderIF>[] => [
+    {
+      key: "id",
+      label: "Order #",
+      sortable: true,
+      width: "80px",
+      render: (val) => <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">#{val as string}</span>,
+    }
+  ];
+
 export default function Order() {
   const { spinning, withSpinner } = useSpinner(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -203,11 +218,16 @@ export default function Order() {
     [openDropdownId]
   );
 
+  const manageOrdersColumns = useMemo(
+    () => getManageOrderColumns(),
+    []
+  );
+
   const init = async () => {
     try {
       setIsLoading(true);
       console.log("load data...");
-      const res: OrdersResponse = await getOrders();
+      const res: OrderListResponse = await getOrders();
       if (res?.data?.length) {
         setOrders(res.data)
       }
@@ -235,9 +255,31 @@ export default function Order() {
     closeModal();
   };
 
+  const [manageOrdersTabs, setManageOrdersTabs] = useState([] as TabOption[]);
   const initialManageOrders = () => {
     withSpinner(async () => {
-      await getProductsBulk();
+      const res: OrderProductsBulkResponse = await getProductsBulk();
+
+      if (res?.data?.length) {
+        let data: OrderProductsBulkItem[] = res.data;
+        console.log('products=', data);
+        const uniqueProducts = new Map<number, OrderItemProduct>()
+
+        for (const item of data) {
+          if (!uniqueProducts.has(item.product.id)) {
+            uniqueProducts.set(item.product.id, item.product)
+          }
+        }
+
+        const products = Array.from(uniqueProducts.values());
+        console.log('unique products=', products);
+      }
+      
+      setManageOrdersTabs([
+        { value: "bill2", label: "Bill No. 2", count: 2, color: "warning" },
+        // { value: "quarterly", label: "Quarterly" },
+        // { value: "annually", label: "Annually" },
+      ] as TabOption[]);
     });
     openModal();
   }
@@ -317,28 +359,29 @@ export default function Order() {
 
             {/* Content */}
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-6">
-              <div className="relative max-w-3xs flex-1">
-                <TabDefault />
-              </div>
-              {/* <p className="text-sm leading-6 text-gray-500 dark:text-gray-400">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque
-                euismod est quis mauris lacinia pharetra. Sed a ligula ac odio
-                condimentum aliquet a nec nulla. Aliquam bibendum ex sit amet ipsum
-                rutrum feugiat ultrices enim quam.
-              </p>
-
-              <p className="mt-5 text-sm leading-6 text-gray-500 dark:text-gray-400">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque
-                euismod est quis mauris lacinia pharetra. Sed a ligula ac odio
-                condimentum aliquet a nec nulla. Aliquam bibendum ex sit amet ipsum
-                rutrum feugiat ultrices enim quam odio condimentum aliquet a nec nulla
-                pellentesque euismod est quis mauris lacinia pharetra.
-              </p>
-
-              <p className="mt-5 text-sm leading-6 text-gray-500 dark:text-gray-400">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque
-                euismod est quis mauris lacinia pharetra.
-              </p> */}
+              <ComponentTabCard 
+                tabs={manageOrdersTabs} 
+              >
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
+                  <div className="lg:col-span-2">
+                    <DataTableOne<OrderIF>
+                      title="Orders"
+                      subtitle="Manage and track all customer orders."
+                      columns={manageOrdersColumns}
+                      data={orders}
+                      rowKey="id"
+                      scrollable
+                      defaultPageSize={3} 
+                      rowHeight={57} 
+                    />
+                  </div>
+                  <div>
+                    <ComponentCard title="Responsive image">
+                      <ResponsiveImage />
+                    </ComponentCard>
+                  </div>
+                </div>
+              </ComponentTabCard>
             </div>
 
             {/* Footer */}

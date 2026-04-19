@@ -13,11 +13,25 @@ export default function SignInForm() {
   const [isChecked, setIsChecked] = useState(false);
 
   const [form, setForm] = useState({ username: '', password: '' });
+  const [errorUsername, setErrorUsername] = useState(false);
+  const [errorPassword, setErrorPassword] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSubmit(e: any) {
     e.preventDefault();
     setError('');
+
+    if (!form.username) {
+      return setErrorUsername(true);
+    } else {
+      setErrorUsername(false);
+    }
+
+    if (!form.password) {
+      return setErrorPassword(true);
+    } else {
+      setErrorPassword(false);
+    }
 
     try {
       const data = await signIn(form.username, form.password);
@@ -128,6 +142,8 @@ export default function SignInForm() {
                     value={form.username} 
                     onChange={e => setForm({ ...form, username: e.target.value })}
                     placeholder="info@gmail.com" 
+                    success={form.username?.length > 0}
+                    error={errorUsername}
                   />
                 </div>
                 <div>
@@ -139,7 +155,9 @@ export default function SignInForm() {
                       value={form.password}
                       onChange={e => setForm({ ...form, password: e.target.value })}
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder="Enter your password" 
+                      success={form.password?.length > 0}
+                      error={errorPassword}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}

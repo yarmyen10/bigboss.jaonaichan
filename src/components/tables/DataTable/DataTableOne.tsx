@@ -104,7 +104,6 @@ function exportCsv<T extends object>(cols: ColumnDef<T>[], rows: T[], filename: 
 function Spinner() {
     return (
         <div className="flex items-center justify-center py-20">
-            {/* <div className="h-9 w-9 animate-spin rounded-full border-4 border-stroke border-t-primary" /> */}
             <img
                 className="h-[8%] w-[8%] object-contain"
                 src="/images/stickers/Shocked Cat Sticker.gif"
@@ -216,6 +215,18 @@ export interface DataTableProps<T extends object> {
     pageSizeOptions?: number[];
     defaultPageSize?: number;
 
+    // ── Scroll mode ───────────────────────────────────────────────────────────
+    /**
+     * เมื่อ true จะซ่อน pagination แล้วแสดงทุก row ใน scroll container
+     * ความสูงของ container = defaultPageSize * rowHeight (px)
+     */
+    scrollable?: boolean;
+    /**
+     * ความสูงของแต่ละ row (px) ใช้คำนวณ max-height ของ scroll container
+     * default: 57
+     */
+    rowHeight?: number;
+
     // ── Rows ──────────────────────────────────────────────────────────────────
     selectable?: boolean;
     onSelectableChange?: (selectedRows: T[]) => void;
@@ -295,6 +306,8 @@ export default function DataTableOne<T extends object>({
     exportFilename = "export.csv",
     pageSizeOptions = [10, 25, 50],
     defaultPageSize = 10,
+    scrollable = false,
+    rowHeight = 57,
     selectable = true,
     onSelectableChange,
     rowActions = [],
@@ -357,10 +370,16 @@ export default function DataTableOne<T extends object>({
     const total = isAsync ? asyncTotal : clientRows.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+    // scroll mode แสดงทุก row, pagination mode slice ตามปกติ
     const visibleRows = useMemo(() => {
+        if (scrollable) return clientRows;
         if (isAsync) return clientRows;
         return clientRows.slice((page - 1) * pageSize, page * pageSize);
-    }, [isAsync, clientRows, page, pageSize]);
+    }, [scrollable, isAsync, clientRows, page, pageSize]);
+
+    // ── Scroll container height ────────────────────────────────────────────────
+    // defaultPageSize * rowHeight = ความสูงเริ่มต้น, row เกินจะ scroll
+    const scrollMaxHeight = defaultPageSize * rowHeight;
 
     // ── Sort ───────────────────────────────────────────────────────────────────
     const handleSort = (key: string) => {
@@ -447,32 +466,10 @@ export default function DataTableOne<T extends object>({
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"
                         >
-                            <path
-                                d="M2.29004 5.90393H17.7067"
-                                stroke=""
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                            <path
-                                d="M17.7075 14.0961H2.29085"
-                                stroke=""
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                            <path
-                                d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z"
-                                fill=""
-                                stroke=""
-                                strokeWidth="1.5"
-                            />
-                            <path
-                                d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z"
-                                fill=""
-                                stroke=""
-                                strokeWidth="1.5"
-                            />
+                            <path d="M2.29004 5.90393H17.7067" stroke="" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M17.7075 14.0961H2.29085" stroke="" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z" fill="" stroke="" strokeWidth="1.5" />
+                            <path d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z" fill="" stroke="" strokeWidth="1.5" />
                         </svg>
                         Filter
                     </button>
@@ -490,25 +487,10 @@ export default function DataTableOne<T extends object>({
                 </div>
             )}
         >
-            {/* Header */}
-            {/* {(title || headerActions) && (
-                <div className="flex items-start justify-between px-6 py-5">
-                    {title && (
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h3>
-                            {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
-                        </div>
-                    )}
-                    {headerActions && <div className="flex items-center gap-3">{headerActions}</div>}
-                </div>
-            )} */}
-
             {/* Toolbar */}
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 !mb-0">
-
-                {/* Right controls */}
+                {/* Left controls */}
                 <div className="flex flex-1 items-center gap-3">
-                    {/* Search */}
                     {searchable === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
                             <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
@@ -523,13 +505,11 @@ export default function DataTableOne<T extends object>({
                             />
                         </div>
                     )}
-                    {/* Tab */}
-                    {tabs?.length && (
+                    {tabs?.length > 0 && (
                         <div className="relative max-w-3xs flex-1">
                             <TabDefault options={tabs} />
                         </div>
                     )}
-                    {/* Selected */}
                     {selectedIds.size > 0 && (
                         <div className="flex items-center gap-2 rounded bg-primary/10 px-3 py-1 text-sm text-primary">
                             <p className="text-sm text-gray-800 dark:text-gray-200">{selectedIds.size} selected</p>
@@ -540,18 +520,25 @@ export default function DataTableOne<T extends object>({
 
                 {/* Right controls */}
                 <div className="flex items-center gap-3">
-                    {pageSizeOptions.length > 1 && (
+                    {/* Page size — ซ่อนเมื่อ scrollable */}
+                    {!scrollable && pageSizeOptions.length > 1 && (
                         <>
                             <span className="text-gray-500 dark:text-gray-400"> Show </span>
                             <Select
                                 defaultValue={'' + pageSize}
-                                options={pageSizeOptions.map((s) => { return { value: '' + s, label: '' + s } })}
+                                options={pageSizeOptions.map((s) => ({ value: '' + s, label: '' + s }))}
                                 placeholder={null}
                                 onChange={(value) => setPageSize(Number(value))}
-
                             />
                             <span className="text-gray-500 dark:text-gray-400"> entries </span>
                         </>
+                    )}
+
+                    {/* Total badge — แสดงเมื่อ scrollable */}
+                    {scrollable && (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {total} รายการ
+                        </span>
                     )}
 
                     {filterConfigs && filterConfigs.length > 0 && (
@@ -572,22 +559,21 @@ export default function DataTableOne<T extends object>({
                         >
                             Export
                         </Button>
-                        // <button
-                        //     onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
-                        //     className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:border-gray-800 dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
-                        // >
-                        //     Export <Ico.Download />
-                        // </button>
                     )}
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="max-w-full overflow-x-auto mb-0">
+            {/* Table — scroll wrapper เมื่อ scrollable */}
+            <div
+                className="max-w-full overflow-x-auto"
+                style={scrollable ? { maxHeight: scrollMaxHeight, overflowY: "auto" } : undefined}
+            >
                 <Table>
-                    {/* Table Header */}
-                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                        <TableRow >
+                    {/* Sticky header เมื่อ scrollable */}
+                    <TableHeader
+                        className={`border-b border-gray-100 dark:border-white/[0.05] ${scrollable ? "sticky top-0 z-10 border-b border-gray-100 dark:border-white/[0.05]" : ""}`}
+                    >
+                        <TableRow>
                             {columns.map((col, idx) => (
                                 <TableCell
                                     isHeader
@@ -597,19 +583,17 @@ export default function DataTableOne<T extends object>({
                                     className={`p-4 whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 ${alignClass(col.align)} ${col.sortable ? "cursor-pointer select-none" : ""}`}
                                 >
                                     <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                        {selectable && idx === 0
-                                            && (
-                                                <CheckboxCustom 
-                                                    className="!w-4 !h-4 !rounded-sm"
-                                                    width="15"
-                                                    height="15"
-                                                    viewBox="0 0 18 14"
-                                                    checked={allSelected}
-                                                    onChange={toggleAll}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            )
-                                        }
+                                        {selectable && idx === 0 && (
+                                            <CheckboxCustom
+                                                className="!w-4 !h-4 !rounded-sm"
+                                                width="15"
+                                                height="15"
+                                                viewBox="0 0 18 14"
+                                                checked={allSelected}
+                                                onChange={toggleAll}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                        )}
                                         <p className="text-theme-xs">{col.label}</p>
                                         {col.sortable && <SortIcon k={col.key} />}
                                     </div>
@@ -617,7 +601,7 @@ export default function DataTableOne<T extends object>({
                             ))}
                         </TableRow>
                     </TableHeader>
-                    {/* Table Body */}
+
                     <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                         {loading ? (
                             <TableRow>
@@ -649,19 +633,17 @@ export default function DataTableOne<T extends object>({
                                                     className={`p-4 ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
                                                 >
                                                     <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                        {selectable && idx === 0
-                                                            && (
-                                                                <CheckboxCustom 
-                                                                    className="!w-4 !h-4 !rounded-sm"
-                                                                    width="15"
-                                                                    height="15"
-                                                                    viewBox="0 0 18 14"
-                                                                    checked={isSelected}
-                                                                    onChange={() => toggleRow(id)}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                />
-                                                            )
-                                                        }
+                                                        {selectable && idx === 0 && (
+                                                            <CheckboxCustom
+                                                                className="!w-4 !h-4 !rounded-sm"
+                                                                width="15"
+                                                                height="15"
+                                                                viewBox="0 0 18 14"
+                                                                checked={isSelected}
+                                                                onChange={() => toggleRow(id)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                        )}
                                                         {col.render
                                                             ? col.render(val, row, rowIndex)
                                                             : <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">{String(val ?? "—")}</span>
@@ -671,78 +653,67 @@ export default function DataTableOne<T extends object>({
                                             );
                                         })}
                                     </TableRow>
-                                )
+                                );
                             })
-                        )
-                        }
+                        )}
                     </TableBody>
                 </Table>
             </div>
 
-            {/* Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
-                <p className="text-sm text-body dark:text-bodydark">
-                    {total === 0 ? "No records" : (
-                        <span className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                            Showing{" "}
-                            <span className="text-gray-800 dark:text-white/90">{startRow}</span>
-                            {" "}to{" "}
-                            <span className="text-gray-800 dark:text-white/90">{endRow}</span>
-                            {" "}of{" "}
-                            <span className="text-gray-800 dark:text-white/90">{total}</span>
-                        </span>
-                    )}
-                </p>
+            {/* Footer — ซ่อนเมื่อ scrollable */}
+            {!scrollable && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
+                    <p className="text-sm text-body dark:text-bodydark">
+                        {total === 0 ? "No records" : (
+                            <span className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+                                Showing{" "}
+                                <span className="text-gray-800 dark:text-white/90">{startRow}</span>
+                                {" "}to{" "}
+                                <span className="text-gray-800 dark:text-white/90">{endRow}</span>
+                                {" "}of{" "}
+                                <span className="text-gray-800 dark:text-white/90">{total}</span>
+                            </span>
+                        )}
+                    </p>
 
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        startIcon={<AngleLeftIcon className="size-5" />}
-                        className="h-10 w-10 disabled:opacity-50"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page === 1 || loading}
-                    >
-                        <></>
-                    </Button>
-                    {/* <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
-                        <Ico.ChevLeft />
-                    </button> */}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            startIcon={<AngleLeftIcon className="size-5" />}
+                            className="h-10 w-10 disabled:opacity-50"
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={page === 1 || loading}
+                        >
+                            <></>
+                        </Button>
 
-                    {pageButtons.map((p, i) =>
-                        p === "..." ? (
-                            <span key={`e${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-body">…</span>
-                        ) : (
-                            <Button
-                                key={p}
-                                variant={page === p ? 'primary' : 'outline'}
-                                className="flex h-10 w-10 text-gray-800 dark:text-white/90"
-                                onClick={() => setPage(p as number)}
-                            >
-                                {p}
-                            </Button>
-                            // <button key={p} onClick={() => setPage(p as number)}
-                            //     className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition ${page === p ? "border-primary bg-primary text-white" : "border-stroke text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"}`}>
-                            //     {p}
-                            // </button>
-                        )
-                    )}
+                        {pageButtons.map((p, i) =>
+                            p === "..." ? (
+                                <span key={`e${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-body">…</span>
+                            ) : (
+                                <Button
+                                    key={p}
+                                    variant={page === p ? 'primary' : 'outline'}
+                                    className="flex h-10 w-10 text-gray-800 dark:text-white/90"
+                                    onClick={() => setPage(p as number)}
+                                >
+                                    {p}
+                                </Button>
+                            )
+                        )}
 
-                    <Button
-                        variant="outline"
-                        endIcon={<AngleRightIcon className="size-5" />}
-                        className="h-10 w-10 disabled:opacity-50"
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages || loading}
-                    >
-                        <></>
-                    </Button>
-                    {/* <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
-                        <Ico.ChevRight />
-                    </button> */}
+                        <Button
+                            variant="outline"
+                            endIcon={<AngleRightIcon className="size-5" />}
+                            className="h-10 w-10 disabled:opacity-50"
+                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages || loading}
+                        >
+                            <></>
+                        </Button>
+                    </div>
                 </div>
-            </div>
+            )}
         </ComponentTableCard>
-    )
+    );
 }
