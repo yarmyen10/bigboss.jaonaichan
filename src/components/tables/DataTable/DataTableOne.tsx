@@ -308,7 +308,7 @@ export default function DataTableOne<T extends object>({
     defaultPageSize = 10,
     scrollable = false,
     rowHeight = 57,
-    selectable = true,
+    selectable = false,
     onSelectableChange,
     rowActions = [],
     onRowClick,
@@ -434,6 +434,15 @@ export default function DataTableOne<T extends object>({
         a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
 
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
+
+    // ── scrollable row/tbody styles ────────────────────────────────────────────
+    const tbodyScrollStyle: React.CSSProperties | undefined = scrollable
+        ? { display: "block", maxHeight: scrollMaxHeight, overflowY: "auto" }
+        : undefined;
+
+    const trScrollStyle: React.CSSProperties | undefined = scrollable
+        ? { display: "table", width: "100%", tableLayout: "fixed" }
+        : undefined;
 
     // ─── Render ────────────────────────────────────────────────────────────────
     return (
@@ -563,16 +572,11 @@ export default function DataTableOne<T extends object>({
                 </div>
             </div>
 
-            {/* Table — scroll wrapper เมื่อ scrollable */}
-            <div
-                className="max-w-full overflow-x-auto"
-                style={scrollable ? { maxHeight: scrollMaxHeight, overflowY: "auto" } : undefined}
-            >
+            {/* Table — overflow-x ครอบทั้งตาราง, scroll-y อยู่แค่ใน tbody */}
+            <div className="max-w-full overflow-x-auto">
                 <Table>
-                    {/* Sticky header เมื่อ scrollable */}
-                    <TableHeader
-                        className={`border-b border-gray-100 dark:border-white/[0.05] ${scrollable ? "sticky top-0 z-10 border-b border-gray-100 dark:border-white/[0.05]" : ""}`}
-                    >
+                    {/* Header — ไม่ต้องใช้ sticky อีกต่อไป เพราะ scroll อยู่ใน tbody */}
+                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                         <TableRow>
                             {columns.map((col, idx) => (
                                 <TableCell
@@ -602,15 +606,23 @@ export default function DataTableOne<T extends object>({
                         </TableRow>
                     </TableHeader>
 
-                    <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                    {/*
+                     * ✅ scroll เฉพาะ body:
+                     *   - display: "block"  → ให้ tbody รับ maxHeight / overflowY ได้
+                     *   - แต่ละ tr ต้องใช้ display: "table" + width: "100%" เพื่อรักษา layout
+                     */}
+                    <TableBody
+                        className="divide-y divide-gray-100 dark:divide-white/[0.05] custom-scrollbar"
+                        style={tbodyScrollStyle}
+                    >
                         {loading ? (
-                            <TableRow>
+                            <TableRow style={trScrollStyle}>
                                 <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
                                     <Spinner />
                                 </TableCell>
                             </TableRow>
                         ) : visibleRows.length === 0 ? (
-                            <TableRow>
+                            <TableRow style={trScrollStyle}>
                                 <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
                                     <Spinner />
                                 </TableCell>
@@ -622,6 +634,7 @@ export default function DataTableOne<T extends object>({
                                 return (
                                     <TableRow
                                         key={String(id)}
+                                        style={trScrollStyle}
                                         onClick={() => onRowClick?.(row)}
                                         className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
                                     >

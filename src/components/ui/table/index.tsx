@@ -16,12 +16,14 @@ interface TableHeaderProps {
 interface TableBodyProps {
   children: ReactNode; // Body row(s)
   className?: string; // Optional className for styling
+  style?: React.CSSProperties; // Optional style for styling
 }
 
 // Props for TableRow
 interface TableRowProps {
   children: ReactNode; // Cells (th or td)
   className?: string; // Optional className for styling
+  style?: React.CSSProperties; // Optional style for styling
   onClick?: (e: React.MouseEvent<HTMLTableCellElement>) => void;
 }
 
@@ -46,13 +48,13 @@ const TableHeader: React.FC<TableHeaderProps> = ({ children, className }) => {
 };
 
 // TableBody Component
-const TableBody: React.FC<TableBodyProps> = ({ children, className }) => {
-  return <tbody className={className}>{children}</tbody>;
+const TableBody: React.FC<TableBodyProps> = ({ children, className, style }) => {
+  return <tbody className={className} style={style}>{children}</tbody>;
 };
 
 // TableRow Component
-const TableRow: React.FC<TableRowProps> = ({ children, className }) => {
-  return <tr className={className}>{children}</tr>;
+const TableRow: React.FC<TableRowProps> = ({ children, className, style }) => {
+  return <tr className={className} style={style}>{children}</tr>;
 };
 
 // TableCell Component

@@ -209,6 +209,8 @@ export default function Order() {
   const hasInitialized = useRef(false);
   const [orders, setOrders] = useState<OrderIF[]>([]);
 
+  const [products, setProducts] = useState<OrderIF[]>([]);
+
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -271,8 +273,11 @@ export default function Order() {
           }
         }
 
-        const products = Array.from(uniqueProducts.values());
-        console.log('unique products=', products);
+        const tmpArr: OrderIF[] = [...orders, ...orders, ...orders];
+        setProducts(tmpArr);
+
+        // const products = Array.from(uniqueProducts.values());
+        // console.log('unique products=', products);
       }
       
       setManageOrdersTabs([
@@ -302,6 +307,7 @@ export default function Order() {
           columns={columns}
           data={orders}
           rowKey="id"
+          selectable
           searchable="header"
           exportable="header"
           tabs={[
@@ -368,11 +374,11 @@ export default function Order() {
                       title="Orders"
                       subtitle="Manage and track all customer orders."
                       columns={manageOrdersColumns}
-                      data={orders}
+                      data={products}
                       rowKey="id"
                       scrollable
-                      defaultPageSize={3} 
-                      rowHeight={57} 
+                      defaultPageSize={10} 
+                      rowHeight={60} 
                     />
                   </div>
                   <div>
