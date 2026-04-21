@@ -193,14 +193,52 @@ const getOrderColumns = (
 
 
 const getManageOrderColumns = (
-): ColumnDef<OrderIF>[] => [
+): ColumnDef<OrderItemProduct>[] => [
     {
-      key: "id",
-      label: "Order #",
+      key: "image",
+      label: "",
+      width: "100px",
+      noExport: true,
+      render: (_, row) => (
+        <img
+          src={row.image?.thumbnail ?? row.image?.medium ?? ""}
+          alt={row.name}
+          className="h-10 w-10 rounded object-cover"
+        />
+      ),
+    },
+    {
+      key: "name",
+      label: "Product",
       sortable: true,
-      width: "80px",
-      render: (val) => <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">#{val as string}</span>,
-    }
+      render: (val, row) => (
+        <div>
+          <p className="text-sm font-medium text-black dark:text-white">{val as string}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{row.sku}</p>
+        </div>
+      ),
+    },
+    {
+      key: "price",
+      label: "Price",
+      sortable: true,
+      render: (val) => (
+        <span className="font-semibold text-black dark:text-white">
+          ฿{Number(val).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "stock",
+      label: "Stock",
+      sortable: true,
+      // width: "100px",
+      render: (val, row) => (
+        val !== null
+          ? <span className="text-sm text-gray-700 dark:text-gray-300">{val as number}</span>
+          : <Badge variant="light" color="light">{row.stock_status}</Badge>
+      ),
+    },
   ];
 
 export default function Order() {
@@ -209,7 +247,7 @@ export default function Order() {
   const hasInitialized = useRef(false);
   const [orders, setOrders] = useState<OrderIF[]>([]);
 
-  const [products, setProducts] = useState<OrderIF[]>([]);
+  const [products, setProducts] = useState<OrderItemProduct[]>([]);
 
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
@@ -272,12 +310,7 @@ export default function Order() {
             uniqueProducts.set(item.product.id, item.product)
           }
         }
-
-        const tmpArr: OrderIF[] = [...orders, ...orders, ...orders];
-        setProducts(tmpArr);
-
-        // const products = Array.from(uniqueProducts.values());
-        // console.log('unique products=', products);
+        setProducts(Array.from(uniqueProducts.values()));
       }
       
       setManageOrdersTabs([
@@ -370,14 +403,14 @@ export default function Order() {
               >
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
                   <div className="lg:col-span-2">
-                    <DataTableOne<OrderIF>
+                    <DataTableOne<OrderItemProduct>
                       title="Orders"
                       subtitle="Manage and track all customer orders."
                       columns={manageOrdersColumns}
                       data={products}
                       rowKey="id"
                       scrollable
-                      defaultPageSize={10} 
+                      defaultPageSize={3} 
                       rowHeight={60} 
                     />
                   </div>

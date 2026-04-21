@@ -435,9 +435,15 @@ export default function DataTableOne<T extends object>({
 
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
 
-    // ── scrollable row/tbody styles ────────────────────────────────────────────
+    // ── scrollable: display:block + scrollbar-gutter:stable ──────────────────────
+    // scrollbar-gutter:stable ทำให้ทั้ง thead/tbody reserve พื้นที่ scrollbar เท่ากัน
+    // จึงไม่เกิด column misalignment เมื่อ scrollbar โผล่
+    const theadScrollStyle: React.CSSProperties | undefined = scrollable
+        ? { display: "block", overflow: "hidden" }
+        : undefined;
+
     const tbodyScrollStyle: React.CSSProperties | undefined = scrollable
-        ? { display: "block", maxHeight: scrollMaxHeight, overflowY: "auto" }
+        ? { display: "block", maxHeight: scrollMaxHeight, overflowX: "auto", overflowY: "scroll" }
         : undefined;
 
     const trScrollStyle: React.CSSProperties | undefined = scrollable
@@ -572,12 +578,11 @@ export default function DataTableOne<T extends object>({
                 </div>
             </div>
 
-            {/* Table — overflow-x ครอบทั้งตาราง, scroll-y อยู่แค่ใน tbody */}
-            <div className="max-w-full overflow-x-auto">
+            {/* Table */}
+            <div className="max-w-full overflow-x-auto custom-scrollbar">
                 <Table>
-                    {/* Header — ไม่ต้องใช้ sticky อีกต่อไป เพราะ scroll อยู่ใน tbody */}
-                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                        <TableRow>
+                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]" style={theadScrollStyle}>
+                        <TableRow style={trScrollStyle}>
                             {columns.map((col, idx) => (
                                 <TableCell
                                     isHeader
@@ -606,15 +611,7 @@ export default function DataTableOne<T extends object>({
                         </TableRow>
                     </TableHeader>
 
-                    {/*
-                     * ✅ scroll เฉพาะ body:
-                     *   - display: "block"  → ให้ tbody รับ maxHeight / overflowY ได้
-                     *   - แต่ละ tr ต้องใช้ display: "table" + width: "100%" เพื่อรักษา layout
-                     */}
-                    <TableBody
-                        className="divide-y divide-gray-100 dark:divide-white/[0.05] custom-scrollbar"
-                        style={tbodyScrollStyle}
-                    >
+                    <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05] custom-scrollbar" style={tbodyScrollStyle}>
                         {loading ? (
                             <TableRow style={trScrollStyle}>
                                 <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
@@ -643,6 +640,7 @@ export default function DataTableOne<T extends object>({
                                             return (
                                                 <TableCell
                                                     key={col.key}
+                                                    style={{ width: col.width }}
                                                     className={`p-4 ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
                                                 >
                                                     <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>

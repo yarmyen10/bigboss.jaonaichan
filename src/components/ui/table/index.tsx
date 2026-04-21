@@ -10,6 +10,7 @@ interface TableProps {
 interface TableHeaderProps {
   children: ReactNode; // Header row(s)
   className?: string; // Optional className for styling
+  style?: React.CSSProperties;
 }
 
 // Props for TableBody
@@ -43,8 +44,8 @@ const Table: React.FC<TableProps> = ({ children, className = "" }) => {
 };
 
 // TableHeader Component
-const TableHeader: React.FC<TableHeaderProps> = ({ children, className }) => {
-  return <thead className={className}>{children}</thead>;
+const TableHeader: React.FC<TableHeaderProps> = ({ children, className, style }) => {
+  return <thead className={className} style={style}>{children}</thead>;
 };
 
 // TableBody Component
