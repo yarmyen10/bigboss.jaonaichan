@@ -45,7 +45,8 @@ const ComponentTabCard: React.FC<ComponentTabCardProps> = ({
 
       {/* Card Body */}
       <div className={`p-4 border-t border-gray-100 dark:border-gray-800 sm:p-6 ${classNameBody}`}>
-        <div className="space-y-6">{children}</div>
+        {/* h-full allows height to propagate to grid children when parent is flex */}
+        <div className="space-y-6 h-full">{children}</div>
       </div>
     </div>
   );

@@ -226,12 +226,16 @@ export interface DataTableProps<T extends object> {
      * default: 57
      */
     rowHeight?: number;
+    /** override max-height ของ scroll container โดยตรง (px) — ถ้าระบุจะ override defaultPageSize * rowHeight */
+    scrollMaxHeight?: number;
 
     // ── Rows ──────────────────────────────────────────────────────────────────
     selectable?: boolean;
     onSelectableChange?: (selectedRows: T[]) => void;
     rowActions?: RowAction<T>[];
     onRowClick?: (row: T) => void;
+    /** key value ของ row ที่ต้องการ highlight (ใช้ค่า rowKey field) */
+    selectedRowKey?: unknown;
 
     // ── Misc ──────────────────────────────────────────────────────────────────
     loading?: boolean;
@@ -308,10 +312,12 @@ export default function DataTableOne<T extends object>({
     defaultPageSize = 10,
     scrollable = false,
     rowHeight = 57,
+    scrollMaxHeight: scrollMaxHeightProp,
     selectable = false,
     onSelectableChange,
     rowActions = [],
     onRowClick,
+    selectedRowKey,
     loading: loadingProp,
     emptyText = "No data found",
     className = "",
@@ -379,7 +385,7 @@ export default function DataTableOne<T extends object>({
 
     // ── Scroll container height ────────────────────────────────────────────────
     // defaultPageSize * rowHeight = ความสูงเริ่มต้น, row เกินจะ scroll
-    const scrollMaxHeight = defaultPageSize * rowHeight;
+    const scrollMaxHeight = scrollMaxHeightProp ?? defaultPageSize * rowHeight;
 
     // ── Sort ───────────────────────────────────────────────────────────────────
     const handleSort = (key: string) => {
@@ -552,7 +558,7 @@ export default function DataTableOne<T extends object>({
                     {/* Total badge — แสดงเมื่อ scrollable */}
                     {scrollable && (
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {total} รายการ
+                            {total} Items
                         </span>
                     )}
 
@@ -633,7 +639,7 @@ export default function DataTableOne<T extends object>({
                                         key={String(id)}
                                         style={trScrollStyle}
                                         onClick={() => onRowClick?.(row)}
-                                        className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                                        className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
                                     >
                                         {columns.map((col, idx) => {
                                             const val = getNestedValue(row, col.key);

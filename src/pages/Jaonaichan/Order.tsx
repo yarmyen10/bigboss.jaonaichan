@@ -18,7 +18,8 @@ import { useSpinner } from "../../hooks/useSpinner";
 import PageSpinner from "../../components/common/PageSpinner";
 import ComponentTabCard from "../../components/common/ComponentTabCard";
 import ComponentCard from "../../components/common/ComponentCard";
-import ResponsiveImage from "../../components/ui/images/ResponsiveImage";
+import Input from "../../components/form/input/InputField";
+import Label from "../../components/form/Label";
 
 
 
@@ -248,6 +249,8 @@ export default function Order() {
   const [orders, setOrders] = useState<OrderIF[]>([]);
 
   const [products, setProducts] = useState<OrderItemProduct[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const selectedProduct = products.find(p => p.id === selectedProductId) ?? null;
 
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
@@ -397,26 +400,109 @@ export default function Order() {
             </div>
 
             {/* Content */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-6">
-              <ComponentTabCard 
-                tabs={manageOrdersTabs} 
+            {/* prevent entire content panel from scrolling as one unit */}
+            <div className="min-h-0 flex-1 overflow-hidden px-2 pt-6">
+              {/* flex flex-col + h-full propagates bounded height into the card body */}
+              <ComponentTabCard
+                tabs={manageOrdersTabs}
+                className="lg:h-full lg:flex lg:flex-col"
+                classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-hidden"
               >
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
-                  <div className="lg:col-span-2">
+                {/* h-full lets each grid column fill the available card body height */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8 lg:h-full">
+                  <div className="lg:col-span-2 lg:h-full">
                     <DataTableOne<OrderItemProduct>
-                      title="Orders"
+                      title="Products"
                       subtitle="Manage and track all customer orders."
                       columns={manageOrdersColumns}
                       data={products}
                       rowKey="id"
+                      selectedRowKey={selectedProductId ?? undefined}
+                      onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
                       scrollable
-                      defaultPageSize={3} 
-                      rowHeight={60} 
+                      defaultPageSize={10} 
+                      // rowHeight={75} 
+                      // scrollMaxHeight={255}
                     />
                   </div>
-                  <div>
-                    <ComponentCard title="Responsive image">
-                      <ResponsiveImage />
+                  {/* flex flex-col h-full so ComponentCard stretches to grid row height */}
+                  <div className="flex flex-col lg:h-full">
+                    {/* scroll scoped to product details only */}
+                    <ComponentCard
+                      title="Product Details"
+                      className="lg:flex lg:flex-col lg:h-full"
+                      classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-y-auto"
+                    >
+                      {!selectedProduct ? (
+                        <p className="text-sm text-gray-400 dark:text-gray-500">Select a product to view details</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {selectedProduct.image?.thumbnail && (
+                            <div className="flex justify-center">
+                              <img
+                                src={selectedProduct.image.thumbnail}
+                                alt={selectedProduct.name}
+                                className="h-20 w-20 rounded object-cover"
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <Label htmlFor="pd-name">Name</Label>
+                            <Input id="pd-name" value={selectedProduct.name} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-sku">SKU</Label>
+                            <Input id="pd-sku" value={selectedProduct.sku} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-type">Type</Label>
+                            <Input id="pd-type" value={selectedProduct.type} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-price">Price</Label>
+                            <Input id="pd-price" type="number" value={selectedProduct.price} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-regular-price">Regular Price</Label>
+                            <Input id="pd-regular-price" type="number" value={selectedProduct.regular_price} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-sale-price">Sale Price</Label>
+                            <Input id="pd-sale-price" type="number" value={selectedProduct.sale_price} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-stock">Stock</Label>
+                            <Input id="pd-stock" type="number" value={selectedProduct.stock ?? ''} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-stock-status">Stock Status</Label>
+                            <Input id="pd-stock-status" value={selectedProduct.stock_status} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-categories">Categories</Label>
+                            <Input id="pd-categories" value={selectedProduct.categories.join(', ')} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-tags">Tags</Label>
+                            <Input id="pd-tags" value={selectedProduct.tags.join(', ')} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                          <div>
+                            <Label htmlFor="pd-permalink">Permalink</Label>
+                            <Input id="pd-permalink" value={selectedProduct.permalink} disabled />
+                            {/* TODO: add onChange handler */}
+                          </div>
+                        </div>
+                      )}
                     </ComponentCard>
                   </div>
                 </div>
