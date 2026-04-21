@@ -233,7 +233,7 @@ const getManageOrderColumns = (
       key: "stock",
       label: "Stock",
       sortable: true,
-      // width: "100px",
+      // width: "1000px",
       render: (val, row) => (
         val !== null
           ? <span className="text-sm text-gray-700 dark:text-gray-300">{val as number}</span>
@@ -313,7 +313,14 @@ export default function Order() {
             uniqueProducts.set(item.product.id, item.product)
           }
         }
-        setProducts(Array.from(uniqueProducts.values()));
+        
+        const tmp: OrderItemProduct[] = [
+          ...Array.from(uniqueProducts.values()), 
+          // ...Array.from(uniqueProducts.values()), 
+          // ...Array.from(uniqueProducts.values()), 
+          // ...Array.from(uniqueProducts.values())
+        ].flat();
+        setProducts(tmp);
       }
       
       setManageOrdersTabs([
@@ -420,9 +427,9 @@ export default function Order() {
                       selectedRowKey={selectedProductId ?? undefined}
                       onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
                       scrollable
-                      defaultPageSize={10} 
+                      defaultPageSize={100} 
                       // rowHeight={75} 
-                      // scrollMaxHeight={255}
+                      // scrollMaxHeight={350}
                     />
                   </div>
                   {/* flex flex-col h-full so ComponentCard stretches to grid row height */}
@@ -431,7 +438,7 @@ export default function Order() {
                     <ComponentCard
                       title="Product Details"
                       className="lg:flex lg:flex-col lg:h-full"
-                      classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-y-auto"
+                      classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar"
                     >
                       {!selectedProduct ? (
                         <p className="text-sm text-gray-400 dark:text-gray-500">Select a product to view details</p>

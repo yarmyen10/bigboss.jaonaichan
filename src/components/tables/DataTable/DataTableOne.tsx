@@ -441,15 +441,21 @@ export default function DataTableOne<T extends object>({
 
     const colSpan = columns.length + (selectable ? 1 : 0) + (rowActions.length ? 1 : 0);
 
-    // ── scrollable: display:block + scrollbar-gutter:stable ──────────────────────
-    // scrollbar-gutter:stable ทำให้ทั้ง thead/tbody reserve พื้นที่ scrollbar เท่ากัน
-    // จึงไม่เกิด column misalignment เมื่อ scrollbar โผล่
+    // ── scrollable layout ────────────────────────────────────────────────────────
+    // thead/tbody เป็น display:block siblings → outer wrapper overflow-x-auto เลื่อน
+    //   X ทั้งสองก้อนไปพร้อมกัน (header + body sync) โดยไม่ต้องใช้ JS
+    // tbody มี overflow-y:auto (ไม่ใช่ scroll) → scrollbar Y โผล่เฉพาะเมื่อ row เกิน
+    //   → ไม่มี reserved gutter, scrollbar Y อยู่แค่ฝั่งแถวข้อมูล (ไม่พาดหัวตาราง)
+    // tr ใช้ display:table + tableLayout:fixed + width:100% → column alignment
+    //   ระหว่าง thead/tbody ตรงกัน
     const theadScrollStyle: React.CSSProperties | undefined = scrollable
-        ? { display: "block", overflow: "hidden" }
+        ? { display: "block" }
         : undefined;
 
+    // overflowX:hidden สำคัญ: ถ้าไม่ระบุ CSS spec จะอัปเกรด overflow-x เป็น auto อัตโนมัติ
+    //   เมื่อ overflow-y เป็น auto → เกิด X scrollbar บน tbody ซ้อนกับ outer wrapper (2 อัน)
     const tbodyScrollStyle: React.CSSProperties | undefined = scrollable
-        ? { display: "block", maxHeight: scrollMaxHeight, overflowX: "auto", overflowY: "scroll" }
+        ? { display: "block", maxHeight: scrollMaxHeight, overflowX: "hidden", overflowY: "auto" }
         : undefined;
 
     const trScrollStyle: React.CSSProperties | undefined = scrollable
@@ -584,9 +590,10 @@ export default function DataTableOne<T extends object>({
                 </div>
             </div>
 
-            {/* Table */}
+            {/* shared X scroll container — thead + tbody (block siblings) เลื่อน X พร้อมกัน */}
             <div className="max-w-full overflow-x-auto custom-scrollbar">
                 <Table>
+                    {/* thead: display:block → เป็น block sibling ของ tbody, เลื่อน X ตาม outer wrapper */}
                     <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]" style={theadScrollStyle}>
                         <TableRow style={trScrollStyle}>
                             {columns.map((col, idx) => (
@@ -617,6 +624,7 @@ export default function DataTableOne<T extends object>({
                         </TableRow>
                     </TableHeader>
 
+                    {/* tbody: display:block + overflow-y:auto → Y scroll เฉพาะแถวข้อมูล (ไม่พาดหัว, ไม่มี reserved gutter) */}
                     <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05] custom-scrollbar" style={tbodyScrollStyle}>
                         {loading ? (
                             <TableRow style={trScrollStyle}>
@@ -730,6 +738,9 @@ export default function DataTableOne<T extends object>({
                         </Button>
                     </div>
                 </div>
+            )}
+            {scrollable && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800"></div>
             )}
         </ComponentTableCard>
     );
