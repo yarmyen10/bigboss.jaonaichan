@@ -1,5 +1,13 @@
 # CLAUDE.md — bigboss.jaonaichan
 
+## Rules
+- ALWAYS check if a file exists before creating it
+- Read existing files first, then modify — never overwrite
+
+## IMPORTANT RULES
+- NEVER create a file without first checking if it already exists
+- Use Read tool to check file existence before any write operation
+
 Admin dashboard for WooCommerce order management, built on **TailAdmin** (Tailwind CSS admin template).
 Backend is a WordPress site at `jaonaichan.com` exposed via WP-REST + custom JWT auth.
 

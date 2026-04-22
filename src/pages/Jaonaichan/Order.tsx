@@ -412,12 +412,12 @@ export default function Order() {
               {/* flex flex-col + h-full propagates bounded height into the card body */}
               <ComponentTabCard
                 tabs={manageOrdersTabs}
-                className="lg:h-full lg:flex lg:flex-col"
+                className="lg:h-full lg:flex lg:flex-col lg:min-h-0"
                 classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-hidden"
               >
-                {/* h-full lets each grid column fill the available card body height */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8 lg:h-full">
-                  <div className="lg:col-span-2 lg:h-full">
+                {/* min-h-0 on grid items overrides the default min-height:auto so explicit lg:h-full wins over intrinsic content height */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8 lg:h-full lg:min-h-0">
+                  <div className="lg:col-span-2 lg:h-full lg:min-h-0 lg:min-w-0">
                     <DataTableOne<OrderItemProduct>
                       title="Products"
                       subtitle="Manage and track all customer orders."
@@ -427,17 +427,17 @@ export default function Order() {
                       selectedRowKey={selectedProductId ?? undefined}
                       onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
                       scrollable
-                      defaultPageSize={100} 
-                      // rowHeight={75} 
+                      defaultPageSize={100}
+                      // rowHeight={75}
                       // scrollMaxHeight={350}
                     />
                   </div>
                   {/* flex flex-col h-full so ComponentCard stretches to grid row height */}
-                  <div className="flex flex-col lg:h-full">
+                  <div className="flex flex-col lg:h-full lg:min-h-0 lg:min-w-0">
                     {/* scroll scoped to product details only */}
                     <ComponentCard
                       title="Product Details"
-                      className="lg:flex lg:flex-col lg:h-full"
+                      className="lg:flex lg:flex-col lg:h-full lg:min-h-0 lg:flex-1"
                       classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar"
                     >
                       {!selectedProduct ? (
@@ -447,9 +447,9 @@ export default function Order() {
                           {selectedProduct.image?.thumbnail && (
                             <div className="flex justify-center">
                               <img
-                                src={selectedProduct.image.thumbnail}
+                                src={selectedProduct.image.full ?? selectedProduct.image.medium ?? selectedProduct.image.thumbnail}
                                 alt={selectedProduct.name}
-                                className="h-20 w-20 rounded object-cover"
+                                className="h-100 w-100 rounded object-cover"
                               />
                             </div>
                           )}
