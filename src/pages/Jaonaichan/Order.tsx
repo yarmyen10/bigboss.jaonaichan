@@ -17,9 +17,7 @@ import { useModal } from "../../hooks/useModal";
 import { useSpinner } from "../../hooks/useSpinner";
 import PageSpinner from "../../components/common/PageSpinner";
 import ComponentTabCard from "../../components/common/ComponentTabCard";
-import ComponentCard from "../../components/common/ComponentCard";
-import Input from "../../components/form/input/InputField";
-import Label from "../../components/form/Label";
+import ProductDetailsCard from "../../components/jaonaichan/ProductDetailsCard";
 
 
 
@@ -196,26 +194,21 @@ const getOrderColumns = (
 const getManageOrderColumns = (
 ): ColumnDef<OrderItemProduct>[] => [
     {
-      key: "image",
-      label: "",
-      width: "100px",
-      noExport: true,
-      render: (_, row) => (
-        <img
-          src={row.image?.thumbnail ?? row.image?.medium ?? ""}
-          alt={row.name}
-          className="h-10 w-10 rounded object-cover"
-        />
-      ),
-    },
-    {
       key: "name",
       label: "Product",
       sortable: true,
+      // width: "1000px",
       render: (val, row) => (
-        <div>
-          <p className="text-sm font-medium text-black dark:text-white">{val as string}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">{row.sku}</p>
+        <div className="flex items-center gap-3">
+          <img
+            src={row.image?.thumbnail ?? row.image?.medium ?? ""}
+            alt={row.name}
+            className="h-10 w-10 shrink-0 rounded object-cover bg-gray-100 dark:bg-gray-800"
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-black dark:text-white truncate">{val as string}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{row.sku}</p>
+          </div>
         </div>
       ),
     },
@@ -223,6 +216,7 @@ const getManageOrderColumns = (
       key: "price",
       label: "Price",
       sortable: true,
+      // width: "1000px",
       render: (val) => (
         <span className="font-semibold text-black dark:text-white">
           ฿{Number(val).toLocaleString()}
@@ -240,6 +234,18 @@ const getManageOrderColumns = (
           : <Badge variant="light" color="light">{row.stock_status}</Badge>
       ),
     },
+    {
+      key: "stock",
+      label: "Stock",
+      sortable: true,
+      // width: "1000px",
+      render: (val, row) => (
+        val !== null
+          ? <span className="text-sm text-gray-700 dark:text-gray-300">{val as number}</span>
+          : <Badge variant="light" color="light">{row.stock_status}</Badge>
+      ),
+    },
+    
   ];
 
 export default function Order() {
@@ -323,10 +329,10 @@ export default function Order() {
         setProducts(tmp);
       }
       
+      // pagination.total = unique orders, total_items = order-item pairs
+      const orderCount = res?.pagination?.total ?? 0;
       setManageOrdersTabs([
-        { value: "bill2", label: "Bill No. 2", count: 2, color: "warning" },
-        // { value: "quarterly", label: "Quarterly" },
-        // { value: "annually", label: "Annually" },
+        { value: "bill2", label: "Bill No. 2", count: orderCount, color: "warning" },
       ] as TabOption[]);
     });
     openModal();
@@ -427,90 +433,16 @@ export default function Order() {
                       selectedRowKey={selectedProductId ?? undefined}
                       onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
                       scrollable
-                      defaultPageSize={100}
+                      fillHeight
+                      // stickyFirstColumn
+                      // defaultPageSize={10}
                       // rowHeight={75}
                       // scrollMaxHeight={350}
                     />
                   </div>
-                  {/* flex flex-col h-full so ComponentCard stretches to grid row height */}
+                  {/* flex flex-col h-full so ProductDetailsCard stretches to grid row height */}
                   <div className="flex flex-col lg:h-full lg:min-h-0 lg:min-w-0">
-                    {/* scroll scoped to product details only */}
-                    <ComponentCard
-                      title="Product Details"
-                      className="lg:flex lg:flex-col lg:h-full lg:min-h-0 lg:flex-1"
-                      classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar"
-                    >
-                      {!selectedProduct ? (
-                        <p className="text-sm text-gray-400 dark:text-gray-500">Select a product to view details</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {selectedProduct.image?.thumbnail && (
-                            <div className="flex justify-center">
-                              <img
-                                src={selectedProduct.image.full ?? selectedProduct.image.medium ?? selectedProduct.image.thumbnail}
-                                alt={selectedProduct.name}
-                                className="h-100 w-100 rounded object-cover"
-                              />
-                            </div>
-                          )}
-                          <div>
-                            <Label htmlFor="pd-name">Name</Label>
-                            <Input id="pd-name" value={selectedProduct.name} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-sku">SKU</Label>
-                            <Input id="pd-sku" value={selectedProduct.sku} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-type">Type</Label>
-                            <Input id="pd-type" value={selectedProduct.type} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-price">Price</Label>
-                            <Input id="pd-price" type="number" value={selectedProduct.price} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-regular-price">Regular Price</Label>
-                            <Input id="pd-regular-price" type="number" value={selectedProduct.regular_price} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-sale-price">Sale Price</Label>
-                            <Input id="pd-sale-price" type="number" value={selectedProduct.sale_price} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-stock">Stock</Label>
-                            <Input id="pd-stock" type="number" value={selectedProduct.stock ?? ''} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-stock-status">Stock Status</Label>
-                            <Input id="pd-stock-status" value={selectedProduct.stock_status} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-categories">Categories</Label>
-                            <Input id="pd-categories" value={selectedProduct.categories.join(', ')} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-tags">Tags</Label>
-                            <Input id="pd-tags" value={selectedProduct.tags.join(', ')} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                          <div>
-                            <Label htmlFor="pd-permalink">Permalink</Label>
-                            <Input id="pd-permalink" value={selectedProduct.permalink} disabled />
-                            {/* TODO: add onChange handler */}
-                          </div>
-                        </div>
-                      )}
-                    </ComponentCard>
+                    <ProductDetailsCard product={selectedProduct} />
                   </div>
                 </div>
               </ComponentTabCard>

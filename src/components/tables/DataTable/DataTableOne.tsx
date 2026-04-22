@@ -228,6 +228,10 @@ export interface DataTableProps<T extends object> {
     rowHeight?: number;
     /** override max-height ของ scroll container โดยตรง (px) — ถ้าระบุจะ override defaultPageSize * rowHeight */
     scrollMaxHeight?: number;
+    /** ทำให้ card กางเต็มความสูง parent — ใช้คู่กับ scrollable, tbody scroll ใน flex container แทน maxHeight */
+    fillHeight?: boolean;
+    /** ทำให้ column แรก sticky ทางซ้าย — ช่วยเมื่อ column เกินกว้างตาราง */
+    stickyFirstColumn?: boolean;
 
     // ── Rows ──────────────────────────────────────────────────────────────────
     selectable?: boolean;
@@ -308,11 +312,13 @@ export default function DataTableOne<T extends object>({
     tabs = [],
     exportable = "",
     exportFilename = "export.csv",
-    pageSizeOptions = [10, 25, 50],
+    pageSizeOptions = [3, 10, 25, 50],
     defaultPageSize = 10,
     scrollable = false,
     rowHeight = 57,
     scrollMaxHeight: scrollMaxHeightProp,
+    fillHeight = false,
+    stickyFirstColumn = false,
     selectable = false,
     onSelectableChange,
     rowActions = [],
@@ -387,6 +393,7 @@ export default function DataTableOne<T extends object>({
     // defaultPageSize * rowHeight = ความสูงเริ่มต้น, row เกินจะ scroll
     const scrollMaxHeight = scrollMaxHeightProp ?? defaultPageSize * rowHeight;
 
+
     // ── Sort ───────────────────────────────────────────────────────────────────
     const handleSort = (key: string) => {
         if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -448,17 +455,19 @@ export default function DataTableOne<T extends object>({
     //   → ไม่มี reserved gutter, scrollbar Y อยู่แค่ฝั่งแถวข้อมูล (ไม่พาดหัวตาราง)
     // tr ใช้ display:table + tableLayout:fixed + width:100% → column alignment
     //   ระหว่าง thead/tbody ตรงกัน
-    const theadScrollStyle: React.CSSProperties | undefined = scrollable
+    // !fillHeight: thead/tbody display:block + tbody overflow-y:auto → scrollbar Y ใน tbody
+    // fillHeight: ใช้ 2 div แยก (header + body) + JS sync X → scrollbar Y ติดขอบ body div
+    const theadScrollStyle: React.CSSProperties | undefined = scrollable && !fillHeight
         ? { display: "block" }
         : undefined;
 
     // overflowX:hidden สำคัญ: ถ้าไม่ระบุ CSS spec จะอัปเกรด overflow-x เป็น auto อัตโนมัติ
     //   เมื่อ overflow-y เป็น auto → เกิด X scrollbar บน tbody ซ้อนกับ outer wrapper (2 อัน)
-    const tbodyScrollStyle: React.CSSProperties | undefined = scrollable
+    const tbodyScrollStyle: React.CSSProperties | undefined = scrollable && !fillHeight
         ? { display: "block", maxHeight: scrollMaxHeight, overflowX: "hidden", overflowY: "auto" }
         : undefined;
 
-    const trScrollStyle: React.CSSProperties | undefined = scrollable
+    const trScrollStyle: React.CSSProperties | undefined = scrollable && !fillHeight
         ? { display: "table", width: "100%", tableLayout: "fixed" }
         : undefined;
 
@@ -467,7 +476,9 @@ export default function DataTableOne<T extends object>({
         <ComponentTableCard
             title={title}
             desc={subtitle}
-            classNameBody={`sm:!p-0`}
+            className={fillHeight ? "lg:flex lg:flex-col lg:h-full lg:min-h-0" : ""}
+            classNameBody={`sm:!p-0${fillHeight ? " lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:!p-0" : ""}`}
+            classNameBodyInner={fillHeight ? "lg:flex lg:flex-col lg:flex-1 lg:min-h-0" : undefined}
             divider={(
                 <div className="flex items-center gap-3 px-6 py-5">
                     {searchable === 'header' && (
@@ -590,100 +601,124 @@ export default function DataTableOne<T extends object>({
                 </div>
             </div>
 
-            {/* shared X scroll container — thead + tbody (block siblings) เลื่อน X พร้อมกัน */}
-            <div className="max-w-full overflow-x-auto custom-scrollbar">
-                <Table>
-                    {/* thead: display:block → เป็น block sibling ของ tbody, เลื่อน X ตาม outer wrapper */}
-                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]" style={theadScrollStyle}>
-                        <TableRow style={trScrollStyle}>
-                            {columns.map((col, idx) => (
-                                <TableCell
-                                    isHeader
-                                    key={col.key}
-                                    onClick={() => col.sortable && handleSort(col.key)}
-                                    style={{ width: col.width }}
-                                    className={`p-4 whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 ${alignClass(col.align)} ${col.sortable ? "cursor-pointer select-none" : ""}`}
-                                >
-                                    <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                        {selectable && idx === 0 && (
-                                            <CheckboxCustom
-                                                className="!w-4 !h-4 !rounded-sm"
-                                                width="15"
-                                                height="15"
-                                                viewBox="0 0 18 14"
-                                                checked={allSelected}
-                                                onChange={toggleAll}
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        )}
-                                        <p className="text-theme-xs">{col.label}</p>
-                                        {col.sortable && <SortIcon k={col.key} />}
-                                    </div>
-                                </TableCell>
-                            ))}
-                        </TableRow>
-                    </TableHeader>
+            {/* ── Table ────────────────────────────────────────────────────────── */}
+            {(() => {
+                // fillHeight: th sticky top-0 → follows X scroll, sticks on Y scroll (single table, no JS sync needed)
+                // !fillHeight: no sticky top, stickyFirstColumn only
+                const getThClass = (idx: number) => {
+                    if (fillHeight && stickyFirstColumn && idx === 0)
+                        return "sticky top-0 left-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/[0.05]";
+                    if (fillHeight)
+                        return "sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/[0.05]";
+                    if (stickyFirstColumn && idx === 0)
+                        return "sticky left-0 z-20 bg-white dark:bg-gray-900";
+                    return "";
+                };
 
-                    {/* tbody: display:block + overflow-y:auto → Y scroll เฉพาะแถวข้อมูล (ไม่พาดหัว, ไม่มี reserved gutter) */}
-                    <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05] custom-scrollbar" style={tbodyScrollStyle}>
-                        {loading ? (
-                            <TableRow style={trScrollStyle}>
-                                <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
-                                    <Spinner />
-                                </TableCell>
+                const headerCells = columns.map((col, idx) => (
+                    <TableCell
+                        isHeader
+                        key={col.key}
+                        onClick={() => col.sortable && handleSort(col.key)}
+                        style={{ width: col.width }}
+                        className={`p-4 whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 ${alignClass(col.align)} ${col.sortable ? "cursor-pointer select-none" : ""} ${getThClass(idx)}`}
+                    >
+                        <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                            {selectable && idx === 0 && (
+                                <CheckboxCustom
+                                    className="!w-4 !h-4 !rounded-sm"
+                                    width="15"
+                                    height="15"
+                                    viewBox="0 0 18 14"
+                                    checked={allSelected}
+                                    onChange={toggleAll}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            )}
+                            <p className="text-theme-xs">{col.label}</p>
+                            {col.sortable && <SortIcon k={col.key} />}
+                        </div>
+                    </TableCell>
+                ));
+
+                const bodyRows = loading || visibleRows.length === 0 ? (
+                    <TableRow style={trScrollStyle}>
+                        <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
+                            <Spinner />
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                    visibleRows.map((row, rowIndex) => {
+                        const id = getId(row);
+                        const isSelected = selectedIds.has(id);
+                        return (
+                            <TableRow
+                                key={String(id)}
+                                style={trScrollStyle}
+                                onClick={() => onRowClick?.(row)}
+                                className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                            >
+                                {columns.map((col, idx) => {
+                                    const val = getNestedValue(row, col.key);
+                                    return (
+                                        <TableCell
+                                            key={col.key}
+                                            style={{ width: col.width }}
+                                            className={`p-4 ${col.classNameTableCell ?? ""} ${alignClass(col.align)} ${stickyFirstColumn && idx === 0 ? "sticky left-0 z-10 bg-white dark:bg-gray-900" : ""}`}
+                                        >
+                                            <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                {selectable && idx === 0 && (
+                                                    <CheckboxCustom
+                                                        className="!w-4 !h-4 !rounded-sm"
+                                                        width="15"
+                                                        height="15"
+                                                        viewBox="0 0 18 14"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleRow(id)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                )}
+                                                {col.render
+                                                    ? col.render(val, row, rowIndex)
+                                                    : <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">{String(val ?? "—")}</span>
+                                                }
+                                            </div>
+                                        </TableCell>
+                                    );
+                                })}
                             </TableRow>
-                        ) : visibleRows.length === 0 ? (
-                            <TableRow style={trScrollStyle}>
-                                <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
-                                    <Spinner />
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            visibleRows.map((row, rowIndex) => {
-                                const id = getId(row);
-                                const isSelected = selectedIds.has(id);
-                                return (
-                                    <TableRow
-                                        key={String(id)}
-                                        style={trScrollStyle}
-                                        onClick={() => onRowClick?.(row)}
-                                        className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
-                                    >
-                                        {columns.map((col, idx) => {
-                                            const val = getNestedValue(row, col.key);
-                                            return (
-                                                <TableCell
-                                                    key={col.key}
-                                                    style={{ width: col.width }}
-                                                    className={`p-4 ${col.classNameTableCell ?? ""} ${alignClass(col.align)}`}
-                                                >
-                                                    <div className={`flex items-center gap-3 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                        {selectable && idx === 0 && (
-                                                            <CheckboxCustom
-                                                                className="!w-4 !h-4 !rounded-sm"
-                                                                width="15"
-                                                                height="15"
-                                                                viewBox="0 0 18 14"
-                                                                checked={isSelected}
-                                                                onChange={() => toggleRow(id)}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            />
-                                                        )}
-                                                        {col.render
-                                                            ? col.render(val, row, rowIndex)
-                                                            : <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">{String(val ?? "—")}</span>
-                                                        }
-                                                    </div>
-                                                </TableCell>
-                                            );
-                                        })}
-                                    </TableRow>
-                                );
-                            })
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
+                        );
+                    })
+                );
+
+                // fillHeight: single table, th sticky top-0 — header scrolls with body on X, sticks on Y
+                if (fillHeight) return (
+                    <div className="lg:flex-1 lg:min-h-0 overflow-auto custom-scrollbar">
+                        <Table className="table-fixed">
+                            <TableHeader>
+                                <TableRow>{headerCells}</TableRow>
+                            </TableHeader>
+                            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                                {bodyRows}
+                            </TableBody>
+                        </Table>
+                    </div>
+                );
+
+                // !fillHeight: single table, thead/tbody display:block, scrollbar Y ใน tbody
+                return (
+                    <div className="max-w-full overflow-x-auto custom-scrollbar">
+                        <Table>
+                            <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]" style={theadScrollStyle}>
+                                <TableRow style={trScrollStyle}>{headerCells}</TableRow>
+                            </TableHeader>
+                            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05] custom-scrollbar" style={tbodyScrollStyle}>
+                                {bodyRows}
+                            </TableBody>
+                        </Table>
+                    </div>
+                );
+            })()}
 
             {/* Footer — ซ่อนเมื่อ scrollable */}
             {!scrollable && (
