@@ -26,6 +26,13 @@ interface TableRowProps {
   className?: string; // Optional className for styling
   style?: React.CSSProperties; // Optional style for styling
   onClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void;
+  onMouseDown?: (e: React.MouseEvent<HTMLTableRowElement>) => void;
+  onMouseUp?: (e: React.MouseEvent<HTMLTableRowElement>) => void;
+  onMouseLeave?: (e: React.MouseEvent<HTMLTableRowElement>) => void;
+  onTouchStart?: (e: React.TouchEvent<HTMLTableRowElement>) => void;
+  onTouchMove?: (e: React.TouchEvent<HTMLTableRowElement>) => void;
+  onTouchEnd?: (e: React.TouchEvent<HTMLTableRowElement>) => void;
+  onTouchCancel?: (e: React.TouchEvent<HTMLTableRowElement>) => void;
 }
 
 // Props for TableCell
@@ -54,8 +61,23 @@ const TableBody: React.FC<TableBodyProps> = ({ children, className, style }) => 
 };
 
 // TableRow Component
-const TableRow: React.FC<TableRowProps> = ({ children, className, style, onClick }) => {
-  return <tr className={className} style={style} onClick={onClick}>{children}</tr>;
+const TableRow: React.FC<TableRowProps> = ({ children, className, style, onClick, onMouseDown, onMouseUp, onMouseLeave, onTouchStart, onTouchMove, onTouchEnd, onTouchCancel }) => {
+  return (
+    <tr
+      className={className}
+      style={style}
+      onClick={onClick}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseLeave}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
+    >
+      {children}
+    </tr>
+  );
 };
 
 // TableCell Component

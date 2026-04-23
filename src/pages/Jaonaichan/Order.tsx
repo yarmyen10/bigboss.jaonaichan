@@ -18,6 +18,7 @@ import { useSpinner } from "../../hooks/useSpinner";
 import PageSpinner from "../../components/common/PageSpinner";
 import ComponentTabCard from "../../components/common/ComponentTabCard";
 import ProductDetailsCard from "../../components/jaonaichan/ProductDetailsCard";
+import BottomSheet from "../../components/ui/bottom-sheet/BottomSheet";
 
 
 
@@ -192,6 +193,9 @@ const getOrderColumns = (
 
 
 const getManageOrderColumns = (
+  summaryAmounts: Record<number, string>,
+  setSummaryAmounts: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  setSelectedProductId: React.Dispatch<React.SetStateAction<number | null>>
 ): ColumnDef<OrderItemProduct>[] => [
     {
       key: "name",
@@ -235,17 +239,47 @@ const getManageOrderColumns = (
       ),
     },
     {
-      key: "stock",
-      label: "Stock",
-      sortable: true,
-      // width: "1000px",
-      render: (val, row) => (
-        val !== null
-          ? <span className="text-sm text-gray-700 dark:text-gray-300">{val as number}</span>
-          : <Badge variant="light" color="light">{row.stock_status}</Badge>
-      ),
+      key: "summary_amount",
+      label: "Bill 2 Amount",
+      width: "150px",
+      noExport: true,
+      render: (_val, row) => {
+        const value = summaryAmounts[row.id] ?? "";
+        return (
+          <div
+            className="relative w-full min-w-[150px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              ฿
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={value}
+              onFocus={() => setSelectedProductId(row.id)}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^\d.]/g, "");
+                const parts = raw.split(".");
+                const next = parts.length > 1
+                  ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`
+                  : raw;
+                setSummaryAmounts((prev) => {
+                  if (next === "") {
+                    const { [row.id]: _removed, ...rest } = prev;
+                    return rest;
+                  }
+                  return { ...prev, [row.id]: next };
+                });
+              }}
+              className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+            />
+          </div>
+        );
+      },
     },
-    
+
   ];
 
 export default function Order() {
@@ -258,6 +292,11 @@ export default function Order() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const selectedProduct = products.find(p => p.id === selectedProductId) ?? null;
 
+  const [sheetProductId, setSheetProductId] = useState<number | null>(null);
+  const sheetProduct = products.find(p => p.id === sheetProductId) ?? null;
+
+  const [summaryAmounts, setSummaryAmounts] = useState<Record<number, string>>({});
+
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -268,8 +307,8 @@ export default function Order() {
   );
 
   const manageOrdersColumns = useMemo(
-    () => getManageOrderColumns(),
-    []
+    () => getManageOrderColumns(summaryAmounts, setSummaryAmounts, setSelectedProductId),
+    [summaryAmounts]
   );
 
   const init = async () => {
@@ -319,14 +358,8 @@ export default function Order() {
             uniqueProducts.set(item.product.id, item.product)
           }
         }
-        
-        const tmp: OrderItemProduct[] = [
-          ...Array.from(uniqueProducts.values()), 
-          // ...Array.from(uniqueProducts.values()), 
-          // ...Array.from(uniqueProducts.values()), 
-          // ...Array.from(uniqueProducts.values())
-        ].flat();
-        setProducts(tmp);
+         
+        setProducts(Array.from(uniqueProducts.values()));
       }
       
       // pagination.total = unique orders, total_items = order-item pairs
@@ -394,6 +427,7 @@ export default function Order() {
           )}
         />
       </CardFrame>
+      {/* Modal Manage Orders */}
       <Modal
         isOpen={isOpen}
         onClose={closeModal}
@@ -418,12 +452,13 @@ export default function Order() {
               {/* flex flex-col + h-full propagates bounded height into the card body */}
               <ComponentTabCard
                 tabs={manageOrdersTabs}
-                className="lg:h-full lg:flex lg:flex-col lg:min-h-0"
-                classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-hidden"
+                className="md:h-full md:flex md:flex-col md:min-h-0"
+                classNameBody="md:flex-1 md:min-h-0 md:overflow-hidden"
               >
                 {/* min-h-0 on grid items overrides the default min-height:auto so explicit lg:h-full wins over intrinsic content height */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8 lg:h-full lg:min-h-0">
-                  <div className="lg:col-span-2 lg:h-full lg:min-h-0 lg:min-w-0">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6 lg:gap-8 md:h-full md:min-h-0">
+                  <div className="md:col-span-3 min-[1025px]:col-span-2 md:h-full md:min-h-0 md:min-w-0">
+                    {/* Unique products By Orders */}
                     <DataTableOne<OrderItemProduct>
                       title="Products"
                       subtitle="Manage and track all customer orders."
@@ -432,6 +467,7 @@ export default function Order() {
                       rowKey="id"
                       selectedRowKey={selectedProductId ?? undefined}
                       onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
+                      onRowLongPress={(row) => setSheetProductId(row.id)}
                       scrollable
                       fillHeight
                       // stickyFirstColumn
@@ -441,7 +477,7 @@ export default function Order() {
                     />
                   </div>
                   {/* flex flex-col h-full so ProductDetailsCard stretches to grid row height */}
-                  <div className="flex flex-col lg:h-full lg:min-h-0 lg:min-w-0">
+                  <div className="hidden min-[1025px]:flex flex-col md:h-full md:min-h-0 md:min-w-0">
                     <ProductDetailsCard product={selectedProduct} />
                   </div>
                 </div>
@@ -464,6 +500,16 @@ export default function Order() {
           </div>
         </div>
       </Modal>
+      <BottomSheet
+        isOpen={isOpen && sheetProductId !== null}
+        onClose={() => setSheetProductId(null)}
+        className="min-[1025px]:hidden"
+        height="70vh"
+      >
+        <div className="p-4">
+          <ProductDetailsCard product={sheetProduct} />
+        </div>
+      </BottomSheet>
     </>
   );
   // ดึง Orders

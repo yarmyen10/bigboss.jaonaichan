@@ -238,6 +238,10 @@ export interface DataTableProps<T extends object> {
     onSelectableChange?: (selectedRows: T[]) => void;
     rowActions?: RowAction<T>[];
     onRowClick?: (row: T) => void;
+    /** เรียกเมื่อกดแถวค้าง (touch long-press) เกิน longPressMs ms — ไม่ trigger onRowClick ที่ตามมา */
+    onRowLongPress?: (row: T) => void;
+    /** ระยะเวลาที่ต้องกดค้างถึงจะถือว่าเป็น long-press (ms) */
+    longPressMs?: number;
     /** key value ของ row ที่ต้องการ highlight (ใช้ค่า rowKey field) */
     selectedRowKey?: unknown;
 
@@ -323,6 +327,8 @@ export default function DataTableOne<T extends object>({
     onSelectableChange,
     rowActions = [],
     onRowClick,
+    onRowLongPress,
+    longPressMs = 500,
     selectedRowKey,
     loading: loadingProp,
     emptyText = "No data found",
@@ -348,6 +354,16 @@ export default function DataTableOne<T extends object>({
     const [selectedIds, setSelectedIds] = useState<Set<unknown>>(new Set());
     const [filterValues, setFilterValues] = useState<Record<string, string>>({});
     const loading = loadingProp ?? asyncLoading;
+
+    // ── Long-press (touch) ─────────────────────────────────────────────────────
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const didLongPressRef = useRef(false);
+    const clearLongPress = () => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+    };
 
     // ── Client-side data ───────────────────────────────────────────────────────
     const clientRows = useMemo(() => {
@@ -607,11 +623,11 @@ export default function DataTableOne<T extends object>({
                 // !fillHeight: no sticky top, stickyFirstColumn only
                 const getThClass = (idx: number) => {
                     if (fillHeight && stickyFirstColumn && idx === 0)
-                        return "sticky top-0 left-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/[0.05]";
+                        return "sticky top-0 left-0 z-30 border-b border-gray-100 dark:border-white/[0.05]";
                     if (fillHeight)
-                        return "sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/[0.05]";
+                        return "sticky top-0 border-b border-gray-100 dark:border-white/[0.05]";
                     if (stickyFirstColumn && idx === 0)
-                        return "sticky left-0 z-20 bg-white dark:bg-gray-900";
+                        return "sticky left-0 z-20";
                     return "";
                 };
 
@@ -655,8 +671,39 @@ export default function DataTableOne<T extends object>({
                             <TableRow
                                 key={String(id)}
                                 style={trScrollStyle}
-                                onClick={() => onRowClick?.(row)}
-                                className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                                onClick={() => {
+                                    if (didLongPressRef.current) {
+                                        didLongPressRef.current = false;
+                                        return;
+                                    }
+                                    onRowClick?.(row);
+                                }}
+                                onMouseDown={(e) => {
+                                    console.log('onMouseDown test', { onRowLongPress, button: e.button });
+                                    
+                                    if (!onRowLongPress || e.button !== 0) return;
+                                    didLongPressRef.current = false;
+                                    clearLongPress();
+                                    longPressTimerRef.current = setTimeout(() => {
+                                        didLongPressRef.current = true;
+                                        onRowLongPress(row);
+                                    }, longPressMs);
+                                }}
+                                onMouseUp={clearLongPress}
+                                onMouseLeave={clearLongPress}
+                                onTouchStart={() => {
+                                    if (!onRowLongPress) return;
+                                    didLongPressRef.current = false;
+                                    clearLongPress();
+                                    longPressTimerRef.current = setTimeout(() => {
+                                        didLongPressRef.current = true;
+                                        onRowLongPress(row);
+                                    }, longPressMs);
+                                }}
+                                onTouchMove={clearLongPress}
+                                onTouchEnd={clearLongPress}
+                                onTouchCancel={clearLongPress}
+                                className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${(onRowClick || onRowLongPress) ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
                             >
                                 {columns.map((col, idx) => {
                                     const val = getNestedValue(row, col.key);
