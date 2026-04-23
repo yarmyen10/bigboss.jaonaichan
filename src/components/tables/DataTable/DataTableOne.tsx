@@ -203,7 +203,7 @@ export interface DataTableProps<T extends object> {
     /** Buttons ฝั่งขวา header (Add Product ฯลฯ) */
     headerActions?: ReactNode;
     /** แสดงเมื่อมี row ถูก select */
-    bulkActions?: (selectedRows: T[]) => ReactNode;
+    bulkActions?: (selectedRows: T[], isAllSelected: boolean) => ReactNode;
 
     // ── Toolbar or LayoutPlan ───────────────────────────────────────────────────────────────
     searchable?: LayoutPlan;
@@ -316,7 +316,7 @@ export default function DataTableOne<T extends object>({
     tabs = [],
     exportable = "",
     exportFilename = "export.csv",
-    pageSizeOptions = [3, 10, 25, 50],
+    pageSizeOptions = [10, 25, 50],
     defaultPageSize = 10,
     scrollable = false,
     rowHeight = 57,
@@ -567,7 +567,7 @@ export default function DataTableOne<T extends object>({
                     {selectedIds.size > 0 && (
                         <div className="flex items-center gap-2 rounded bg-primary/10 px-3 py-1 text-sm text-primary">
                             <p className="text-sm text-gray-800 dark:text-gray-200">{selectedIds.size} selected</p>
-                            {bulkActions && bulkActions(selectedRows)}
+                            {bulkActions && bulkActions(selectedRows, allSelected)}
                         </div>
                     )}
                 </div>
@@ -582,7 +582,7 @@ export default function DataTableOne<T extends object>({
                                 defaultValue={'' + pageSize}
                                 options={pageSizeOptions.map((s) => ({ value: '' + s, label: '' + s }))}
                                 placeholder={null}
-                                onChange={(value) => setPageSize(Number(value))}
+                                onChange={(value) => { setPageSize(Number(value)); setSelectedIds(new Set()); }}
                             />
                             <span className="text-gray-500 dark:text-gray-400"> entries </span>
                         </>

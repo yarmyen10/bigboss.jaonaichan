@@ -1,176 +1,79 @@
-# CLAUDE.md — bigboss.jaonaichan
+# CLAUDE.md
 
-Admin dashboard for WooCommerce order management, built on **TailAdmin** (Tailwind CSS admin template).
-Backend is a WordPress site at `jaonaichan.com` exposed via WP-REST + custom JWT auth.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
----
+## Project
 
-## Rules
-- ALWAYS check if a file exists before creating it
-- Read existing files first, then modify — never overwrite
+Admin dashboard for WooCommerce order management, built on the **TailAdmin** React template. The backend is a WordPress site at `jaonaichan.com` exposed via WP-REST + custom JWT auth — this app is a pure frontend SPA that talks to that REST API.
 
----
+## Commands
 
-## IMPORTANT RULES
-- NEVER create a file without first checking if it already exists
-- Use Read tool to check file existence before any write operation
-
----
-
-## Tech Stack
-
-| Layer | Library / Version |
-|---|---|
-| Framework | React 19 + TypeScript ~5.7 |
-| Build | Vite 6.1 + vite-plugin-svgr |
-| Styling | Tailwind CSS 4.0 + tailwind-merge + clsx |
-| Routing | React Router 7.1 (BrowserRouter, manual routes) |
-| State | Context API only — no Redux / Zustand |
-| Charts | ApexCharts 4 (react-apexcharts) |
-| Calendar | @fullcalendar/react 6 |
-| Date picker | flatpickr 4 |
-| Drag & drop | @dnd-kit/core + @dnd-kit/sortable |
-| DOMPurify | dompurify 3 (HTML sanitisation) |
-| SEO | react-helmet-async 2 |
-
----
-
-## Project Structure
-
-```
-src/
-├── api/
-│   ├── auth.ts          # JWT sign-in/sign-out, localStorage helpers
-│   └── client.ts        # apiRequest() — fetch wrapper, injects Bearer token, handles 403
-├── services/
-│   └── jaonaichan.ts    # getOrders(), getProductsBulk() — only API call site
-├── interfaces/
-│   ├── order.jaonaichan.ts         # Primary WooCommerce order / product types
-│   └── order-second.jaonaichan.ts  # Alternative order schema
-├── context/
-│   ├── ThemeContext.tsx    # light / dark — persisted to localStorage, toggled via html.dark class
-│   └── SidebarContext.tsx # isExpanded, isMobileOpen, hover, active menu
-├── hooks/
-│   ├── useAuth.ts     # { user, isLoggedIn, token, signOut }
-│   ├── useSpinner.ts  # withSpinner(asyncFn) loading helper
-│   ├── useModal.ts    # open / close modal state
-│   └── useGoBack.ts   # navigation helper
-├── layout/
-│   ├── AppLayout.tsx    # outer shell — AppHeader + AppSidebar + <Outlet>
-│   ├── AppHeader.tsx
-│   ├── AppSidebar.tsx
-│   └── Backdrop.tsx     # mobile sidebar overlay
-├── pages/               # one folder per route
-│   ├── AuthPages/       # SignIn, SignUp, SignOut
-│   ├── Dashboard/
-│   ├── Jaonaichan/      # primary order-management page
-│   ├── Forms/ Tables/ Charts/ UiElements/ OtherPage/
-│   ├── UserProfiles.tsx
-│   └── Calendar.tsx
-├── components/
-│   ├── auth/            # ProtectedRoute, SignInForm, SignUpForm
-│   ├── charts/          # bar/ line/ ApexCharts wrappers
-│   ├── common/          # CardFrame, PageMeta, PageBreadCrumb, PageSpinner, ScrollToTop, ThemeToggleButton
-│   ├── ecommerce/       # EcommerceMetrics, MonthlySalesChart, RecentOrders, …
-│   ├── form/            # input/ form-elements/ switch/ Select MultiSelect DatePicker
-│   ├── header/
-│   ├── tables/
-│   │   ├── BasicTables/
-│   │   └── DataTable/   # DataTableOne — primary generic table (see below)
-│   ├── ui/              # button/ badge/ modal/ dropdown/ alert/ avatar/ tabs/ table/ task/
-│   └── UserProfile/
-├── icons/               # SVG icon components (+ icons/order/)
-├── App.tsx              # route tree
-├── main.tsx             # entry point
-└── index.css            # Tailwind base styles
+```bash
+npm run dev         # Vite dev server
+npm run build       # tsc -b || true && vite build  — TS errors do NOT fail the build
+npm run type-check  # tsc --noEmit  — use THIS to verify types before committing
+npm run lint        # eslint .
+npm run preview     # preview production build
 ```
 
----
+There is no test runner configured.
 
-## Routing
+## Environment variables
 
-Defined manually in `App.tsx`:
-
-- Public: `/signin`, `/signup`, `/signout`
-- Protected (inside `<AppLayout>`): wrapped by `<ProtectedRoute>` which redirects to `/signin` when no token
-- 404 catch-all at the bottom
-
----
-
-## Auth Flow
-
-1. POST `/jwt-auth/v1/token` → returns `{ token, user_display_name, … }`
-2. Token stored in localStorage as `${PREFIX}Token`, user as `${PREFIX}User`
-3. Every request: `Authorization: Bearer {token}` added by `apiRequest()`
-4. 403 response → automatic redirect to `/signin`
-5. Sign-out clears both localStorage keys
-
-Env vars (in `.env`):
+Vite is configured (`vite.config.ts`) with `envPrefix: ['VITE_', 'JAONAICHAN_']`, so env vars prefixed `JAONAICHAN_` are exposed to client code via `import.meta.env`. Required in `.env`:
 
 ```
 JAONAICHAN_API_URL=https://jaonaichan.com/wp-json
-JAONAICHAN_PREFIX=bigboss
+JAONAICHAN_PREFIX=bigboss                # localStorage key prefix
 ```
 
----
+`.env` is gitignored; the values above are the current dev defaults.
 
-## State Management
+## Architecture
 
-- **ThemeContext** — `useTheme()` — light/dark, class on `<html>`
-- **SidebarContext** — `useSidebar()` — expand/collapse, mobile open, hover, active item
-- Everything else is local `useState` per page
-- `useRef` used as init-flag to prevent duplicate API calls under React 18/19 StrictMode
+### Request layer: `src/api/` → `src/services/` → pages
 
----
+- `src/api/auth.ts` — JWT sign-in against `/jwt-auth/v1/token`; stores token under `${PREFIX}Token` and a `BigBossUser` JSON under `${PREFIX}User` in localStorage.
+- `src/api/client.ts` — single `apiRequest<T>()` fetch wrapper. Injects `Authorization: Bearer <token>`, and on **403** calls `signOut()` and hard-redirects to `/signin`. All network calls must go through this.
+- `src/services/jaonaichan.ts` — typed endpoint functions (`getOrders`, `getProductsBulk`). Pages consume these; they must not call `fetch` directly.
 
-## DataTableOne — Generic Table Component
+Domain types live in `src/interfaces/order.jaonaichan.ts` (primary) and `order-second.jaonaichan.ts` (alt schema). Follow the `*.jaonaichan.ts` suffix when adding domain types.
 
-Location: `src/components/tables/DataTable/DataTableOne.tsx`
+### Auth gating
 
-Key props:
+Routes in `App.tsx` are wrapped individually in `<ProtectedRoute>` (`src/components/auth/ProtectedRoute.tsx`), which checks `isLoggedIn()` against localStorage and redirects to `/signin` if missing. Public routes (`/signin`, `/signup`, `/signout`) sit outside the `<AppLayout>` route element. There is no route-level guard — every protected route must be wrapped manually.
 
-| Prop | Type | Purpose |
-|---|---|---|
-| `columns` | `ColumnDef<T>[]` | Column definitions — key (dot-notation), label, sortable, render fn |
-| `data` | `T[]` | Static client-side data |
-| `fetchFn` | `(params) => Promise<FetchResult<T>>` | Server-side fetch (mutually exclusive with data) |
-| `rowKey` | `keyof T` | Unique row identifier |
-| `searchable` | `"toolbar" \| "header" \| ""` | Where to render search input |
-| `exportable` | `"toolbar" \| "header" \| ""` | Where to render CSV export button |
-| `scrollable` | `boolean` | Replaces pagination with scroll container |
-| `selectable` | `boolean` | Checkbox column + bulk actions |
-| `filters` | `FilterConfig[]` | Dropdown filter panel |
-| `tabs` | `TabOption[]` | Tab row in toolbar |
+### Layout shell
 
-ColumnDef supports dot-notation keys (`"billing.first_name"`), custom `render()`, `noExport`, and `classNameTableCell`.
+`src/layout/AppLayout.tsx` composes `AppSidebar` + `AppHeader` + `<Outlet />` under a `SidebarProvider`. The sidebar's collapsed/expanded/mobile state lives in `SidebarContext`; theme (light/dark, class-based on `<html>`) lives in `ThemeContext` and is persisted to localStorage. These are the only two contexts — all other state is page-local `useState`.
 
----
+### `DataTableOne` — the generic table
 
-## Shared Component Conventions
+`src/components/tables/DataTable/DataTableOne.tsx` is the shared table used by every list page (orders, customers, products, etc.). Before building a new table UI, extend this one. Key capabilities:
 
-- **`<ComponentTableCard>`** — card wrapper for table pages (title, desc, divider slot, body)
-- **`<PageMeta>`** — Helmet title + description
-- **`<PageBreadCrumb>`** — breadcrumb nav
-- **`<Button>`** — variants: `primary | outline | orange | …`, sizes: `sm | md | lg`
-- **`<Modal>`** — overlay modal, `fullscreen` prop available
-- **`<Badge>`** — status labels with color variants
-- **`<Dropdown>` / `<DropdownItem>`** — rendered via `createPortal` to avoid z-index issues
+- Column defs via `ColumnDef<T>[]` with dot-notation keys, `sortable`, `render(value, row)`, `noExport`, `width`, `align`, `classNameTableCell`.
+- Either `data` (client-side) **or** `fetchFn` (server-side) — mutually exclusive.
+- Toolbar features: `searchable`, `exportable` (CSV), `tabs`, `filters`, `bulkActions`, `selectable` checkboxes.
+- Row interactions: `onRowClick`, `onRowLongPress`, `selectedRowKey`, `scrollable` (swaps pagination for a scroll container), `fillHeight`, `stickyFirstColumn`.
 
----
+See `src/pages/Jaonaichan/Order.tsx` for a worked example using tabs, bulk actions, per-row portal dropdowns, summary inputs, and a paired detail pane.
 
-## Styling Conventions
+### StrictMode double-effect guard
 
-- Tailwind utility classes directly in JSX — no CSS modules
-- `clsx()` for conditional classes
-- Dark mode: class-based (`dark:` prefix) toggled on `<html>`
-- TailAdmin-specific tokens: `dark:bg-boxdark`, `dark:border-strokedark`, `text-body`, `dark:text-bodydark`
-- Responsive: `sm:`, `md:`, `lg:`, `xl:` prefixes
+`useEffect` in pages that fetch on mount uses a `hasInitialized = useRef(false)` flag to prevent the second StrictMode invocation from firing duplicate API calls. Match this pattern when adding new mount-fetch pages.
 
----
+### Portaled overlays
 
-## TypeScript Conventions
+Row-level dropdowns (see `Order.tsx`) render via `createPortal` into `document.body` with `position: fixed` computed from the button's `getBoundingClientRect()`. This is deliberate — the table's overflow clipping would otherwise hide the menu. `Modal` and `BottomSheet` (`src/components/ui/modal`, `src/components/ui/bottom-sheet`) follow the same pattern.
 
-- Strict mode on (`noUnusedLocals`, `noUnusedParameters`)
-- Generic components: `<DataTableOne<OrderIF>>`
-- All domain types live in `src/interfaces/`
-- Naming: `PascalCase` for components, `camelCase` for hooks/utilities, `*.jaonaichan.ts` suffix for domain types
+## Conventions
+
+- **ESLint `naming-convention`** is enforced (see `eslint.config.js`): `PascalCase` for types/components, `camelCase` for functions/variables, `UPPER_CASE` allowed for constants, `snake_case` allowed on interface members (to match WP REST payload shape).
+- `@typescript-eslint/no-explicit-any` is a warning with auto-fix to `unknown`.
+- Styling is Tailwind utilities in JSX, `clsx` / `tailwind-merge` for conditionals. Dark mode is class-based with the `dark:` prefix.
+- TailAdmin design tokens in use: `text-body`, `bg-boxdark`, `border-strokedark`, `text-brand-500`, `shadow-theme-xs`.
+- `tsconfig.app.json` has `strict`, `noUnusedLocals`, `noUnusedParameters` on. `npm run build` swallows TS errors (`tsc -b || true`), so rely on `npm run type-check` as the gate.
+
+## Route map
+
+Routes are registered manually in `src/App.tsx`. The active feature is `/order-jaonaichan` (`src/pages/Jaonaichan/Order.tsx`); most other routes (charts, forms, UI elements, table examples) are TailAdmin template pages kept as reference implementations.

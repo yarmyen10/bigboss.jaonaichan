@@ -11,7 +11,7 @@ import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrders, getProductsBulk } from "../../services/jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { MoreDotIcon } from "../../icons";
-import Button from "../../components/ui/button/Button";
+import { BulkActionsDropdown, DropdownSectionHeader } from "../../components/ui/dropdown/BulkActionsDropdown";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
 import { useSpinner } from "../../hooks/useSpinner";
@@ -358,10 +358,10 @@ export default function Order() {
             uniqueProducts.set(item.product.id, item.product)
           }
         }
-         
+
         setProducts(Array.from(uniqueProducts.values()));
       }
-      
+
       // pagination.total = unique orders, total_items = order-item pairs
       const orderCount = res?.pagination?.total ?? 0;
       setManageOrdersTabs([
@@ -407,23 +407,31 @@ export default function Order() {
           //     { label: "Backorder", value: "onbackorder" },
           //   ],
           // }]}
-          bulkActions={(selected) => (
-            <>
-              <Button
-                className="!px-3 !py-1 text-sm"
-                variant="orange"
-                onClick={initialManageOrders}
-              >
-                Manage {selected.length} orders
-              </Button>
-
-              <Button
-                className="!px-3 !py-1 text-sm"
-                variant="outline"
-              >
-                Cancel {selected.length} orders
-              </Button>
-            </>
+          bulkActions={(selected, isAllSelected) => (
+            <BulkActionsDropdown label="Actions">
+              {(close) => (
+                <>
+                  <DropdownSectionHeader label="Manage" />
+                  {isAllSelected && (
+                    <DropdownItem onItemClick={() => { close(); initialManageOrders(); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                      Manage all orders.
+                    </DropdownItem>
+                  )}
+                  <DropdownItem onItemClick={() => { close(); initialManageOrders(); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                    Manage {selected.length} orders.
+                  </DropdownItem>
+                  <DropdownSectionHeader label="Cancel" border />
+                  {isAllSelected && (
+                    <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                      Cancel all orders.
+                    </DropdownItem>
+                  )}
+                  <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                    Cancel {selected.length} orders.
+                  </DropdownItem>
+                </>
+              )}
+            </BulkActionsDropdown>
           )}
         />
       </CardFrame>
@@ -470,10 +478,10 @@ export default function Order() {
                       onRowLongPress={(row) => setSheetProductId(row.id)}
                       scrollable
                       fillHeight
-                      // stickyFirstColumn
-                      // defaultPageSize={10}
-                      // rowHeight={75}
-                      // scrollMaxHeight={350}
+                    // stickyFirstColumn
+                    // defaultPageSize={10}
+                    // rowHeight={75}
+                    // scrollMaxHeight={350}
                     />
                   </div>
                   {/* flex flex-col h-full so ProductDetailsCard stretches to grid row height */}
@@ -512,8 +520,4 @@ export default function Order() {
       </BottomSheet>
     </>
   );
-  // ดึง Orders
-  // async function getOrders(page = 1, per_page = 10): Promise<OrdersResponse> {
-  //   return apiRequest(`/jaonaichan/v1/orders?page=${page}&per_page=${per_page}`);
-  // }
 }
