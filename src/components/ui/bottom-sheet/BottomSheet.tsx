@@ -1,100 +1,70 @@
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Sheet } from "react-modal-sheet";
 
 interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  /** Sheet height (CSS length). Defaults to "75vh". */
+  /**
+   * "peek" — opens showing only the handle bar; user swipes up to reveal content.
+   * "default" — opens at full height immediately.
+   */
+  defaultSnap?: "peek" | "default";
+  /** Sheet height at the default snap point as a CSS vh string, e.g. "70vh". */
   height?: string;
-  /** Distance (px) dragged past the handle threshold before close fires. */
-  closeThreshold?: number;
-  /** className applied to the outer portal root — use this to gate by media query (e.g. "min-[1025px]:hidden"). */
+  /** Visible strip height in peek state, e.g. "52px". */
+  peekHeight?: string;
+  /**
+   * Applied to the Sheet root — use for responsive gating, e.g. "min-[1025px]:hidden".
+   * The Sheet root is the portalled element so this hides backdrop + panel together.
+   */
   className?: string;
-  /** className applied to the sheet panel. */
+  /** Extra className for the sheet panel only. */
   sheetClassName?: string;
-  /** Render a drag handle at the top. Default true. */
-  showHandle?: boolean;
+}
+
+/** "70vh" → 0.7  |  "52px" → 52  |  fallback to provided default */
+function parseSnapValue(s: string, fallback: number): number {
+  const vh = s.match(/^(\d+(?:\.\d+)?)vh$/);
+  if (vh) return parseFloat(vh[1]) / 100;
+  const px = s.match(/^(\d+(?:\.\d+)?)px$/);
+  if (px) return parseFloat(px[1]);
+  return fallback;
 }
 
 export default function BottomSheet({
   isOpen,
   onClose,
   children,
+  defaultSnap = "default",
   height = "75vh",
-  closeThreshold = 120,
+  peekHeight = "52px",
   className = "",
   sheetClassName = "",
-  showHandle = true,
 }: BottomSheetProps) {
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const startYRef = useRef<number | null>(null);
+  const defaultFraction = parseSnapValue(height, 0.75);
+  const peekPx = parseSnapValue(peekHeight, 52);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  // Ascending order — library auto-prepends 0 (closed) and appends 1 (full):
+  //   [0, peekPx, defaultFraction, 1]
+  // indices: 0=closed, 1=peek, 2=default, 3=full
+  const snapPoints = [peekPx, defaultFraction];
+  const initialSnap = defaultSnap === "peek" ? 1 : 2;
 
-  useEffect(() => {
-    if (!isOpen) setDragY(0);
-  }, [isOpen]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    startYRef.current = e.touches[0].clientY;
-    setIsDragging(true);
-  };
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (startYRef.current == null) return;
-    const delta = e.touches[0].clientY - startYRef.current;
-    if (delta > 0) setDragY(delta);
-  };
-  const handleTouchEnd = () => {
-    if (dragY > closeThreshold) {
-      onClose();
-    }
-    setDragY(0);
-    setIsDragging(false);
-    startYRef.current = null;
-  };
-
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div className={`fixed inset-0 z-[9999] flex items-end ${className}`}>
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className={`relative w-full flex flex-col bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl ${sheetClassName}`}
-        style={{
-          height,
-          transform: `translateY(${dragY}px)`,
-          transition: isDragging ? "none" : "transform 300ms ease",
-        }}
-      >
-        {showHandle && (
-          <div
-            className="flex justify-center pt-3 pb-2 touch-none cursor-grab active:cursor-grabbing"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-          </div>
-        )}
-        <div className="flex-1 min-h-0 overflow-auto">
-          {children}
-        </div>
-      </div>
-    </div>,
-    document.body
+  return (
+    <Sheet
+      isOpen={isOpen}
+      onClose={onClose}
+      snapPoints={snapPoints}
+      initialSnap={initialSnap}
+      className={className}
+      // Sheet root defaults to z-9999; modal uses z-99999 — must exceed it
+      style={{ zIndex: 100000 }}
+    >
+      <Sheet.Container className={sheetClassName}>
+        <Sheet.Header />
+        <Sheet.Content>{children}</Sheet.Content>
+      </Sheet.Container>
+      <Sheet.Backdrop onTap={onClose} />
+    </Sheet>
   );
 }

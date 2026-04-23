@@ -8,7 +8,7 @@ import { OrderListResponse, Order as OrderIF, OrderProductsBulkResponse, OrderPr
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
-import { getOrders, getProductsBulk } from "../../services/jaonaichan";
+import { getOrders, getProductsBulkByOrders } from "../../services/jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { MoreDotIcon } from "../../icons";
 import { BulkActionsDropdown, DropdownSectionHeader } from "../../components/ui/dropdown/BulkActionsDropdown";
@@ -344,9 +344,9 @@ export default function Order() {
   };
 
   const [manageOrdersTabs, setManageOrdersTabs] = useState([] as TabOption[]);
-  const initialManageOrders = () => {
+  const initialManageOrders = (orderIds: number[]) => {
     withSpinner(async () => {
-      const res: OrderProductsBulkResponse = await getProductsBulk();
+      const res: OrderProductsBulkResponse = await getProductsBulkByOrders({ orderIds });
 
       if (res?.data?.length) {
         let data: OrderProductsBulkItem[] = res.data;
@@ -413,11 +413,11 @@ export default function Order() {
                 <>
                   <DropdownSectionHeader label="Manage" />
                   {isAllSelected && (
-                    <DropdownItem onItemClick={() => { close(); initialManageOrders(); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                    <DropdownItem onItemClick={() => { close(); initialManageOrders(orders.map(o => o.id)); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
                       Manage all orders.
                     </DropdownItem>
                   )}
-                  <DropdownItem onItemClick={() => { close(); initialManageOrders(); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                  <DropdownItem onItemClick={() => { close(); initialManageOrders(selected.map(o => o.id)); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
                     Manage {selected.length} orders.
                   </DropdownItem>
                   <DropdownSectionHeader label="Cancel" border />
@@ -473,6 +473,8 @@ export default function Order() {
                       columns={manageOrdersColumns}
                       data={products}
                       rowKey="id"
+                      searchable="header"
+                      exportable="header"
                       selectedRowKey={selectedProductId ?? undefined}
                       onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
                       onRowLongPress={(row) => setSheetProductId(row.id)}
@@ -502,7 +504,7 @@ export default function Order() {
               </button>
 
               <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300">
-                Save Changes
+                Save Orders
               </button>
             </div>
           </div>
@@ -512,6 +514,7 @@ export default function Order() {
         isOpen={isOpen && sheetProductId !== null}
         onClose={() => setSheetProductId(null)}
         className="min-[1025px]:hidden"
+        defaultSnap="peek"
         height="70vh"
       >
         <div className="p-4">

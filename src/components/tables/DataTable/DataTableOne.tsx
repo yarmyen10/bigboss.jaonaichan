@@ -136,7 +136,7 @@ function FilterPanel({
 
     return (
         <div ref={ref} className="relative">
-            <button
+            <Button
                 onClick={() => setOpen((v) => !v)}
                 className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition ${activeCount > 0
                     ? "border-primary bg-primary/5 text-primary"
@@ -150,7 +150,7 @@ function FilterPanel({
                         {activeCount}
                     </span>
                 )}
-            </button>
+            </Button>
 
             {open && (
                 <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white mt-2 p-4 shadow-md dark:border-strokedark dark:bg-boxdark">
@@ -175,12 +175,12 @@ function FilterPanel({
                         </div>
                     ))}
                     {activeCount > 0 && (
-                        <button
+                        <Button
                             onClick={() => filters.forEach((f) => onChange(f.paramKey, ""))}
                             className="mt-2 w-full rounded border border-stroke py-1.5 text-xs text-body transition hover:border-danger hover:text-danger dark:border-strokedark"
                         >
                             Clear all
-                        </button>
+                        </Button>
                     )}
                 </div>
             )}
@@ -474,7 +474,7 @@ export default function DataTableOne<T extends object>({
     // !fillHeight: thead/tbody display:block + tbody overflow-y:auto → scrollbar Y ใน tbody
     // fillHeight: ใช้ 2 div แยก (header + body) + JS sync X → scrollbar Y ติดขอบ body div
     const theadScrollStyle: React.CSSProperties | undefined = scrollable && !fillHeight
-        ? { display: "block" }
+        ? { display: "block", position: "relative", zIndex: 1 }
         : undefined;
 
     // overflowX:hidden สำคัญ: ถ้าไม่ระบุ CSS spec จะอัปเกรด overflow-x เป็น auto อัตโนมัติ
@@ -511,7 +511,7 @@ export default function DataTableOne<T extends object>({
                             />
                         </div>
                     )}
-                    <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                    <Button size="sm" variant="outline" className="inline-flex items-center gap-2">
                         <svg
                             className="stroke-current fill-white dark:fill-gray-800"
                             width="20"
@@ -526,7 +526,7 @@ export default function DataTableOne<T extends object>({
                             <path d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z" fill="" stroke="" strokeWidth="1.5" />
                         </svg>
                         Filter
-                    </button>
+                    </Button>
                     {exportable === "header" && (
                         <Button
                             size="sm"
@@ -623,11 +623,11 @@ export default function DataTableOne<T extends object>({
                 // !fillHeight: no sticky top, stickyFirstColumn only
                 const getThClass = (idx: number) => {
                     if (fillHeight && stickyFirstColumn && idx === 0)
-                        return "sticky top-0 left-0 z-30 border-b border-gray-100 dark:border-white/[0.05]";
+                        return "sticky top-0 left-0 z-30 border-b border-gray-100 dark:border-white/[0.05] bg-white dark:bg-[#1e2636]";
                     if (fillHeight)
-                        return "sticky top-0 border-b border-gray-100 dark:border-white/[0.05]";
+                        return "sticky top-0 z-20 border-b border-gray-100 dark:border-white/[0.05] bg-white dark:bg-[#1e2636]";
                     if (stickyFirstColumn && idx === 0)
-                        return "sticky left-0 z-20";
+                        return "sticky left-0 z-20 border-b border-gray-100 dark:border-white/[0.05] bg-white dark:bg-[#1e2636]";
                     return "";
                 };
 
@@ -679,8 +679,6 @@ export default function DataTableOne<T extends object>({
                                     onRowClick?.(row);
                                 }}
                                 onMouseDown={(e) => {
-                                    console.log('onMouseDown test', { onRowLongPress, button: e.button });
-                                    
                                     if (!onRowLongPress || e.button !== 0) return;
                                     didLongPressRef.current = false;
                                     clearLongPress();
