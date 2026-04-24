@@ -1,4 +1,16 @@
+import React from "react";
 import { Sheet } from "react-modal-sheet";
+
+// Reads currentSnap from Sheet context and clips overflow at the peek snap (index 1)
+// so the card body's scrollbar doesn't appear in the collapsed strip.
+function SnapAwareWrapper({ children }: { children: React.ReactNode }) {
+  const { currentSnap } = Sheet.useContext();
+  return (
+    <div className={`h-full${currentSnap === 1 ? " overflow-hidden" : ""}`}>
+      {children}
+    </div>
+  );
+}
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -62,7 +74,9 @@ export default function BottomSheet({
     >
       <Sheet.Container className={sheetClassName}>
         <Sheet.Header />
-        <Sheet.Content>{children}</Sheet.Content>
+        <Sheet.Content disableDrag disableScroll>
+          <SnapAwareWrapper>{children}</SnapAwareWrapper>
+        </Sheet.Content>
       </Sheet.Container>
       <Sheet.Backdrop onTap={onClose} />
     </Sheet>

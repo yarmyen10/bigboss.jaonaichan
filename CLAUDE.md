@@ -74,6 +74,22 @@ Row-level dropdowns (see `Order.tsx`) render via `createPortal` into `document.b
 - TailAdmin design tokens in use: `text-body`, `bg-boxdark`, `border-strokedark`, `text-brand-500`, `shadow-theme-xs`.
 - `tsconfig.app.json` has `strict`, `noUnusedLocals`, `noUnusedParameters` on. `npm run build` swallows TS errors (`tsc -b || true`), so rely on `npm run type-check` as the gate.
 
+## Reuse existing components — check before building new
+
+Before writing raw HTML or custom styles, check if an existing component covers the need:
+
+| Need | Component | Path |
+|------|-----------|------|
+| Button | `Button` | `src/components/ui/button/Button.tsx` — variants: `primary`, `outline`, `orange`; sizes: `sm`, `md` |
+| Select / dropdown | `Select` | `src/components/form/Select.tsx` — uncontrolled (`defaultValue` + `onChange`); pass `key` to reset externally |
+| Text input | `Input` | `src/components/form/input/InputField.tsx` — does **not** forward `ref`; use raw `<input ref={...}>` when flatpickr or direct DOM access is needed |
+| Form label | `Label` | `src/components/form/Label.tsx` |
+| Badge | `Badge` | `src/components/ui/badge/Badge.tsx` |
+| Modal | `Modal` | `src/components/ui/modal/index.tsx` |
+| Portaled dropdown menu | `Dropdown` + `DropdownItem` | `src/components/ui/dropdown/` |
+
+**`Button` and `Input` do not use `forwardRef`** — when a `ref` on the underlying DOM element is required (e.g. portal positioning, flatpickr init), use a raw `<button>` or `<input>` instead. Do not wrap in a `forwardRef` shim without asking first.
+
 ## Route map
 
 Routes are registered manually in `src/App.tsx`. The active feature is `/order-jaonaichan` (`src/pages/Jaonaichan/Order.tsx`); most other routes (charts, forms, UI elements, table examples) are TailAdmin template pages kept as reference implementations.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from 'react-dom';
+import flatpickr from "flatpickr";
 import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -10,7 +11,10 @@ import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrders, getProductsBulkByOrders } from "../../services/jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
-import { MoreDotIcon } from "../../icons";
+import { CalenderIcon, CheckCircleIcon, MoreDotIcon } from "../../icons";
+import Button from "../../components/ui/button/Button";
+import Select from "../../components/form/Select";
+import Label from "../../components/form/Label";
 import { BulkActionsDropdown, DropdownSectionHeader } from "../../components/ui/dropdown/BulkActionsDropdown";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
@@ -62,6 +66,185 @@ const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
   "bank_transfer": { color: "info", text: "Bank Transfer" },
   "cod": { color: "light", text: "Cash on Delivery" },
 };
+
+// ── Date filter ──────────────────────────────────────────────────────────────
+
+interface DateFilter {
+  month: string;  // "" = All, "1"–"12"
+  year: string;   // "yyyy"
+  date: string;   // "" = no day override, "dd/mm/yyyy"
+}
+
+
+function parseDMY(s: string): Date | undefined {
+  const [d, m, y] = s.split("/").map(Number);
+  return d && m && y ? new Date(y, m - 1, d) : undefined;
+}
+
+const MONTHS = [
+  { label: "All", value: "" },
+  { label: "January", value: "1" },
+  { label: "February", value: "2" },
+  { label: "March", value: "3" },
+  { label: "April", value: "4" },
+  { label: "May", value: "5" },
+  { label: "June", value: "6" },
+  { label: "July", value: "7" },
+  { label: "August", value: "8" },
+  { label: "September", value: "9" },
+  { label: "October", value: "10" },
+  { label: "November", value: "11" },
+  { label: "December", value: "12" },
+];
+
+function DateFilterDropdown({
+  value,
+  onChange,
+}: {
+  value: DateFilter;
+  onChange: (v: DateFilter) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fpRef = useRef<flatpickr.Instance | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      if (fpRef.current?.calendarContainer.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
+  // re-init flatpickr each time the panel mounts so defaultDate reflects current value
+  useEffect(() => {
+    if (!inputRef.current) return;
+    const fp = flatpickr(inputRef.current, {
+      mode: "single",
+      dateFormat: "d/m/Y",
+      defaultDate: parseDMY(valueRef.current.date) ?? new Date(),
+      monthSelectorType: "static",
+      prevArrow:
+        '<svg class="stroke-current" width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M12.5 15L7.5 10L12.5 5" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      nextArrow:
+        '<svg class="stroke-current" width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M7.5 15L12.5 10L7.5 5" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      onChange: (_dates, dateStr) => {
+        onChangeRef.current({ ...valueRef.current, date: dateStr });
+      },
+    });
+    fpRef.current = Array.isArray(fp) ? fp[0] : fp;
+    return () => {
+      fpRef.current?.destroy();
+      fpRef.current = null;
+    };
+  }, [open]);
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const isFiltered = value.date !== "" || value.month !== "" || value.year !== String(currentYear);
+  const btnRect = buttonRef.current?.getBoundingClientRect();
+
+  return (
+    <>
+      <Button
+        ref={buttonRef}
+        size="sm"
+        variant={isFiltered ? "primary" : "outline"}
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1.5 font-medium transition`}
+        startIcon={<CalenderIcon className="size-5 shrink-0" />}
+        endIcon={isFiltered && (<CheckCircleIcon className="size-5 shrink-0" />)}
+      >
+        Date
+      </Button>
+
+      {open && btnRect && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            top: btnRect.bottom + 8,
+            right: window.innerWidth - btnRect.right,
+            zIndex: 9999,
+          }}
+          className="w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+        >
+          {/* Year */}
+          <div className="mb-3">
+            <Label>Year</Label>
+            <Select
+              key={value.year}
+              options={years.map((y) => ({ value: String(y), label: String(y) }))}
+              placeholder={null}
+              defaultValue={value.year}
+              onChange={(val) => onChange({ ...value, year: val })}
+            />
+          </div>
+
+          {/* Month */}
+          <div className="mb-3">
+            <Label>Month</Label>
+            <Select
+              key={value.month}
+              options={MONTHS.map((m) => ({ value: m.value, label: m.label }))}
+              placeholder={null}
+              defaultValue={value.month}
+              onChange={(val) => onChange({ ...value, month: val, date: "" })}
+            />
+          </div>
+
+          {/* Date */}
+          <div className="mb-1">
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label>Date</Label>
+              {value.date && (
+                <button
+                  type="button"
+                  onClick={() => { fpRef.current?.clear(); onChange({ ...value, date: "" }); }}
+                  className="text-xs text-gray-400 transition-colors hover:text-red-500 dark:hover:text-red-400"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <CalenderIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-gray-400" />
+              <input
+                ref={inputRef}
+                readOnly
+                placeholder="dd/mm/yyyy"
+                className="h-9 w-full cursor-pointer rounded-lg border border-gray-300 bg-transparent pl-9 pr-3 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+              />
+            </div>
+          </div>
+
+          {/* Reset all */}
+          {isFiltered && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { fpRef.current?.clear(); onChange({ month: "", year: String(currentYear), date: "" }); }}
+              className="mt-3 w-full !py-2 text-xs"
+            >
+              Reset filters
+            </Button>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 const getOrderColumns = (
   buttonRefs: React.RefObject<Record<string, HTMLButtonElement | null>>,
@@ -288,6 +471,12 @@ export default function Order() {
   const hasInitialized = useRef(false);
   const [orders, setOrders] = useState<OrderIF[]>([]);
 
+  const [dateFilter, setDateFilter] = useState<DateFilter>(() => ({
+    month: "",
+    year: String(new Date().getFullYear()),
+    date: "",
+  }));
+
   const [products, setProducts] = useState<OrderItemProduct[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const selectedProduct = products.find(p => p.id === selectedProductId) ?? null;
@@ -311,29 +500,34 @@ export default function Order() {
     [summaryAmounts]
   );
 
-  const init = async () => {
+  const loadOrders = async (filter: DateFilter) => {
     try {
       setIsLoading(true);
-      console.log("load data...");
-      const res: OrderListResponse = await getOrders();
-      if (res?.data?.length) {
-        setOrders(res.data)
-      }
-      console.log('res=', res);
-
+      const res: OrderListResponse = await getOrders({
+        ...(filter.date
+          ? { createDate: filter.date }
+          : {
+              ...(filter.month ? { createDateM: Number(filter.month) } : {}),
+              ...(filter.year  ? { createDateY: Number(filter.year)  } : {}),
+            }),
+      });
+      setOrders(Array.isArray(res?.data) ? res.data : []);
     } catch (error) {
       console.error(error);
     } finally {
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 100);
+      setTimeout(() => setIsLoading(false), 100);
     }
+  };
+
+  const handleFilterChange = (newFilter: DateFilter) => {
+    setDateFilter(newFilter);
+    loadOrders(newFilter);
   };
 
   useEffect(() => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
-    init();
+    loadOrders(dateFilter);
   }, []);
 
   const { isOpen, openModal, closeModal } = useModal();
@@ -392,6 +586,7 @@ export default function Order() {
           selectable
           searchable="header"
           exportable="header"
+          headerFilter={<DateFilterDropdown value={dateFilter} onChange={handleFilterChange} />}
           tabs={[
             { value: "all", label: "All Order" },
             { value: "unpaid", label: "Unpaid" },
@@ -514,10 +709,11 @@ export default function Order() {
         isOpen={isOpen && sheetProductId !== null}
         onClose={() => setSheetProductId(null)}
         className="min-[1025px]:hidden"
+        sheetClassName="!bg-white dark:!bg-gray-900"
         defaultSnap="peek"
         height="70vh"
       >
-        <div className="p-4">
+        <div className="h-full flex flex-col p-4">
           <ProductDetailsCard product={sheetProduct} />
         </div>
       </BottomSheet>

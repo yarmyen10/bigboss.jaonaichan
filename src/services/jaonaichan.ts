@@ -1,8 +1,27 @@
 import { apiRequest } from "../api/client";
 import { OrderListResponse, OrderProductsBulkResponse } from "../interfaces/order.jaonaichan";
 
-export async function getOrders(page = 1, perPage = 10): Promise<OrderListResponse> {
-    return apiRequest(`/jaonaichan/v1/orders?page=${page}&per_page=${perPage}`);
+export interface GetOrdersParams {
+    page?: number;
+    perPage?: number;
+    status?: string;
+    /** exact date override — dd/mm/yyyy, takes precedence over month/year */
+    createDate?: string;
+    createDateM?: number;
+    createDateY?: number;
+}
+
+export async function getOrders(params: GetOrdersParams = {}): Promise<OrderListResponse> {
+    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY } = params;
+    const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+    if (status) qs.set("status", status);
+    if (createDate) {
+        qs.set("create_date", createDate);
+    } else {
+        if (createDateM) qs.set("create_date_m", String(createDateM));
+        if (createDateY) qs.set("create_date_y", String(createDateY));
+    }
+    return apiRequest(`/jaonaichan/v1/orders?${qs}`);
 }
 
 export async function getProductsBulk(statuses = "all", page = 1, perPage = 10): Promise<any> {

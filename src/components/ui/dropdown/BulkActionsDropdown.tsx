@@ -21,7 +21,7 @@ export function BulkActionsDropdown({ label = "Actions", children }: BulkActions
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
-      <Dropdown isOpen={open} onClose={close} className="w-52 py-2 left-0 right-auto">
+      <Dropdown isOpen={open} onClose={close} className="w-52 px-2 py-3 left-0 right-auto">
         {children(close)}
       </Dropdown>
     </div>

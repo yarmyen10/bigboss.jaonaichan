@@ -18,8 +18,8 @@ export default function ProductDetailsCard({ product }: ProductDetailsCardProps)
   return (
     <ComponentCard
       title="Product Details"
-      className="lg:flex lg:flex-col lg:h-full lg:min-h-0 lg:flex-1"
-      classNameBody="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar"
+      className="flex flex-col flex-1 min-h-0"
+      classNameBody="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
       bodyRef={bodyRef}
     >
       {!product ? (
