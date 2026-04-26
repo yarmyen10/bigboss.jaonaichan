@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/modal";
 import Badge, { BadgeColor } from "../ui/badge/Badge";
+import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
 import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
 import { getOrder } from "../../services/jaonaichan";
 
@@ -95,68 +96,55 @@ function BillRow({
   );
 }
 
+const ITEM_COLUMNS: BasicTableColumn[] = [
+  { key: "product", label: "Product" },
+  { key: "qty", label: "Quantity", className: "text-center" },
+  { key: "unitPrice", label: "Unit Price", className: "text-right" },
+  { key: "subtotal", label: "Subtotal", className: "text-right" },
+  { key: "lineTotal", label: "Total", className: "text-right" },
+];
+
 function ItemsTable({ items }: { items: OrderItem[] }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Product
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Qty
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Unit Price
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Subtotal
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {items.map((item) => (
-            <tr key={item.item_id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  {item.product.image?.thumbnail ? (
-                    <img
-                      src={item.product.image.thumbnail}
-                      alt={item.name}
-                      className="h-10 w-10 shrink-0 rounded object-cover bg-gray-100 dark:bg-gray-800"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 shrink-0 rounded bg-gray-100 dark:bg-gray-800" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="max-w-[220px] truncate text-sm font-medium text-gray-800 dark:text-white">
-                      {item.name}
-                    </p>
-                    {item.variation.length > 0 && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {item.variation.map((v) => `${v.key}: ${v.value}`).join(", ")}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{item.product.sku}</p>
-                  </div>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-center text-sm text-gray-700 dark:text-gray-300">
-                {item.quantity}
-              </td>
-              <td className="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                ฿{Number(item.unit_price).toLocaleString()}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-semibold text-gray-800 dark:text-white">
-                ฿{Number(item.subtotal).toLocaleString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const rows = items.map((item) => ({
+    product: (
+      <div className="flex items-center gap-3">
+        {item.product.image?.thumbnail ? (
+          <img
+            src={item.product.image.thumbnail}
+            alt={item.name}
+            className="h-10 w-10 shrink-0 rounded object-cover bg-gray-100 dark:bg-gray-800"
+          />
+        ) : (
+          <div className="h-10 w-10 shrink-0 rounded bg-gray-100 dark:bg-gray-800" />
+        )}
+        <div className="min-w-0">
+          <p className="max-w-[220px] truncate text-sm font-medium text-gray-800 dark:text-white">
+            {item.name}
+          </p>
+          {item.variation.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {item.variation.map((v) => `${v.key}: ${v.value}`).join(", ")}
+            </p>
+          )}
+          <p className="text-xs text-gray-400 dark:text-gray-500">{item.product.sku}</p>
+        </div>
+      </div>
+    ),
+    qty: item.quantity,
+    unitPrice: `฿${Number(item.unit_price).toLocaleString()}`,
+    subtotal: (
+      <span className="font-semibold text-gray-800 dark:text-white">
+        ฿{Number(item.subtotal).toLocaleString()}
+      </span>
+    ),
+    lineTotal: (
+      <span className="font-semibold text-gray-800 dark:text-white">
+        ฿{Number(item.total).toLocaleString()}
+      </span>
+    ),
+  }));
+
+  return <BasicTableOne columns={ITEM_COLUMNS} rows={rows} />;
 }
 
 export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsProps) {
