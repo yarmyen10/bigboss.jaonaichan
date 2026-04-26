@@ -31,7 +31,7 @@ export default function ProductDetailsCard({ product }: ProductDetailsCardProps)
               <img
                 src={product.image.full ?? product.image.medium ?? product.image.thumbnail}
                 alt={product.name}
-                className="h-50 w-50 rounded object-cover"
+                className="h-full w-80 rounded object-cover"
               />
             </div>
           )}

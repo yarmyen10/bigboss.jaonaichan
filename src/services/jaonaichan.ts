@@ -1,5 +1,5 @@
 import { apiRequest } from "../api/client";
-import { OrderListResponse, OrderProductsBulkResponse } from "../interfaces/order.jaonaichan";
+import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse } from "../interfaces/order.jaonaichan";
 
 export interface GetOrdersParams {
     page?: number;
@@ -22,6 +22,10 @@ export async function getOrders(params: GetOrdersParams = {}): Promise<OrderList
         if (createDateY) qs.set("create_date_y", String(createDateY));
     }
     return apiRequest(`/jaonaichan/v1/orders?${qs}`);
+}
+
+export async function getOrder(id: number): Promise<OrderDetailResponse> {
+    return apiRequest(`/jaonaichan/v1/orders/${id}?with_items=true`);
 }
 
 export async function getProductsBulk(statuses = "all", page = 1, perPage = 10): Promise<any> {

@@ -229,7 +229,7 @@ function ActionDropdown<T extends object>({ row, actions }: { row: T; actions: R
       </button>
 
       {open && (
-        <div className="absolute right-0 top-9 z-50 min-w-[150px] rounded-md border border-stroke bg-white py-1 shadow-md dark:border-strokedark dark:bg-boxdark">
+        <div className="absolute right-0 top-9 z-50 min-w-[150px] rounded-md border border-stroke bg-white py-1 shadow-md dark:dark:border-gray-800 dark:bg-boxdark">
           {actions.map((action, i) => (
             <button
               key={i}
@@ -278,7 +278,7 @@ function FilterPanel({
         className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition ${
           activeCount > 0
             ? "border-primary bg-primary/5 text-primary"
-            : "border-stroke bg-white text-black hover:bg-gray-1 dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+            : "border-stroke bg-white text-black hover:bg-gray-1 dark:dark:border-gray-800 dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
         }`}
       >
         <Ico.Filter />
@@ -291,7 +291,7 @@ function FilterPanel({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white p-4 shadow-md dark:border-strokedark dark:bg-boxdark">
+        <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white p-4 shadow-md dark:dark:border-gray-800 dark:bg-boxdark">
           {filters.map((f) => (
             <div key={f.paramKey} className="mb-4 last:mb-0">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-body dark:text-bodydark">
@@ -315,7 +315,7 @@ function FilterPanel({
           {activeCount > 0 && (
             <button
               onClick={() => filters.forEach((f) => onChange(f.paramKey, ""))}
-              className="mt-2 w-full rounded border border-stroke py-1.5 text-xs text-body transition hover:border-danger hover:text-danger dark:border-strokedark"
+              className="mt-2 w-full rounded border border-stroke py-1.5 text-xs text-body transition hover:border-danger hover:text-danger dark:dark:border-gray-800"
             >
               Clear all
             </button>
@@ -489,7 +489,7 @@ export default function DataTable<T extends object>({
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className={`rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark ${className}`}>
+    <div className={`rounded-sm border border-stroke bg-white shadow-default dark:dark:border-gray-800 dark:bg-boxdark ${className}`}>
 
       {/* Header */}
       {(title || headerActions) && (
@@ -506,14 +506,14 @@ export default function DataTable<T extends object>({
 
       {/* Bulk action bar */}
       {selectable && selectedRows.length > 0 && bulkActions && (
-        <div className="flex items-center gap-3 border-t border-stroke bg-primary/5 px-6 py-3 dark:border-strokedark">
+        <div className="flex items-center gap-3 border-t border-stroke bg-primary/5 px-6 py-3 dark:dark:border-gray-800">
           <span className="text-sm font-medium text-primary">{selectedRows.length} selected</span>
           {bulkActions(selectedRows)}
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 border-b border-t border-stroke px-6 py-3.5 dark:border-strokedark">
+      <div className="flex items-center justify-between gap-3 border-b border-t border-stroke px-6 py-3.5 dark:dark:border-gray-800">
         {/* Search */}
         <div className="flex flex-1 items-center gap-2">
           {searchable && (
@@ -526,7 +526,7 @@ export default function DataTable<T extends object>({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full rounded-lg border border-stroke bg-white py-2.5 pl-11 pr-4 text-sm text-black outline-none transition focus:border-primary dark:border-strokedark dark:bg-boxdark dark:text-white dark:focus:border-primary"
+                className="w-full rounded-lg border border-stroke bg-white py-2.5 pl-11 pr-4 text-sm text-black outline-none transition focus:border-primary dark:dark:border-gray-800 dark:bg-boxdark dark:text-white dark:focus:border-primary"
               />
             </div>
           )}
@@ -538,7 +538,7 @@ export default function DataTable<T extends object>({
             <select
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}
-              className="rounded-lg border border-stroke bg-white px-3 py-2.5 text-sm text-black outline-none dark:border-strokedark dark:bg-boxdark dark:text-white"
+              className="rounded-lg border border-stroke bg-white px-3 py-2.5 text-sm text-black outline-none dark:dark:border-gray-800 dark:bg-boxdark dark:text-white"
             >
               {pageSizeOptions.map((s) => <option key={s} value={s}>{s} / page</option>)}
             </select>
@@ -555,7 +555,7 @@ export default function DataTable<T extends object>({
           {exportable && (
             <button
               onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
-              className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+              className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:dark:border-gray-800 dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
             >
               Export <Ico.Download />
             </button>
@@ -575,7 +575,7 @@ export default function DataTable<T extends object>({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-stroke text-left dark:border-strokedark">
+            <tr className="border-b border-stroke text-left dark:dark:border-gray-800">
               {selectable && (
                 <th className="w-12 px-6 py-4">
                   <input type="checkbox" checked={allSelected} onChange={toggleAll}
@@ -616,7 +616,7 @@ export default function DataTable<T extends object>({
                   <tr
                     key={String(id)}
                     onClick={() => onRowClick?.(row)}
-                    className={`border-b border-stroke last:border-0 transition-colors dark:border-strokedark ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                    className={`border-b border-stroke last:border-0 transition-colors dark:dark:border-gray-800 ${onRowClick ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
                   >
                     {selectable && (
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
@@ -648,7 +648,7 @@ export default function DataTable<T extends object>({
       </div>
 
       {/* Footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-6 py-4 dark:border-strokedark">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-6 py-4 dark:dark:border-gray-800">
         <p className="text-sm text-body dark:text-bodydark">
           {total === 0 ? "No records" : (
             <Fragment>
@@ -664,7 +664,7 @@ export default function DataTable<T extends object>({
 
         <div className="flex items-center gap-1">
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:dark:border-gray-800 dark:text-white">
             <Ico.ChevLeft />
           </button>
 
@@ -673,14 +673,14 @@ export default function DataTable<T extends object>({
               <span key={`e${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-body">…</span>
             ) : (
               <button key={p} onClick={() => setPage(p as number)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition ${page === p ? "border-primary bg-primary text-white" : "border-stroke text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"}`}>
+                className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition ${page === p ? "border-primary bg-primary text-white" : "border-stroke text-black hover:border-primary hover:text-primary dark:dark:border-gray-800 dark:text-white"}`}>
                 {p}
               </button>
             )
           )}
 
           <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:border-strokedark dark:text-white">
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-primary hover:text-primary disabled:opacity-40 dark:dark:border-gray-800 dark:text-white">
             <Ico.ChevRight />
           </button>
         </div>

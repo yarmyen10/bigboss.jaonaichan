@@ -140,7 +140,7 @@ function FilterPanel({
                 onClick={() => setOpen((v) => !v)}
                 className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition ${activeCount > 0
                     ? "border-primary bg-primary/5 text-primary"
-                    : "border-stroke bg-white text-black hover:bg-gray-1 dark:border-strokedark dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
+                    : "border-stroke bg-white text-black hover:bg-gray-1 dark:border-white/[0.05] dark:bg-boxdark dark:text-white dark:hover:bg-meta-4"
                     }`}
             >
                 <Ico.Filter />
@@ -153,7 +153,7 @@ function FilterPanel({
             </Button>
 
             {open && (
-                <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white mt-2 p-4 shadow-md dark:border-strokedark dark:bg-boxdark">
+                <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-stroke bg-white mt-2 p-4 shadow-md dark:border-white/[0.05] dark:bg-boxdark">
                     {filters.map((f) => (
                         <div key={f.paramKey} className="mb-4 last:mb-0">
                             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-body dark:text-bodydark">
@@ -177,7 +177,7 @@ function FilterPanel({
                     {activeCount > 0 && (
                         <Button
                             onClick={() => filters.forEach((f) => onChange(f.paramKey, ""))}
-                            className="mt-2 w-full rounded border border-stroke py-1.5 text-xs text-body transition hover:border-danger hover:text-danger dark:border-strokedark"
+                            className="mt-2 w-full rounded border border-stroke py-1.5 text-xs text-body transition hover:border-danger hover:text-danger dark:border-white/[0.05] dark:bg-boxdark"
                         >
                             Clear all
                         </Button>
@@ -513,7 +513,7 @@ export default function DataTableOne<T extends object>({
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={searchPlaceholder}
-                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-100 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-100 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-white/[0.05] dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                             />
                         </div>
                     )}
@@ -533,7 +533,7 @@ export default function DataTableOne<T extends object>({
             )}
         >
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 !mb-0">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-white/[0.05] !mb-0">
                 {/* Left controls */}
                 <div className="flex flex-1 items-center gap-3">
                     {searchable === 'toolbar' && (
@@ -546,7 +546,7 @@ export default function DataTableOne<T extends object>({
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={searchPlaceholder}
-                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-100 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                                className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-100 bg-transparent py-2.5 pr-4 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden sm:w-[300px] sm:min-w-[300px] dark:border-white/[0.05] dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                             />
                         </div>
                     )}
@@ -693,7 +693,7 @@ export default function DataTableOne<T extends object>({
                                 onTouchMove={clearLongPress}
                                 onTouchEnd={clearLongPress}
                                 onTouchCancel={clearLongPress}
-                                className={`border-b border-stroke last:border-0 transition-shadow duration-300 ease-in-out dark:border-strokedark ${(onRowClick || onRowLongPress) ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
+                                className={`border-b border-gray-100 last:border-0 transition-shadow duration-300 ease-in-out dark:border-white/[0.05] ${(onRowClick || onRowLongPress) ? "cursor-pointer" : ""} ${String(id) === String(selectedRowKey) ? "bg-gray-50 dark:bg-gray-50/10" : isSelected ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-1/60 dark:hover:bg-meta-4/40"}`}
                             >
                                 {columns.map((col, idx) => {
                                     const val = getNestedValue(row, col.key);
@@ -744,7 +744,7 @@ export default function DataTableOne<T extends object>({
 
                 // !fillHeight: single table, thead/tbody display:block, scrollbar Y ใน tbody
                 return (
-                    <div className="max-w-full overflow-x-auto custom-scrollbar">
+                    <div className="max-w-full overflow-x-auto custom-scrollbar mb-0">
                         <Table>
                             <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]" style={theadScrollStyle}>
                                 <TableRow style={trScrollStyle}>{headerCells}</TableRow>
@@ -759,7 +759,7 @@ export default function DataTableOne<T extends object>({
 
             {/* Footer — ซ่อนเมื่อ scrollable */}
             {!scrollable && (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-white/[0.05]">
                     <p className="text-sm text-body dark:text-gray-400">
                         {total === 0 ? "No records" : (
                             <span className="block text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -812,7 +812,7 @@ export default function DataTableOne<T extends object>({
                 </div>
             )}
             {scrollable && (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800"></div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-white/[0.05]"></div>
             )}
         </ComponentTableCard>
     );

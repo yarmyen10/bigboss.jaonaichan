@@ -71,7 +71,7 @@ Row-level dropdowns (see `Order.tsx`) render via `createPortal` into `document.b
 - **ESLint `naming-convention`** is enforced (see `eslint.config.js`): `PascalCase` for types/components, `camelCase` for functions/variables, `UPPER_CASE` allowed for constants, `snake_case` allowed on interface members (to match WP REST payload shape).
 - `@typescript-eslint/no-explicit-any` is a warning with auto-fix to `unknown`.
 - Styling is Tailwind utilities in JSX, `clsx` / `tailwind-merge` for conditionals. Dark mode is class-based with the `dark:` prefix.
-- TailAdmin design tokens in use: `text-body`, `bg-boxdark`, `border-strokedark`, `text-brand-500`, `shadow-theme-xs`.
+- TailAdmin design tokens in use: `text-body`, `bg-boxdark`, `dark:border-gray-800`, `text-brand-500`, `shadow-theme-xs`.
 - `tsconfig.app.json` has `strict`, `noUnusedLocals`, `noUnusedParameters` on. `npm run build` swallows TS errors (`tsc -b || true`), so rely on `npm run type-check` as the gate.
 
 ## Reuse existing components — check before building new

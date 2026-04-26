@@ -66,9 +66,9 @@ const PRODUCT_COLUMNS: ColumnDef<WCProduct>[] = [
       <div className="flex items-center gap-4">
         {row.images?.[0] ? (
           <img src={row.images[0].src} alt={row.name}
-            className="h-[46px] w-[46px] rounded-md border border-stroke object-cover dark:border-strokedark" />
+            className="h-[46px] w-[46px] rounded-md border border-stroke object-cover dark:dark:border-gray-800" />
         ) : (
-          <div className="flex h-[46px] w-[46px] items-center justify-center rounded-md border border-stroke bg-gray-1 dark:border-strokedark dark:bg-meta-4">
+          <div className="flex h-[46px] w-[46px] items-center justify-center rounded-md border border-stroke bg-gray-1 dark:dark:border-gray-800 dark:bg-meta-4">
             <span className="text-xs text-body">N/A</span>
           </div>
         )}
@@ -174,7 +174,7 @@ export function ProductsPage() {
       ]}
       headerActions={
         <>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:border-strokedark dark:bg-boxdark dark:text-white">
+          <button className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-gray-1 dark:dark:border-gray-800 dark:bg-boxdark dark:text-white">
             Export <IcoDownload />
           </button>
           <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-opacity-90">

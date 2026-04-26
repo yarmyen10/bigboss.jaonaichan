@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from 'react-dom';
 import flatpickr from "flatpickr";
 import CardFrame from "../../components/common/CardFrame";
@@ -22,6 +22,7 @@ import { useSpinner } from "../../hooks/useSpinner";
 import PageSpinner from "../../components/common/PageSpinner";
 import ComponentTabCard from "../../components/common/ComponentTabCard";
 import ProductDetailsCard from "../../components/jaonaichan/ProductDetailsCard";
+import OrderDetails from "../../components/jaonaichan/OrderDetails";
 import BottomSheet from "../../components/ui/bottom-sheet/BottomSheet";
 
 
@@ -249,7 +250,8 @@ function DateFilterDropdown({
 const getOrderColumns = (
   buttonRefs: React.RefObject<Record<string, HTMLButtonElement | null>>,
   openDropdownId: string | null,
-  setOpenDropdownId: (id: string | null) => void
+  setOpenDropdownId: (id: string | null) => void,
+  onViewMore: (row: OrderIF) => void
 ): ColumnDef<OrderIF>[] => [
     {
       key: "id",
@@ -353,7 +355,7 @@ const getOrderColumns = (
                   className="w-40 p-2"
                 >
                   <DropdownItem
-                    onItemClick={() => setOpenDropdownId(null)}
+                    onItemClick={() => { setOpenDropdownId(null); onViewMore(row); }}
                     className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
                   >
                     View More
@@ -488,11 +490,19 @@ export default function Order() {
 
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
+  const [viewOrder, setViewOrder] = useState<OrderIF | null>(null);
+  const { isOpen: isDetailsOpen, openModal: openDetails, closeModal: closeDetails } = useModal();
+
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
+  const handleViewMore = useCallback((row: OrderIF) => {
+    setViewOrder(row);
+    openDetails();
+  }, [openDetails]);
+
   const columns = useMemo(
-    () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId),
-    [openDropdownId]
+    () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore),
+    [openDropdownId, handleViewMore]
   );
 
   const manageOrdersColumns = useMemo(
@@ -717,6 +727,11 @@ export default function Order() {
           <ProductDetailsCard product={sheetProduct} />
         </div>
       </BottomSheet>
+      <OrderDetails
+        order={viewOrder}
+        isOpen={isDetailsOpen}
+        onClose={closeDetails}
+      />
     </>
   );
 }
