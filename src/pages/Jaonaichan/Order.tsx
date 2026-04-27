@@ -27,7 +27,7 @@ import BottomSheet from "../../components/ui/bottom-sheet/BottomSheet";
 
 
 
-type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded" | "failed" | "checkout-draft" | "waiting-transfer";
+type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded" | "failed" | "checkout-draft" | "waiting-transfer" | "pending-payment-1" | "pending-payment-2" | string;
 type PaymentMethod = "promptpay_qr" | "bank_transfer" | "cod";
 // interface WCOrder {
 //   id: number;
@@ -56,6 +56,8 @@ const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
   "failed": { color: "error", text: "Failed" },
   "checkout-draft": { color: "light", text: "Draft" },
   "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
+  "pending-payment-1": { color: "primary", text: "Pending payment 1" },
+  "pending-payment-2": { color: "primary", text: "Pending payment 2" },
 };
 
 const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
