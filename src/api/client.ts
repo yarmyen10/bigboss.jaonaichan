@@ -28,3 +28,23 @@ export async function apiRequest<T>(endpoint: string, options: RequestOptions = 
 
     return res.json() as Promise<T>;
 }
+
+export async function apiFetch(endpoint: string, options: RequestOptions = {}): Promise<Response> {
+    const token = getToken();
+
+    const res = await fetch(`${JAONAICHAN_API_URL}${endpoint}`, {
+        ...options,
+        headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            ...options.headers,
+        },
+    });
+
+    if (res.status === 403) {
+        signOut();
+        window.location.href = '/signin';
+        throw new Error('Unauthorized');
+    }
+
+    return res;
+}

@@ -56,8 +56,10 @@ const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
   "failed": { color: "error", text: "Failed" },
   "checkout-draft": { color: "light", text: "Draft" },
   "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
-  "pending-payment-1": { color: "primary", text: "Pending payment 1" },
-  "pending-payment-2": { color: "primary", text: "Pending payment 2" },
+  "pending-payment-1": { color: "warning", text: "Pending payment 1" },
+  "pending-payment-2": { color: "warning", text: "Pending payment 2" },
+  "wait-verify-1": { color: "warning", text: "Waiting for Verification 1" },
+  "wait-verify-2": { color: "warning", text: "Waiting for Verification 2" },
 };
 
 const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {

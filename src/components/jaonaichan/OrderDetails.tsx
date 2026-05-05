@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal } from "../ui/modal";
 import Badge, { BadgeColor } from "../ui/badge/Badge";
 import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
 import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
-import { getOrder } from "../../services/jaonaichan";
+import { getBillSlipObjectUrl, getOrder } from "../../services/jaonaichan";
 
 interface OrderDetailsProps {
   order: Order | null;
@@ -67,15 +68,19 @@ function BillRow({
   amount,
   status,
   paidAt,
+  slipUrl,
+  onPreviewSlip,
 }: {
   label: string;
   amount: number;
   status: string;
   paidAt: string | null;
+  slipUrl?: string | null;
+  onPreviewSlip?: (url: string) => void;
 }) {
   const badge = BILL_STATUS_MAP[status] ?? { color: "light" as BadgeColor, text: status };
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
         <div className="flex items-center gap-2">
@@ -91,6 +96,20 @@ function BillRow({
         <p className="text-right text-xs text-gray-400 dark:text-gray-500">
           Paid {new Date(paidAt).toLocaleDateString("th-TH")}
         </p>
+      )}
+      {slipUrl && (
+        <button
+          type="button"
+          onClick={() => onPreviewSlip?.(slipUrl)}
+          className="block w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:opacity-90 dark:border-gray-700 dark:bg-gray-800"
+          title="Click to preview"
+        >
+          <img
+            src={slipUrl}
+            alt={`${label} slip`}
+            className="h-auto w-full max-h-40 object-contain"
+          />
+        </button>
       )}
     </div>
   );
@@ -150,6 +169,9 @@ function ItemsTable({ items }: { items: OrderItem[] }) {
 export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsProps) {
   const [detail, setDetail] = useState<OrderDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [slip1, setSlip1] = useState<string | null>(null);
+  const [slip2, setSlip2] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !order) return;
@@ -163,6 +185,39 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
 
   const displayed = detail ?? order;
   const items: OrderItem[] = detail?.items ?? [];
+
+  useEffect(() => {
+    if (!isOpen || !displayed) return;
+
+    setSlip1(null);
+    setSlip2(null);
+    setPreviewUrl(null);
+
+    let cancelled = false;
+    const created: string[] = [];
+
+    const load = async (bill: 1 | 2, setter: (u: string | null) => void) => {
+      try {
+        const url = await getBillSlipObjectUrl(displayed.id, bill);
+        if (cancelled) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        if (url) created.push(url);
+        setter(url);
+      } catch (err) {
+        console.error(`load slip ${bill}`, err);
+      }
+    };
+
+    load(1, setSlip1);
+    load(2, setSlip2);
+
+    return () => {
+      cancelled = true;
+      for (const u of created) URL.revokeObjectURL(u);
+    };
+  }, [isOpen, displayed?.id]);
 
   const statusInfo = displayed
     ? (STATUS_MAP[displayed.status] ?? { color: "light" as BadgeColor, text: displayed.status })
@@ -253,6 +308,8 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                     amount={displayed.bill1.amount}
                     status={displayed.bill1.status}
                     paidAt={displayed.bill1.paid_at}
+                    slipUrl={slip1}
+                    onPreviewSlip={setPreviewUrl}
                   />
                   <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
                     <BillRow
@@ -260,6 +317,8 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                       amount={displayed.bill2.amount}
                       status={displayed.bill2.status}
                       paidAt={displayed.bill2.paid_at}
+                      slipUrl={slip2}
+                      onPreviewSlip={setPreviewUrl}
                     />
                   </div>
                 </SectionCard>
@@ -300,6 +359,35 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
           </button>
         </div>
       </div>
+      {previewUrl && createPortal(
+        <div
+          onClick={() => setPreviewUrl(null)}
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        >
+          <img
+            src={previewUrl}
+            alt="Slip preview"
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            aria-label="Close preview"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M6.04289 16.5413C5.65237 16.9318 5.65237 17.565 6.04289 17.9555C6.43342 18.346 7.06658 18.346 7.45711 17.9555L11.9987 13.4139L16.5408 17.956C16.9313 18.3466 17.5645 18.3466 17.955 17.956C18.3455 17.5655 18.3455 16.9323 17.955 16.5418L13.4129 11.9997L17.955 7.4576C18.3455 7.06707 18.3455 6.43391 17.955 6.04338C17.5645 5.65286 16.9313 5.65286 16.5408 6.04338L11.9987 10.5855L7.45711 6.0439C7.06658 5.65338 6.43342 5.65338 6.04289 6.0439C5.65237 6.43442 5.65237 7.06759 6.04289 7.45811L10.5845 11.9997L6.04289 16.5413Z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+        </div>,
+        document.body
+      )}
     </Modal>
   );
 }

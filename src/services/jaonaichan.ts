@@ -1,4 +1,4 @@
-import { apiRequest } from "../api/client";
+import { apiFetch, apiRequest } from "../api/client";
 import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse } from "../interfaces/order.jaonaichan";
 
 export interface GetOrdersParams {
@@ -37,6 +37,13 @@ export interface GetProductsBulkByOrdersParams {
     statuses?: string;
     page?: number;
     perPage?: number;
+}
+
+export async function getBillSlipObjectUrl(orderId: number, bill: 1 | 2): Promise<string | null> {
+    const res = await apiFetch(`/promptpay/v1/slip/${orderId}/${bill}`);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
 }
 
 export async function getProductsBulkByOrders({
