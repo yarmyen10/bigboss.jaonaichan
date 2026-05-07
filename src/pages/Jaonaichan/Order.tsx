@@ -292,13 +292,15 @@ const getOrderColumns = (
       key: "status",
       label: "Status",
       sortable: true,
-      // width: "150px",
+      width: "180px",
       render: (val) => {
         const s = val as OrderStatus;
         return (
-          <Badge variant="light" color={((STATUS_DETAILS_AND_STYLE[s]?.color ?? 'light') as BadgeColor)}>
-            {STATUS_DETAILS_AND_STYLE[s]?.text ?? s}
-          </Badge>
+          <span className="whitespace-nowrap">
+            <Badge variant="light" color={((STATUS_DETAILS_AND_STYLE[s]?.color ?? 'light') as BadgeColor)}>
+              {STATUS_DETAILS_AND_STYLE[s]?.text ?? s}
+            </Badge>
+          </span>
         );
       },
     },
