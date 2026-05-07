@@ -502,10 +502,10 @@ export default function DataTableOne<T extends object>({
             classNameBody={`sm:!p-0${fillHeight ? " lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:!p-0" : ""}`}
             classNameBodyInner={fillHeight ? "lg:flex lg:flex-col lg:flex-1 lg:min-h-0" : undefined}
             divider={(
-                <div className="flex items-center gap-3 px-6 py-5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4 sm:py-5">
                     {searchable === 'header' && (
-                        <div className="relative max-w-xs flex-1">
-                            <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                        <div className="relative min-w-[140px] flex-1">
+                            <span className="absolute z-1 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                                 <SearchOneIcon />
                             </span>
                             <Input
@@ -533,7 +533,7 @@ export default function DataTableOne<T extends object>({
             )}
         >
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-white/[0.05] !mb-0">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-100 px-5 py-4 dark:border-white/[0.05] !mb-0">
                 {/* Left controls */}
                 <div className="flex flex-1 items-center gap-3">
                     {searchable === 'toolbar' && (
@@ -551,7 +551,7 @@ export default function DataTableOne<T extends object>({
                         </div>
                     )}
                     {tabs?.length > 0 && (
-                        <div className="relative max-w-3xs flex-1">
+                        <div className="relative flex-1 max-w-fit overflow-x-auto">
                             <TabDefault options={tabs} />
                         </div>
                     )}

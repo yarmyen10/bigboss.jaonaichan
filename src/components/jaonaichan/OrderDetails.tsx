@@ -5,6 +5,7 @@ import Badge, { BadgeColor } from "../ui/badge/Badge";
 import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
 import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
 import { getBillSlipObjectUrl, getOrder } from "../../services/jaonaichan";
+import { ReceiptApproved, ReceiptBill, ReceiptDeclined, ReceiptRecheck } from "../../icons";
 
 interface OrderDetailsProps {
   order: Order | null;
@@ -63,6 +64,11 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
+const SLIP_ICON_MAP: Record<string, { Icon: React.FC<React.SVGProps<SVGSVGElement>>; className: string }> = {
+  paid:      { Icon: ReceiptApproved, className: "text-green-500" },
+  cancelled: { Icon: ReceiptDeclined, className: "text-gray-400 dark:text-gray-600" },
+};
+
 function BillRow({
   label,
   amount,
@@ -79,6 +85,15 @@ function BillRow({
   onPreviewSlip?: (url: string) => void;
 }) {
   const badge = BILL_STATUS_MAP[status] ?? { color: "light" as BadgeColor, text: status };
+  const { Icon, className: iconClass } = SLIP_ICON_MAP[status] ?? {
+    Icon: slipUrl ? ReceiptRecheck : ReceiptBill,
+    className: slipUrl ? "text-orange-400" : "text-gray-300 dark:text-gray-600",
+  };
+
+  const icon = (
+    <Icon className={`size-10 shrink-0 ${iconClass}`} />
+  );
+
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -97,20 +112,20 @@ function BillRow({
           Paid {new Date(paidAt).toLocaleDateString("th-TH")}
         </p>
       )}
-      {slipUrl && (
-        <button
-          type="button"
-          onClick={() => onPreviewSlip?.(slipUrl)}
-          className="block w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:opacity-90 dark:border-gray-700 dark:bg-gray-800"
-          title="Click to preview"
-        >
-          <img
-            src={slipUrl}
-            alt={`${label} slip`}
-            className="h-auto w-full max-h-40 object-contain"
-          />
-        </button>
-      )}
+      <div className="flex justify-center py-1">
+        {slipUrl ? (
+          <button
+            type="button"
+            onClick={() => onPreviewSlip?.(slipUrl)}
+            title="Click to preview slip"
+            className="transition-opacity hover:opacity-70"
+          >
+            {icon}
+          </button>
+        ) : (
+          icon
+        )}
+      </div>
     </div>
   );
 }

@@ -124,7 +124,7 @@ function DateFilterDropdown({
       const target = e.target as Node;
       if (buttonRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
-      if (fpRef.current?.calendarContainer.contains(target)) return;
+      if (fpRef.current?.calendarContainer?.contains(target)) return;
       setOpen(false);
     };
     document.addEventListener("mousedown", fn);

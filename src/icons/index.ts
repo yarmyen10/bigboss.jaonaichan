@@ -59,6 +59,10 @@ import { ReactComponent as SearchAltIcon } from "./search-alt.svg?react";
 import { ReactComponent as SearchOneIcon } from "./search-one.svg?react";
 import { ReactComponent as ThaiQRLogo } from "./order/Thai_QR_Logo.svg?react";
 import { ReactComponent as PromptPayLogo } from "./order/prompt-pay-logo.svg?react";
+import { ReactComponent as ReceiptBill } from "./order/receipt-bill.svg?react";
+import { ReactComponent as ReceiptApproved } from "./order/receipt-approved.svg?react";
+import { ReactComponent as ReceiptDeclined } from "./order/receipt-declined.svg?react";
+import { ReactComponent as ReceiptRecheck } from "./order/receipt-recheck.svg?react";
 
 export {
   ErrorHexaIcon,
@@ -122,4 +126,8 @@ export {
   SearchOneIcon,
   ThaiQRLogo,
   PromptPayLogo,
+  ReceiptBill,
+  ReceiptApproved,
+  ReceiptDeclined,
+  ReceiptRecheck,
 };
