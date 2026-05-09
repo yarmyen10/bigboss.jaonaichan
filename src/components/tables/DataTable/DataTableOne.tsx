@@ -517,25 +517,42 @@ export default function DataTableOne<T extends object>({
                             />
                         </div>
                     )}
-                    {headerFilter}
-                    {exportable === "header" && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            startIcon={<FileIcon className="size-5" />}
-                            onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
-                            className="relative"
-                        >
-                            Export
-                        </Button>
+                    {/* Mobile: compact segmented group */}
+                    {(headerFilter || exportable === "header") && (
+                        <div className="flex sm:hidden items-center h-11 rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden shadow-theme-xs divide-x divide-gray-300 dark:divide-gray-700 [&_button]:!border-0 [&_button]:!rounded-none [&_button]:!shadow-none">
+                            {headerFilter}
+                            {exportable === "header" && (
+                                <button
+                                    className="flex items-center justify-center px-3 h-full text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
+                                >
+                                    <FileIcon className="size-5" />
+                                </button>
+                            )}
+                        </div>
                     )}
+                    {/* Desktop: separate buttons */}
+                    <div className="hidden sm:contents">
+                        {headerFilter}
+                        {exportable === "header" && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                startIcon={<FileIcon className="size-5" />}
+                                onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
+                                className="relative"
+                            >
+                                Export
+                            </Button>
+                        )}
+                    </div>
                 </div>
             )}
         >
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-100 px-5 py-4 dark:border-white/[0.05] !mb-0">
                 {/* Left controls */}
-                <div className="flex flex-1 items-center gap-3">
+                <div className="flex flex-1 items-center gap-3 min-w-0">
                     {searchable === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
                             <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
@@ -551,12 +568,13 @@ export default function DataTableOne<T extends object>({
                         </div>
                     )}
                     {tabs?.length > 0 && (
-                        <div className="relative flex-1 max-w-fit overflow-x-auto">
+                        <div className="relative overflow-x-auto">
                             <TabDefault options={tabs} />
                         </div>
                     )}
+                    {/* Desktop: inline badge */}
                     {selectedIds.size > 0 && (
-                        <div className="flex items-center gap-2 rounded bg-primary/10 px-3 py-1 text-sm text-primary">
+                        <div className="hidden sm:flex items-center gap-2 rounded bg-primary/10 px-3 py-1 text-sm text-primary">
                             <p className="text-sm text-gray-800 dark:text-gray-200">{selectedIds.size} selected</p>
                             {bulkActions && bulkActions(selectedRows, allSelected)}
                         </div>
@@ -564,18 +582,18 @@ export default function DataTableOne<T extends object>({
                 </div>
 
                 {/* Right controls */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
                     {/* Page size — ซ่อนเมื่อ scrollable */}
                     {!scrollable && pageSizeOptions.length > 1 && (
                         <>
-                            <span className="text-gray-500 dark:text-gray-400"> Show </span>
+                            <span className="hidden sm:inline text-gray-500 dark:text-gray-400">Show</span>
                             <Select
                                 defaultValue={'' + pageSize}
                                 options={pageSizeOptions.map((s) => ({ value: '' + s, label: '' + s }))}
                                 placeholder={null}
                                 onChange={(value) => { setPageSize(Number(value)); setSelectedIds(new Set()); }}
                             />
-                            <span className="text-gray-500 dark:text-gray-400"> entries </span>
+                            <span className="hidden sm:inline text-gray-500 dark:text-gray-400">entries</span>
                         </>
                     )}
 
@@ -607,6 +625,18 @@ export default function DataTableOne<T extends object>({
                     )}
                     {toolbarExtra}
                 </div>
+
+                {/* Mobile: full-width selection bar */}
+                {selectedIds.size > 0 && (
+                    <div className="flex sm:hidden w-full items-center justify-between gap-3 rounded-lg bg-primary/10 px-4 py-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                            {selectedIds.size} selected
+                        </p>
+                        {bulkActions && (
+                            <div>{bulkActions(selectedRows, allSelected)}</div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* ── Table ────────────────────────────────────────────────────────── */}

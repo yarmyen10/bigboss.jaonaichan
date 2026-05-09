@@ -170,7 +170,7 @@ function DateFilterDropdown({
         startIcon={<CalenderIcon className="size-5 shrink-0" />}
         endIcon={isFiltered && (<CheckCircleIcon className="size-5 shrink-0" />)}
       >
-        Date
+        <span className="hidden sm:inline">Date</span>
       </Button>
 
       {open && btnRect && createPortal(

@@ -34,7 +34,7 @@ const TabDefault: React.FC<TabProps> = ({
     };
 
     return (
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900">
+        <div className="flex w-max items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900">
             {options.map((option) => (
                 <button
                     key={option.value}
