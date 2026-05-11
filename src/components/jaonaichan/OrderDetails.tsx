@@ -23,6 +23,12 @@ const STATUS_MAP: Record<string, { color: BadgeColor; text: string }> = {
   failed:             { color: "error",   text: "Failed" },
   "checkout-draft":   { color: "light",   text: "Draft" },
   "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
+  "pending-payment-1": { color: "warning", text: "Pending payment 1" },
+  "pending-payment-2": { color: "warning", text: "Pending payment 2" },
+  "wait-verify-1": { color: "warning", text: "Waiting for Verification 1" },
+  "wait-verify-2": { color: "warning", text: "Waiting for Verification 2" },
+  "paid-1": { color: "primary", text: "Paid 1" },
+  "paid-2": { color: "primary", text: "Paid 2" },
 };
 
 const BILL_STATUS_MAP: Record<string, { color: BadgeColor; text: string }> = {

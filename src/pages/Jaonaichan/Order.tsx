@@ -5,11 +5,12 @@ import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataTableOne";
-import { OrderListResponse, Order as OrderIF, OrderProductsBulkResponse, OrderProductsBulkItem, OrderItemProduct } from "../../interfaces/order.jaonaichan"
+import { OrderListResponse, Order as OrderIF, OrderProductsBulkResponse, OrderItemProduct, OrderProductsBulkItem } from "../../interfaces/order.jaonaichan"
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
-import { getOrders, getProductsBulkByOrders } from "../../services/jaonaichan";
+import { getOrders, getProductsBulkByOrders, patchBill2 } from "../../services/jaonaichan";
+import { resolveManageTabs, hasManageableOrders, STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { CalenderIcon, CheckCircleIcon, MoreDotIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
@@ -60,6 +61,8 @@ const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
   "pending-payment-2": { color: "warning", text: "Pending payment 2" },
   "wait-verify-1": { color: "warning", text: "Waiting for Verification 1" },
   "wait-verify-2": { color: "warning", text: "Waiting for Verification 2" },
+  "paid-1": { color: "primary", text: "Paid 1" },
+  "paid-2": { color: "primary", text: "Paid 2" },
 };
 
 const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
@@ -368,7 +371,7 @@ const getOrderColumns = (
                   </DropdownItem>
                   <DropdownItem
                     onItemClick={() => setOpenDropdownId(null)}
-                    className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                    className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300"
                   >
                     Delete
                   </DropdownItem>
@@ -384,8 +387,8 @@ const getOrderColumns = (
 
 
 const getManageOrderColumns = (
-  summaryAmounts: Record<number, string>,
-  setSummaryAmounts: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  unitPrices: Record<number, string>,
+  setUnitPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
   setSelectedProductId: React.Dispatch<React.SetStateAction<number | null>>
 ): ColumnDef<OrderItemProduct>[] => [
     {
@@ -430,12 +433,12 @@ const getManageOrderColumns = (
       ),
     },
     {
-      key: "summary_amount",
-      label: "Bill 2 Amount",
+      key: "unit_price",
+      label: "Unit Price",
       width: "150px",
       noExport: true,
       render: (_val, row) => {
-        const value = summaryAmounts[row.id] ?? "";
+        const value = unitPrices[row.id] ?? "";
         return (
           <div
             className="relative w-full min-w-[150px]"
@@ -456,7 +459,7 @@ const getManageOrderColumns = (
                 const next = parts.length > 1
                   ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`
                   : raw;
-                setSummaryAmounts((prev) => {
+                setUnitPrices((prev) => {
                   if (next === "") {
                     const { [row.id]: _removed, ...rest } = prev;
                     return rest;
@@ -492,7 +495,7 @@ export default function Order() {
   const [sheetProductId, setSheetProductId] = useState<number | null>(null);
   const sheetProduct = products.find(p => p.id === sheetProductId) ?? null;
 
-  const [summaryAmounts, setSummaryAmounts] = useState<Record<number, string>>({});
+  const [unitPrices, setUnitPrices] = useState<Record<number, string>>({});
 
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
@@ -512,8 +515,8 @@ export default function Order() {
   );
 
   const manageOrdersColumns = useMemo(
-    () => getManageOrderColumns(summaryAmounts, setSummaryAmounts, setSelectedProductId),
-    [summaryAmounts]
+    () => getManageOrderColumns(unitPrices, setUnitPrices, setSelectedProductId),
+    [unitPrices]
   );
 
   const loadOrders = async (filter: DateFilter) => {
@@ -547,38 +550,48 @@ export default function Order() {
   }, []);
 
   const { isOpen, openModal, closeModal } = useModal();
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving changes...");
-    closeModal();
-  };
-
   const [manageOrdersTabs, setManageOrdersTabs] = useState([] as TabOption[]);
-  const initialManageOrders = (orderIds: number[]) => {
+  const [manageOrderItems, setManageOrderItems] = useState<OrderProductsBulkItem[]>([]);
+  const [activeManageTab, setActiveManageTab] = useState<string>("");
+  const initialManageOrders = (selectedOrders: OrderIF[]) => {
     withSpinner(async () => {
+      const orderIds = selectedOrders.map(o => o.id);
       const res: OrderProductsBulkResponse = await getProductsBulkByOrders({ orderIds });
 
-      if (res?.data?.length) {
-        let data: OrderProductsBulkItem[] = res.data;
-        console.log('products=', data);
-        const uniqueProducts = new Map<number, OrderItemProduct>()
+      const manageable = (res?.data ?? []).filter(item => (STATUS_MANAGE_ACTIONS[item.status]?.length ?? 0) > 0);
+      setManageOrderItems(manageable);
 
-        for (const item of data) {
-          if (!uniqueProducts.has(item.product.id)) {
-            uniqueProducts.set(item.product.id, item.product)
-          }
+      const uniqueProducts = new Map<number, OrderItemProduct>();
+      for (const item of manageable) {
+        if (!uniqueProducts.has(item.product.id)) {
+          uniqueProducts.set(item.product.id, item.product);
         }
-
-        setProducts(Array.from(uniqueProducts.values()));
       }
+      setProducts(Array.from(uniqueProducts.values()));
 
-      // pagination.total = unique orders, total_items = order-item pairs
-      const orderCount = res?.pagination?.total ?? 0;
-      setManageOrdersTabs([
-        { value: "bill2", label: "Bill No. 2", count: orderCount, color: "warning" },
-      ] as TabOption[]);
+      const tabs = resolveManageTabs(selectedOrders);
+      setManageOrdersTabs(tabs);
+      setActiveManageTab(tabs[0]?.value ?? "");
+      setUnitPrices({});
     });
     openModal();
+  }
+
+  const handleSaveOrders = () => {
+    withSpinner(async () => {
+      if (activeManageTab === "bill2") {
+        const orderTotals = new Map<number, number>();
+        for (const item of manageOrderItems) {
+          const unitPrice = parseFloat(unitPrices[item.product.id] ?? "0") || 0;
+          orderTotals.set(item.id, (orderTotals.get(item.id) ?? 0) + unitPrice * item.quantity);
+        }
+        await Promise.all(
+          Array.from(orderTotals.entries()).map(([orderId, amount]) => patchBill2(orderId, amount, 'pending'))
+        );
+      }
+      closeModal();
+      loadOrders(dateFilter);
+    });
   }
 
   if (spinning) {
@@ -588,8 +601,8 @@ export default function Order() {
   return (
     <>
       <PageMeta
-        title="React.js Order Dashboard | TailAdmin - Next.js Admin Dashboard Template"
-        description="This is React.js Order Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
+        title="Order Dashboard | Admin Dashboard Template"
+        description="This is Order Dashboard page for Tailwind CSS Admin Dashboard Template"
       />
       <PageBreadcrumb pageTitle="Order Jaonaichan" />
       <CardFrame isLoading={isLoading}>
@@ -622,22 +635,26 @@ export default function Order() {
             <BulkActionsDropdown label="Actions">
               {(close) => (
                 <>
-                  <DropdownSectionHeader label="Manage" />
-                  {isAllSelected && (
-                    <DropdownItem onItemClick={() => { close(); initialManageOrders(orders.map(o => o.id)); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
-                      Manage all orders.
-                    </DropdownItem>
+                  {hasManageableOrders(selected.map(o => o.status)) && (
+                    <>
+                      <DropdownSectionHeader label="Manage" />
+                      {isAllSelected && hasManageableOrders(orders.map(o => o.status)) && (
+                        <DropdownItem onItemClick={() => { close(); initialManageOrders(orders); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                          Manage all orders.
+                        </DropdownItem>
+                      )}
+                      <DropdownItem onItemClick={() => { close(); initialManageOrders(selected); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                        Manage {selected.length} orders.
+                      </DropdownItem>
+                    </>
                   )}
-                  <DropdownItem onItemClick={() => { close(); initialManageOrders(selected.map(o => o.id)); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
-                    Manage {selected.length} orders.
-                  </DropdownItem>
                   <DropdownSectionHeader label="Cancel" border />
                   {isAllSelected && (
-                    <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                    <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300">
                       Cancel all orders.
                     </DropdownItem>
                   )}
-                  <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                  <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300">
                     Cancel {selected.length} orders.
                   </DropdownItem>
                 </>
@@ -671,6 +688,7 @@ export default function Order() {
               {/* flex flex-col + h-full propagates bounded height into the card body */}
               <ComponentTabCard
                 tabs={manageOrdersTabs}
+                onChange={setActiveManageTab}
                 className="md:h-full md:flex md:flex-col md:min-h-0"
                 classNameBody="md:flex-1 md:min-h-0 md:overflow-hidden"
               >
@@ -714,7 +732,11 @@ export default function Order() {
                 Close
               </button>
 
-              <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300">
+              <button
+                onClick={handleSaveOrders}
+                disabled={spinning || Object.keys(unitPrices).length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300"
+              >
                 Save Orders
               </button>
             </div>

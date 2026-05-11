@@ -1,5 +1,5 @@
 import { apiFetch, apiRequest } from "../api/client";
-import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse } from "../interfaces/order.jaonaichan";
+import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse, PatchBillResponse } from "../interfaces/order.jaonaichan";
 
 export interface GetOrdersParams {
     page?: number;
@@ -44,6 +44,13 @@ export async function getBillSlipObjectUrl(orderId: number, bill: 1 | 2): Promis
     if (!res.ok) return null;
     const blob = await res.blob();
     return URL.createObjectURL(blob);
+}
+
+export async function patchBill2(orderId: number, amount: number, status?: string, paidAt?: string): Promise<PatchBillResponse> {
+    return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/2`, {
+        method: "PATCH",
+        body: JSON.stringify({ amount, ...(status && { status }), ...(paidAt && { paid_at: paidAt }) }),
+    });
 }
 
 export async function getProductsBulkByOrders({
