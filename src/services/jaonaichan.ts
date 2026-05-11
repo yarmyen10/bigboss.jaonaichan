@@ -59,6 +59,13 @@ export async function patchBill2(orderId: number, amount: number, status?: strin
     });
 }
 
+export async function patchOrderStatus(orderId: number, status: string): Promise<unknown> {
+    return apiRequest(`/jaonaichan/v1/orders/${orderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+    });
+}
+
 export async function getProductsBulkByOrders({
     orderIds,
     statuses,

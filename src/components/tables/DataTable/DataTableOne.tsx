@@ -210,6 +210,8 @@ export interface DataTableProps<T extends object> {
     searchPlaceholder?: string;
     filters?: FilterConfig[];
     tabs?: TabOption[];
+    tabValue?: string;
+    onTabChange?: (value: string) => void;
     exportable?: LayoutPlan;
     exportFilename?: string;
     /** Replaces the inert Filter button in the card header */
@@ -318,6 +320,8 @@ export default function DataTableOne<T extends object>({
     searchPlaceholder = "Search...",
     filters: filterConfigs,
     tabs = [],
+    tabValue,
+    onTabChange,
     exportable = "",
     exportFilename = "export.csv",
     headerFilter,
@@ -569,7 +573,7 @@ export default function DataTableOne<T extends object>({
                     )}
                     {tabs?.length > 0 && (
                         <div className="relative overflow-x-auto">
-                            <TabDefault options={tabs} />
+                            <TabDefault options={tabs} defaultValue={tabValue} onChange={onTabChange} />
                         </div>
                     )}
                     {/* Desktop: inline badge */}
