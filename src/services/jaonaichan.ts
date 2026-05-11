@@ -46,10 +46,16 @@ export async function getBillSlipObjectUrl(orderId: number, bill: 1 | 2): Promis
     return URL.createObjectURL(blob);
 }
 
-export async function patchBill2(orderId: number, amount: number, status?: string, paidAt?: string): Promise<PatchBillResponse> {
+export async function patchBill2(orderId: number, amount: number, status?: string, paidAt?: string, unitPrices?: Record<number, number>, unitPricesId?: string): Promise<PatchBillResponse> {
     return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/2`, {
         method: "PATCH",
-        body: JSON.stringify({ amount, ...(status && { status }), ...(paidAt && { paid_at: paidAt }) }),
+        body: JSON.stringify({
+            amount,
+            ...(status && { status }),
+            ...(paidAt && { paid_at: paidAt }),
+            ...(unitPrices && { unit_prices: unitPrices }),
+            ...(unitPricesId && { unit_prices_id: unitPricesId }),
+        }),
     });
 }
 

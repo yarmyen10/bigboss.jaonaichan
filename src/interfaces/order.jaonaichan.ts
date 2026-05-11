@@ -32,12 +32,16 @@ export interface Bill {
     status: BillStatus
     amount: number
     paid_at: string | null
+    unit_prices?: Record<number, number>
+    unit_prices_id?: string | null
 }
 
 /** bill1 / bill2 — summary version (ไม่มี paid_at) ใช้ใน bulk / flat */
 export interface BillSummary {
     status: BillStatus
     amount: number
+    unit_prices?: Record<number, number>
+    unit_prices_id?: string | null
 }
 
 // =============================================================================
@@ -254,7 +258,7 @@ export interface PatchCustomerResponse {
 export interface PatchBillResponse {
     success: true
     message: string
-    updated: Partial<Pick<Bill, 'status' | 'amount' | 'paid_at'>>
+    updated: Partial<Pick<Bill, 'status' | 'amount' | 'paid_at' | 'unit_prices' | 'unit_prices_id'>>
 }
 
 // =============================================================================
