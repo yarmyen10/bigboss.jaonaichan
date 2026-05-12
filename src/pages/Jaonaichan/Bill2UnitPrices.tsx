@@ -154,6 +154,7 @@ export default function Bill2UnitPrices() {
   const [bulkItems, setBulkItems] = useState<OrderProductsBulkItem[]>([]);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [unitPrices, setUnitPrices] = useState<Record<number, string>>({});
+  const savedUnitPrices = useRef<Record<number, string>>({});
   const [modalProduct, setModalProduct] = useState<OrderItemProduct | null>(null);
 
   const { isOpen: isConfirmOpen, openModal: openConfirm, closeModal: closeConfirm } = useModal();
@@ -222,6 +223,14 @@ export default function Bill2UnitPrices() {
   }, [bulkItems, unitPrices, activeBatchOrders]);
 
   const pricedCount = Object.keys(unitPrices).length;
+
+  const hasChanges = useMemo(() => {
+    const saved = savedUnitPrices.current;
+    const currentKeys = Object.keys(unitPrices).sort();
+    const savedKeys = Object.keys(saved).sort();
+    if (currentKeys.length !== savedKeys.length) return true;
+    return currentKeys.some((k) => unitPrices[Number(k)] !== saved[Number(k)]);
+  }, [unitPrices]);
   const totalBill2 = orderTotals.reduce((s, o) => s + o.total, 0);
   const isNewBatch = activeBatchId === null;
 
@@ -245,6 +254,7 @@ export default function Bill2UnitPrices() {
         }
       }
     }
+    savedUnitPrices.current = merged;
     setUnitPrices(merged);
   }, []);
 
@@ -518,7 +528,7 @@ export default function Bill2UnitPrices() {
                 variant="primary"
                 size="sm"
                 onClick={openConfirm}
-                disabled={pricedCount === 0 || activeBatchOrders.length === 0}
+                disabled={pricedCount === 0 || activeBatchOrders.length === 0 || (!isNewBatch && !hasChanges)}
                 className="w-full justify-center"
               >
                 {isNewBatch

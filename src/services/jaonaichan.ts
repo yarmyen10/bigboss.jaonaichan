@@ -1,5 +1,6 @@
 import { apiFetch, apiRequest } from "../api/client";
 import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse, PatchBillResponse } from "../interfaces/order.jaonaichan";
+import { PatchProfilePayload, PatchProfileResponse, UserProfile } from "../interfaces/profile.jaonaichan";
 
 export interface GetOrdersParams {
     page?: number;
@@ -83,4 +84,41 @@ export async function getProductsBulkByOrders({
     });
 }
 
+// =========================================================================
+// Profile
+// =========================================================================
 
+function mapProfile(raw: Record<string, unknown>): UserProfile {
+    return {
+        id:           raw.id as number,
+        username:     raw.username as string,
+        email:        raw.email as string,
+        displayName:  raw.display_name as string,
+        firstName:    (raw.first_name as string) ?? "",
+        lastName:     (raw.last_name as string) ?? "",
+        nickname:     (raw.nickname as string) ?? "",
+        description:  (raw.description as string) ?? "",
+        registeredAt: raw.registered_at as string,
+        roles:        raw.roles as string[],
+        role:         raw.role as string,
+        avatarUrl:    raw.avatar_url as string,
+    };
+}
+
+export async function getProfile(): Promise<UserProfile> {
+    const raw = await apiRequest<Record<string, unknown>>("/bigboss-auth/v1/profile");
+    return mapProfile(raw);
+}
+
+export async function patchProfile(payload: PatchProfilePayload): Promise<PatchProfileResponse> {
+    const raw = await apiRequest<{
+        success: boolean;
+        message: string;
+        updated: string[];
+        data: Record<string, unknown>;
+    }>("/bigboss-auth/v1/profile", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+    });
+    return { ...raw, data: mapProfile(raw.data) };
+}
