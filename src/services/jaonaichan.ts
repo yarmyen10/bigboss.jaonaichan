@@ -85,6 +85,64 @@ export async function getProductsBulkByOrders({
 }
 
 // =========================================================================
+// Barcode Pack
+// =========================================================================
+
+import type {
+    BarcodeImportSaveResponse,
+    ConfirmPackResponse,
+    GetOrderItemsResponse,
+    ProductSearchResponse,
+    ValidateBarcodeResponse,
+} from '../interfaces/barcode.jaonaichan';
+
+const BARCODE_PACK_ENDPOINT = '/custom/v1/barcode-pack';
+
+export async function getBarcodeOrderItems(orderId: number): Promise<GetOrderItemsResponse> {
+    return apiRequest(BARCODE_PACK_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_order_items', order_id: orderId }),
+    });
+}
+
+export async function validateBarcode(barcode: string): Promise<ValidateBarcodeResponse> {
+    return apiRequest(BARCODE_PACK_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'validate_barcode', barcode }),
+    });
+}
+
+export async function confirmPack(
+    orderId: number,
+    scanned: Record<number, string[]>
+): Promise<ConfirmPackResponse> {
+    return apiRequest(BARCODE_PACK_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'confirm_pack', order_id: orderId, scanned }),
+    });
+}
+
+// =========================================================================
+// Barcode Import
+// =========================================================================
+
+const BARCODE_IMPORT_ENDPOINT = '/custom/v1/barcode-import';
+
+export async function searchProductsForImport(query: string): Promise<ProductSearchResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'search_products', query }),
+    });
+}
+
+export async function saveBarcodeImport(productId: number, barcode: string): Promise<BarcodeImportSaveResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'save_barcode', product_id: productId, barcode }),
+    });
+}
+
+// =========================================================================
 // Profile
 // =========================================================================
 

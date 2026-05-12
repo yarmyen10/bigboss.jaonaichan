@@ -38,6 +38,8 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Order", path: "/order-jaonaichan", pro: false },
       { name: "Bill 2 Unit Prices", path: "/bill2-unit-prices", pro: false },
+      { name: "Pack Order", path: "/barcode-pack", pro: false },
+      { name: "Barcode Import", path: "/barcode-import", pro: false },
     ],
   },
   {
