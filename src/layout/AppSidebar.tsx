@@ -35,7 +35,10 @@ const navItems: NavItem[] = [
   {
     icon: <CatIcon />,
     name: "Jaonaichan",
-    subItems: [{ name: "Order", path: "/order-jaonaichan", pro: false }],
+    subItems: [
+      { name: "Order", path: "/order-jaonaichan", pro: false },
+      { name: "Bill 2 Unit Prices", path: "/bill2-unit-prices", pro: false },
+    ],
   },
   {
     icon: <CalenderIcon />,

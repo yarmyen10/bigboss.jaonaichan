@@ -21,6 +21,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Order from "./pages/Jaonaichan/Order";
+import Bill2UnitPrices from "./pages/Jaonaichan/Bill2UnitPrices";
 import { CustomersPage, OrdersPage } from "./components/tables/DataTable/DataTableExample";
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
 
             {/* Jaonaichan */}
             <Route path="/order-jaonaichan" element={<ProtectedRoute><Order /></ProtectedRoute>} />
+            <Route path="/bill2-unit-prices" element={<ProtectedRoute><Bill2UnitPrices /></ProtectedRoute>} />
 
             {/* Others Page */}
             <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />
