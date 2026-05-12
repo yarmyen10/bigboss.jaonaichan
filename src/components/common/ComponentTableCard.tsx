@@ -1,12 +1,12 @@
 interface ComponentCardProps {
   title?: string | undefined;
   children: React.ReactNode;
-  className?: string; // Additional custom classes for styling
-  classNameBody?: string; // Additional custom classes for styling body
-  classNameBodyInner?: string; // override inner wrapper (default: "space-y-6") — ใช้ override เป็น flex col สำหรับ flex-fill
-  desc?: string; // Description text
-  divider?: React.ReactNode; // Whether to show a divider between header and body
-  // You can add more props as needed
+  className?: string;
+  classNameBody?: string;
+  classNameBodyInner?: string;
+  desc?: string;
+  divider?: React.ReactNode;
+  headerActions?: React.ReactNode;
 }
 
 const ComponentTableCard: React.FC<ComponentCardProps> = ({
@@ -17,6 +17,7 @@ const ComponentTableCard: React.FC<ComponentCardProps> = ({
   classNameBodyInner = "space-y-6",
   desc = "",
   divider = false,
+  headerActions,
 }) => {
   return (
     <div
@@ -34,6 +35,11 @@ const ComponentTableCard: React.FC<ComponentCardProps> = ({
             </p>
           )}
         </div>
+        {headerActions && (
+          <div className="flex items-center gap-3 px-6 py-5">
+            {headerActions}
+          </div>
+        )}
         <>
           {/* Divider */}
           {divider}

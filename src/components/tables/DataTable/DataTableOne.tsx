@@ -454,6 +454,26 @@ export default function DataTableOne<T extends object>({
         [selectedIds, isAsync, asyncData, clientRows]
     );
 
+    // ── Async fetch ────────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!isAsync || !fetchFn) return;
+        let cancelled = false;
+        setAsyncLoading(true);
+        setError("");
+        fetchFn({ page, pageSize, search: dSearch, sortKey, sortDir, filters: filterValues })
+            .then((result) => {
+                if (!cancelled) { setAsyncData(result.data); setAsyncTotal(result.total); }
+            })
+            .catch((e) => { if (!cancelled) setError(String(e)); })
+            .finally(() => { if (!cancelled) setAsyncLoading(false); });
+        return () => { cancelled = true; };
+    }, [isAsync, fetchFn, page, pageSize, dSearch, sortKey, sortDir, filterValues]);
+
+    // ── Selection callback ─────────────────────────────────────────────────────
+    useEffect(() => {
+        onSelectableChange?.(selectedRows);
+    }, [selectedRows, onSelectableChange]);
+
     // ── Pagination ─────────────────────────────────────────────────────────────
     const pageButtons = useMemo(() => {
         const pages: (number | "...")[] = [1];
@@ -502,7 +522,8 @@ export default function DataTableOne<T extends object>({
         <ComponentTableCard
             title={title}
             desc={subtitle}
-            className={fillHeight ? "lg:flex lg:flex-col lg:h-full lg:min-h-0" : ""}
+            headerActions={headerActions}
+            className={`${fillHeight ? "lg:flex lg:flex-col lg:h-full lg:min-h-0" : ""}${className ? ` ${className}` : ""}`}
             classNameBody={`sm:!p-0${fillHeight ? " lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:!p-0" : ""}`}
             classNameBodyInner={fillHeight ? "lg:flex lg:flex-col lg:flex-1 lg:min-h-0" : undefined}
             divider={(
@@ -683,10 +704,22 @@ export default function DataTableOne<T extends object>({
                     </TableCell>
                 ));
 
-                const bodyRows = loading || visibleRows.length === 0 ? (
+                const bodyRows = loading ? (
                     <TableRow style={trScrollStyle}>
                         <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start">
                             <Spinner />
+                        </TableCell>
+                    </TableRow>
+                ) : error ? (
+                    <TableRow style={trScrollStyle}>
+                        <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start text-sm text-danger">
+                            {error}
+                        </TableCell>
+                    </TableRow>
+                ) : visibleRows.length === 0 ? (
+                    <TableRow style={trScrollStyle}>
+                        <TableCell colSpan={colSpan} className="px-5 py-4 sm:px-6 text-start text-sm text-gray-500 dark:text-gray-400">
+                            {emptyText}
                         </TableCell>
                     </TableRow>
                 ) : (

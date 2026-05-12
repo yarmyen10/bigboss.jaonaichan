@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/ui/button/Button';
 import Badge from '../../components/ui/badge/Badge';
 import Input from '../../components/form/input/InputField';
+import { Modal } from '../../components/ui/modal';
 import {
     getBarcodeOrderItems,
     validateBarcode,
@@ -272,22 +273,6 @@ export default function BarcodePack() {
                         </button>
                     )}
 
-                    {/* Camera view */}
-                    {cameraOpen && (
-                        <div className="space-y-2">
-                            <div className="mx-auto max-w-sm overflow-hidden rounded-xl">
-                                <div id={SCANNER_ELEMENT_ID} className="w-full" />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setCameraOpen(false)}
-                                className="flex h-12 w-full items-center justify-center rounded-xl border border-gray-300 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    )}
-
                     {/* Confirm Pack */}
                     <Button
                         variant="orange"
@@ -299,6 +284,29 @@ export default function BarcodePack() {
                     </Button>
                 </div>
             )}
+            {/* Camera modal */}
+            <Modal
+                isOpen={cameraOpen}
+                onClose={() => setCameraOpen(false)}
+                showCloseButton={false}
+                className="max-w-sm mx-4"
+            >
+                <div className="p-4 space-y-3">
+                    <p className="text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        สแกน Barcode
+                    </p>
+                    <div className="overflow-hidden rounded-xl">
+                        <div id={SCANNER_ELEMENT_ID} className="w-full" />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCameraOpen(false)}
+                        className="flex h-11 w-full items-center justify-center rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 }

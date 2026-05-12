@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Badge from '../../components/ui/badge/Badge';
-import { searchProductsForImport, saveBarcodeImport } from '../../services/jaonaichan';
-import type { ProductSearchResult } from '../../interfaces/barcode.jaonaichan';
+import { Modal } from '../../components/ui/modal';
+import { searchProductsForImport, getProductVariations, saveBarcodeImport } from '../../services/jaonaichan';
+import type { ProductSearchResult, ProductVariation } from '../../interfaces/barcode.jaonaichan';
 
 const SCANNER_ELEMENT_ID = 'barcode-import-reader';
 
@@ -36,17 +37,25 @@ export default function BarcodeImport() {
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [saving, setSaving] = useState(false);
     const [sessionBarcodes, setSessionBarcodes] = useState<string[]>([]);
+    const [variations, setVariations] = useState<ProductVariation[]>([]);
+    const [loadingVariations, setLoadingVariations] = useState(false);
+    const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
 
     const hasInitialized = useRef(false);
     const scannerRef = useRef<Html5QrcodeInstance | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const selectedProductRef = useRef<ProductSearchResult | null>(null);
+    const selectedVariationRef = useRef<ProductVariation | null>(null);
 
-    // Keep ref in sync so the camera callback can read current product without a stale closure
+    // Keep refs in sync so camera callbacks can read current values without stale closures
     useEffect(() => {
         selectedProductRef.current = selectedProduct;
     }, [selectedProduct]);
+
+    useEffect(() => {
+        selectedVariationRef.current = selectedVariation;
+    }, [selectedVariation]);
 
     // Inject Html5Qrcode CDN script once on mount
     useEffect(() => {
@@ -108,13 +117,27 @@ export default function BarcodeImport() {
 
                         const product = selectedProductRef.current;
                         if (!product) return;
+                        const targetId = selectedVariationRef.current?.variation_id ?? product.product_id;
 
                         setSaving(true);
                         try {
-                            const res = await saveBarcodeImport(product.product_id, barcode);
+                            const res = await saveBarcodeImport(targetId, barcode);
                             if (res.success) {
                                 setScanResult({ ok: true, barcode });
-                                setBarcodeCount((c) => c + 1);
+                                const newCount = res.barcode_count;
+                                if (newCount !== undefined) {
+                                    setBarcodeCount(newCount);
+                                    const vid = selectedVariationRef.current?.variation_id;
+                                    if (vid !== undefined) {
+                                        setVariations((prev) =>
+                                            prev.map((v) =>
+                                                v.variation_id === vid ? { ...v, barcode_count: newCount } : v
+                                            )
+                                        );
+                                    }
+                                } else {
+                                    setBarcodeCount((c) => c + 1);
+                                }
                                 setSessionBarcodes((prev) => [...prev, barcode]);
                             } else {
                                 setScanResult({ ok: false, message: res.message });
@@ -146,6 +169,8 @@ export default function BarcodeImport() {
         const q = e.target.value;
         setSearchQuery(q);
         setSelectedProduct(null);
+        setVariations([]);
+        setSelectedVariation(null);
         setShowDropdown(false);
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -168,12 +193,27 @@ export default function BarcodeImport() {
         }, 400);
     };
 
-    const handleSelectProduct = (product: ProductSearchResult) => {
+    const handleSelectProduct = async (product: ProductSearchResult) => {
         setSelectedProduct(product);
         setBarcodeCount(product.barcode_count);
         setSearchQuery(product.name);
         setShowDropdown(false);
         setScanResult(null);
+        setVariations([]);
+        setSelectedVariation(null);
+        setSessionBarcodes([]);
+
+        if (product.type === 'variable') {
+            setLoadingVariations(true);
+            try {
+                const res = await getProductVariations(product.product_id);
+                setVariations(res.variations);
+            } catch {
+                // variations will stay empty
+            } finally {
+                setLoadingVariations(false);
+            }
+        }
     };
 
     const handleOpenCamera = () => {
@@ -204,7 +244,7 @@ export default function BarcodeImport() {
                         value={searchQuery}
                         onChange={handleSearchInput}
                         placeholder="ค้นหาสินค้าด้วยชื่อ หรือ SKU"
-                        className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90 dark:placeholder-gray-500"
+                        className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-base text-gray-800 placeholder-gray-400 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90 dark:placeholder-gray-500"
                     />
                     {searching && (
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -220,14 +260,17 @@ export default function BarcodeImport() {
                             <button
                                 key={p.product_id}
                                 type="button"
-                                onMouseDown={() => handleSelectProduct(p)}
+                                onMouseDown={() => void handleSelectProduct(p)}
                                 className="flex w-full flex-col gap-0.5 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
                             >
                                 <span className="text-sm font-medium text-gray-800 dark:text-white/90">
                                     {p.name}
+                                    {p.type === 'variable' && (
+                                        <span className="ml-2 text-xs font-normal text-gray-400">(มี variation)</span>
+                                    )}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    SKU: {p.sku} · Barcode: {p.barcode_count}
+                                    ID: {p.product_id} · SKU: {p.sku} · Barcode: {p.barcode_count}
                                 </span>
                             </button>
                         ))}
@@ -246,7 +289,15 @@ export default function BarcodeImport() {
                             SKU: {selectedProduct.sku}
                         </p>
                     )}
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge color="light" size="sm">
+                            ID: {selectedProduct.product_id}
+                        </Badge>
+                        {selectedVariation && (
+                            <Badge color="light" size="sm">
+                                Variation ID: {selectedVariation.variation_id}
+                            </Badge>
+                        )}
                         <Badge color="info" size="sm">
                             Barcode ทั้งหมด: {barcodeCount}
                         </Badge>
@@ -254,8 +305,47 @@ export default function BarcodeImport() {
                 </div>
             )}
 
+            {/* Variation selector */}
+            {selectedProduct?.type === 'variable' && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                    <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        เลือก Variation
+                    </p>
+                    {loadingVariations ? (
+                        <p className="text-xs text-gray-400">กำลังโหลด…</p>
+                    ) : variations.length === 0 ? (
+                        <p className="text-xs text-gray-400">ไม่พบ variation</p>
+                    ) : (
+                        <div className="flex flex-col gap-1">
+                            {variations.map((v) => (
+                                <button
+                                    key={v.variation_id}
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedVariation(v);
+                                        setBarcodeCount(v.barcode_count);
+                                        setScanResult(null);
+                                        setSessionBarcodes([]);
+                                    }}
+                                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                                        selectedVariation?.variation_id === v.variation_id
+                                            ? 'bg-brand-500 text-white'
+                                            : 'bg-gray-50 text-gray-800 hover:bg-gray-100 dark:bg-gray-700 dark:text-white/90 dark:hover:bg-gray-600'
+                                    }`}
+                                >
+                                    <span>{v.name}</span>
+                                    <span className={`text-xs ${selectedVariation?.variation_id === v.variation_id ? 'text-white/70' : 'text-gray-400'}`}>
+                                        Barcode: {v.barcode_count}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Scan zone */}
-            {selectedProduct && (
+            {selectedProduct && (selectedProduct.type === 'simple' || selectedVariation) && (
                 <div className="space-y-3">
                     {/* Scan result feedback */}
                     {scanResult && (
@@ -277,22 +367,6 @@ export default function BarcodeImport() {
                         </div>
                     )}
 
-                    {/* Camera view */}
-                    {cameraOpen && (
-                        <div className="space-y-2">
-                            <div className="mx-auto max-w-sm overflow-hidden rounded-xl">
-                                <div id={SCANNER_ELEMENT_ID} className="w-full" />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setCameraOpen(false)}
-                                className="flex h-12 w-full items-center justify-center rounded-xl border border-gray-300 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-                            >
-                                ยกเลิก
-                            </button>
-                        </div>
-                    )}
-
                     {/* Open / Scan-again button */}
                     {!cameraOpen && !saving && (
                         <button
@@ -311,6 +385,30 @@ export default function BarcodeImport() {
                     )}
                 </div>
             )}
+
+            {/* Camera modal */}
+            <Modal
+                isOpen={cameraOpen}
+                onClose={() => setCameraOpen(false)}
+                showCloseButton={false}
+                className="max-w-sm mx-4"
+            >
+                <div className="p-4 space-y-3">
+                    <p className="text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        สแกน Barcode
+                    </p>
+                    <div className="overflow-hidden rounded-xl">
+                        <div id={SCANNER_ELEMENT_ID} className="w-full" />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCameraOpen(false)}
+                        className="flex h-11 w-full items-center justify-center rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                    >
+                        ยกเลิก
+                    </button>
+                </div>
+            </Modal>
 
             {/* Session barcode list */}
             {sessionBarcodes.length > 0 && (

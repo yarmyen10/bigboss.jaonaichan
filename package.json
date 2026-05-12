@@ -1,11 +1,12 @@
 {
-  "name": "tailadmin-react",
+  "name": "bigboss.jaonaichan",
   "private": true,
   "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b || true && vite build",
+    "prebuild": "tsc -b || echo TypeScript errors detected (build continues)",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"

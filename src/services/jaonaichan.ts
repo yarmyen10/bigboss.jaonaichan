@@ -92,11 +92,12 @@ import type {
     BarcodeImportSaveResponse,
     ConfirmPackResponse,
     GetOrderItemsResponse,
+    GetVariationsResponse,
     ProductSearchResponse,
     ValidateBarcodeResponse,
 } from '../interfaces/barcode.jaonaichan';
 
-const BARCODE_PACK_ENDPOINT = '/custom/v1/barcode-pack';
+const BARCODE_PACK_ENDPOINT = '/jaonaichan/v1/barcode-pack';
 
 export async function getBarcodeOrderItems(orderId: number): Promise<GetOrderItemsResponse> {
     return apiRequest(BARCODE_PACK_ENDPOINT, {
@@ -126,12 +127,19 @@ export async function confirmPack(
 // Barcode Import
 // =========================================================================
 
-const BARCODE_IMPORT_ENDPOINT = '/custom/v1/barcode-import';
+const BARCODE_IMPORT_ENDPOINT = '/jaonaichan/v1/barcode-import';
 
 export async function searchProductsForImport(query: string): Promise<ProductSearchResponse> {
     return apiRequest(BARCODE_IMPORT_ENDPOINT, {
         method: 'POST',
         body: JSON.stringify({ action: 'search_products', query }),
+    });
+}
+
+export async function getProductVariations(productId: number): Promise<GetVariationsResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_variations', product_id: productId }),
     });
 }
 
