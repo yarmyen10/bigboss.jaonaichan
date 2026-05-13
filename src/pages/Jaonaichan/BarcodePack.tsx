@@ -199,6 +199,7 @@ export default function BarcodePack() {
                         value={orderId}
                         onChange={(e) => setOrderId(e.target.value)}
                         disabled={loadingItems}
+                        className="!text-base"
                     />
                 </div>
                 <Button size="sm" disabled={loadingItems || !orderId.trim()}>
