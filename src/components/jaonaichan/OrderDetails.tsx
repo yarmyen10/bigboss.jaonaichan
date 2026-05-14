@@ -5,7 +5,8 @@ import Badge, { BadgeColor } from "../ui/badge/Badge";
 import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
 import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
 import { getBillSlipObjectUrl, getOrder } from "../../services/jaonaichan";
-import { ReceiptApproved, ReceiptBill, ReceiptDeclined, ReceiptRecheck } from "../../icons";
+import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
+import { BoxIcon, ReceiptApproved, ReceiptBill, ReceiptDeclined } from "../../icons";
 
 interface OrderDetailsProps {
   order: Order | null;
@@ -13,29 +14,6 @@ interface OrderDetailsProps {
   onClose: () => void;
 }
 
-const STATUS_MAP: Record<string, { color: BadgeColor; text: string }> = {
-  pending:            { color: "primary", text: "Pending payment" },
-  processing:         { color: "warning", text: "Processing" },
-  "on-hold":          { color: "dark",    text: "On hold" },
-  completed:          { color: "success", text: "Completed" },
-  cancelled:          { color: "light",   text: "Cancelled" },
-  refunded:           { color: "light",   text: "Refunded" },
-  failed:             { color: "error",   text: "Failed" },
-  "checkout-draft":   { color: "light",   text: "Draft" },
-  "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
-  "pending-payment-1": { color: "warning", text: "Pending payment 1" },
-  "pending-payment-2": { color: "warning", text: "Pending payment 2" },
-  "wait-verify-1": { color: "warning", text: "Waiting for Verification 1" },
-  "wait-verify-2": { color: "warning", text: "Waiting for Verification 2" },
-  "paid-1": { color: "primary", text: "Paid 1" },
-  "paid-2": { color: "primary", text: "Paid 2" },
-};
-
-const BILL_STATUS_MAP: Record<string, { color: BadgeColor; text: string }> = {
-  paid:      { color: "success", text: "Paid" },
-  pending:   { color: "warning", text: "Pending" },
-  cancelled: { color: "light",   text: "Cancelled" },
-};
 
 const PAYMENT_LABEL: Record<string, string> = {
   promptpay_qr:  "PromptPay QR",
@@ -70,67 +48,115 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-const SLIP_ICON_MAP: Record<string, { Icon: React.FC<React.SVGProps<SVGSVGElement>>; className: string }> = {
-  paid:      { Icon: ReceiptApproved, className: "text-green-500" },
-  cancelled: { Icon: ReceiptDeclined, className: "text-gray-400 dark:text-gray-600" },
+interface HistoryEvent {
+  id: string;
+  Icon: React.FC<React.SVGProps<SVGSVGElement>>;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  date: string | null;
+  slipUrl?: string | null;
+}
+
+const BILL_STYLE: Record<string, { Icon: React.FC<React.SVGProps<SVGSVGElement>>; iconBg: string; iconColor: string }> = {
+  paid:      { Icon: ReceiptApproved, iconBg: "bg-green-50 dark:bg-green-500/10",  iconColor: "text-green-500" },
+  pending:   { Icon: ReceiptBill,     iconBg: "bg-amber-50 dark:bg-amber-500/10",  iconColor: "text-amber-500" },
+  cancelled: { Icon: ReceiptDeclined, iconBg: "bg-gray-100 dark:bg-gray-800",      iconColor: "text-gray-400 dark:text-gray-500" },
 };
 
-function BillRow({
-  label,
-  amount,
-  status,
-  paidAt,
-  slipUrl,
-  onPreviewSlip,
-}: {
-  label: string;
-  amount: number;
-  status: string;
-  paidAt: string | null;
-  slipUrl?: string | null;
-  onPreviewSlip?: (url: string) => void;
-}) {
-  const badge = BILL_STATUS_MAP[status] ?? { color: "light" as BadgeColor, text: status };
-  const { Icon, className: iconClass } = SLIP_ICON_MAP[status] ?? {
-    Icon: slipUrl ? ReceiptRecheck : ReceiptBill,
-    className: slipUrl ? "text-orange-400" : "text-gray-300 dark:text-gray-600",
+function buildHistory(
+  displayed: Order | OrderDetailResponse,
+  slip1: string | null,
+  slip2: string | null,
+): HistoryEvent[] {
+  const paidEvents: HistoryEvent[] = [];
+  const pendingEvents: HistoryEvent[] = [];
+
+  const placed: HistoryEvent = {
+    id: "placed",
+    Icon: BoxIcon,
+    iconBg: "bg-blue-50 dark:bg-blue-500/10",
+    iconColor: "text-blue-500",
+    title: "Order Placed",
+    subtitle: PAYMENT_LABEL[displayed.payment_method] ?? displayed.payment_method,
+    date: displayed.date,
   };
 
-  const icon = (
-    <Icon className={`size-10 shrink-0 ${iconClass}`} />
-  );
+  for (const [key, bill, slip] of [
+    ["bill1", displayed.bill1, slip1],
+    ["bill2", displayed.bill2, slip2],
+  ] as const) {
+    const style = BILL_STYLE[bill.status] ?? BILL_STYLE.pending;
+    const label = key === "bill1" ? "Bill 1" : "Bill 2";
+    const statusLabel = bill.status === "paid" ? "Paid" : bill.status === "cancelled" ? "Cancelled" : "Pending";
+    const event: HistoryEvent = {
+      id: key,
+      ...style,
+      title: `${label} · ${statusLabel}`,
+      subtitle: `฿${Number(bill.amount).toLocaleString()}`,
+      date: bill.paid_at,
+      slipUrl: bill.status === "paid" ? slip : null,
+    };
+    if (bill.paid_at) paidEvents.push(event);
+    else pendingEvents.push(event);
+  }
 
+  paidEvents.sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime());
+
+  return [placed, ...paidEvents, ...pendingEvents];
+}
+
+function OrderHistoryTimeline({
+  events,
+  onPreviewSlip,
+}: {
+  events: HistoryEvent[];
+  onPreviewSlip: (url: string) => void;
+}) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-800 dark:text-white">
-            ฿{Number(amount).toLocaleString()}
-          </span>
-          <Badge variant="light" size="sm" color={badge.color}>
-            {badge.text}
-          </Badge>
-        </div>
-      </div>
-      {paidAt && (
-        <p className="text-right text-xs text-gray-400 dark:text-gray-500">
-          Paid {new Date(paidAt).toLocaleDateString("th-TH")}
-        </p>
-      )}
-      <div className="flex justify-center py-1">
-        {slipUrl ? (
-          <button
-            type="button"
-            onClick={() => onPreviewSlip?.(slipUrl)}
-            title="Click to preview slip"
-            className="transition-opacity hover:opacity-70"
-          >
-            {icon}
-          </button>
-        ) : (
-          icon
-        )}
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+        Order History
+      </p>
+      <div>
+        {events.map((event, i) => {
+          const d = event.date ? new Date(event.date) : null;
+          const time = d ? d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+          const date = d ? d.toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" }) : "";
+          const isLast = i === events.length - 1;
+          return (
+            <div key={event.id} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${event.iconBg}`}>
+                  <event.Icon className={`size-5 ${event.iconColor}`} />
+                </div>
+                {!isLast && (
+                  <div className="my-1 w-px flex-1 border-l-2 border-dashed border-gray-200 dark:border-gray-700" />
+                )}
+              </div>
+              <div className={`flex flex-1 items-start justify-between gap-2 ${!isLast ? "pb-4" : ""}`}>
+                <div className="min-w-0 pt-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white">{event.title}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{event.subtitle}</p>
+                  {event.slipUrl && (
+                    <button
+                      type="button"
+                      onClick={() => onPreviewSlip(event.slipUrl!)}
+                      className="mt-1 text-xs text-brand-500 hover:underline"
+                    >
+                      View Slip
+                    </button>
+                  )}
+                </div>
+                <div className="shrink-0 pt-2 text-right">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white">{time}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{date}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -241,7 +267,7 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
   }, [isOpen, displayed?.id]);
 
   const statusInfo = displayed
-    ? (STATUS_MAP[displayed.status] ?? { color: "light" as BadgeColor, text: displayed.status })
+    ? (ORDER_STATUS_DETAILS[displayed.status] ?? { color: "light" as BadgeColor, text: displayed.status })
     : null;
 
   const formattedDate = displayed
@@ -263,7 +289,7 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                 Order #{displayed?.number ?? displayed?.id ?? "—"}
               </h2>
               {statusInfo && (
-                <Badge variant="light" color={statusInfo.color}>
+                <Badge variant="gradient" color={statusInfo.color}>
                   {statusInfo.text}
                 </Badge>
               )}
@@ -292,9 +318,9 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
               <p className="text-sm text-gray-400 dark:text-gray-500">No order selected.</p>
             </div>
           ) : (
-            <div className="mx-auto max-w-4xl space-y-6">
-              {/* Info cards */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="mx-auto max-w-6xl space-y-6">
+              {/* Info cards — 2 columns */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <SectionCard title="Customer">
                   <InfoRow label="Name">{displayed.customer.name}</InfoRow>
                   <InfoRow label="Email">{displayed.customer.email}</InfoRow>
@@ -322,43 +348,26 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                     </InfoRow>
                   </div>
                 </SectionCard>
-
-                <SectionCard title="Bills">
-                  <BillRow
-                    label="Bill 1"
-                    amount={displayed.bill1.amount}
-                    status={displayed.bill1.status}
-                    paidAt={displayed.bill1.paid_at}
-                    slipUrl={slip1}
-                    onPreviewSlip={setPreviewUrl}
-                  />
-                  <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
-                    <BillRow
-                      label="Bill 2"
-                      amount={displayed.bill2.amount}
-                      status={displayed.bill2.status}
-                      paidAt={displayed.bill2.paid_at}
-                      slipUrl={slip2}
-                      onPreviewSlip={setPreviewUrl}
-                    />
-                  </div>
-                </SectionCard>
               </div>
 
-              {/* Items */}
-              <div>
-                <p className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Items
-                </p>
-                {loading ? (
-                  <div className="flex h-32 items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-                  </div>
-                ) : items.length === 0 ? (
-                  <p className="text-sm text-gray-400 dark:text-gray-500">No items to display.</p>
-                ) : (
-                  <ItemsTable items={items} />
-                )}
+              {/* Items + Order History side by side */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
+                <div>
+                  {loading ? (
+                    <div className="flex h-32 items-center justify-center">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                    </div>
+                  ) : items.length === 0 ? (
+                    <p className="text-sm text-gray-400 dark:text-gray-500">No items to display.</p>
+                  ) : (
+                    <ItemsTable items={items} />
+                  )}
+                </div>
+
+                <OrderHistoryTimeline
+                  events={buildHistory(displayed, slip1, slip2)}
+                  onPreviewSlip={setPreviewUrl}
+                />
               </div>
             </div>
           )}

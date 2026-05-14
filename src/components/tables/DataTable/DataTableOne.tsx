@@ -527,7 +527,7 @@ export default function DataTableOne<T extends object>({
             classNameBody={`sm:!p-0${fillHeight ? " lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:!p-0" : ""}`}
             classNameBodyInner={fillHeight ? "lg:flex lg:flex-col lg:flex-1 lg:min-h-0" : undefined}
             divider={(
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4 sm:py-5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-4 sm:py-5">
                     {searchable === 'header' && (
                         <div className="relative min-w-[140px] flex-1">
                             <span className="absolute z-1 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
@@ -544,11 +544,11 @@ export default function DataTableOne<T extends object>({
                     )}
                     {/* Mobile: compact segmented group */}
                     {(headerFilter || exportable === "header") && (
-                        <div className="flex sm:hidden items-center h-11 rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden shadow-theme-xs divide-x divide-gray-300 dark:divide-gray-700 [&_button]:!border-0 [&_button]:!rounded-none [&_button]:!shadow-none">
+                        <div className="flex sm:hidden items-center gap-x-1.5">
                             {headerFilter}
                             {exportable === "header" && (
                                 <button
-                                    className="flex items-center justify-center px-3 h-full text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    className="flex items-center justify-center h-11 px-3 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-theme-xs transition-colors"
                                     onClick={() => exportCsv(columns, isAsync ? asyncData : clientRows, exportFilename)}
                                 >
                                     <FileIcon className="size-5" />
@@ -575,7 +575,7 @@ export default function DataTableOne<T extends object>({
             )}
         >
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-100 px-5 py-4 dark:border-white/[0.05] !mb-0">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-100 px-0 sm:px-6 py-4 dark:border-white/[0.05] !mb-0">
                 {/* Left controls */}
                 <div className="flex flex-1 items-center gap-3 min-w-0">
                     {searchable === 'toolbar' && (

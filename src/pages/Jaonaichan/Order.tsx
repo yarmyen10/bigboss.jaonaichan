@@ -11,6 +11,7 @@ import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrders, getProductsBulkByOrders, patchBill2, patchOrderStatus } from "../../services/jaonaichan";
 import { resolveManageTabs, hasManageableOrders, STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
+import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { CalenderIcon, CheckCircleIcon, MoreDotIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
@@ -30,7 +31,6 @@ import BottomSheet from "../../components/ui/bottom-sheet/BottomSheet";
 
 
 
-type OrderStatus = "pending" | "processing" | "on-hold" | "completed" | "cancelled" | "refunded" | "failed" | "checkout-draft" | "waiting-transfer" | "pending-payment-1" | "pending-payment-2" | string;
 type PaymentMethod = "promptpay_qr" | "bank_transfer" | "cod";
 // interface WCOrder {
 //   id: number;
@@ -49,23 +49,6 @@ interface Details {
   [key: string]: unknown;
 }
 
-const STATUS_DETAILS_AND_STYLE: Record<OrderStatus, Details> = {
-  "pending": { color: "primary", text: "Pending payment" },
-  "processing": { color: "warning", text: "Processing" },
-  "on-hold": { color: "dark", text: "On hold" },
-  "completed": { color: "success", text: "Completed" },
-  "cancelled": { color: "light", text: "Cancelled" },
-  "refunded": { color: "light", text: "Refunded" },
-  "failed": { color: "error", text: "Failed" },
-  "checkout-draft": { color: "light", text: "Draft" },
-  "waiting-transfer": { color: "warning", text: "Waiting Transfer" },
-  "pending-payment-1": { color: "warning", text: "Pending payment 1" },
-  "pending-payment-2": { color: "warning", text: "Pending payment 2" },
-  "wait-verify-1": { color: "warning", text: "Waiting for Verification 1" },
-  "wait-verify-2": { color: "warning", text: "Waiting for Verification 2" },
-  "paid-1": { color: "primary", text: "Paid 1" },
-  "paid-2": { color: "primary", text: "Paid 2" },
-};
 
 const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
   "promptpay_qr": {
@@ -307,11 +290,11 @@ const getOrderColumns = (
       sortable: true,
       width: "180px",
       render: (val) => {
-        const s = val as OrderStatus;
+        const s = val as string;
         return (
           <span className="whitespace-nowrap">
-            <Badge variant="light" color={((STATUS_DETAILS_AND_STYLE[s]?.color ?? 'light') as BadgeColor)}>
-              {STATUS_DETAILS_AND_STYLE[s]?.text ?? s}
+            <Badge variant="gradient" color={((ORDER_STATUS_DETAILS[s]?.color ?? 'light') as BadgeColor)}>
+              {ORDER_STATUS_DETAILS[s]?.text ?? s}
             </Badge>
           </span>
         );
