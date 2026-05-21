@@ -4,9 +4,11 @@ import { Link, useLocation } from "react-router";
 // Assume these icons are imported from an icon library
 import {
   BoxCubeIcon,
+  BoxIcon,
   CalenderIcon,
   CatIcon,
   ChevronDownIcon,
+  FileIcon,
   GridIcon,
   HorizontaLDots,
   ListIcon,
@@ -15,6 +17,7 @@ import {
   PlugInIcon,
   TableIcon,
   UserCircleIcon,
+  UserIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 // import SidebarWidget from "./SidebarWidget";
@@ -34,12 +37,45 @@ const navItems: NavItem[] = [
   },
   {
     icon: <CatIcon />,
-    name: "Jaonaichan",
+    name: "Jaonaichan - Sales",
     subItems: [
       { name: "Order", path: "/order-jaonaichan", pro: false },
       { name: "Bill 2 Unit Prices", path: "/bill2-unit-prices", pro: false },
+      // { name: "POS / หน้าขาย", path: "/jaonaichan/pos", pro: false },
+      // { name: "โปรโมชัน / ส่วนลด", path: "/jaonaichan/promotions", pro: false },
+    ],
+  },
+  {
+    icon: <FileIcon />,
+    name: "Jaonaichan - Documents",
+    subItems: [
+      { name: "Invoice / ใบแจ้งหนี้", path: "/jaonaichan/invoice", pro: false },
+      { name: "ใบเสร็จ / Receipt", path: "/jaonaichan/receipt", pro: false },
+    ],
+  },
+  {
+    icon: <BoxIcon />,
+    name: "Jaonaichan - Inventory",
+    subItems: [
       { name: "Pack Order", path: "/barcode-pack", pro: false },
       { name: "Barcode Import", path: "/barcode-import", pro: false },
+      { name: "จัดการสต็อก", path: "/jaonaichan/stock", pro: false },
+    ],
+  },
+  {
+    icon: <UserIcon />,
+    name: "Jaonaichan - Customers",
+    subItems: [
+      { name: "ทะเบียนลูกค้า", path: "/jaonaichan/customers", pro: false },
+      { name: "เครดิตลูกค้า", path: "/jaonaichan/customer-credit", pro: false },
+    ],
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "Jaonaichan - Reports",
+    subItems: [
+      { name: "รายงานยอดขาย", path: "/jaonaichan/report-sales", pro: false },
+      { name: "รายงานสต็อก", path: "/jaonaichan/report-stock", pro: false },
     ],
   },
   {
