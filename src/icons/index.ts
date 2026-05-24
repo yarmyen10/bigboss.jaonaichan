@@ -63,6 +63,11 @@ import { ReactComponent as ReceiptBill } from "./order/receipt-bill.svg?react";
 import { ReactComponent as ReceiptApproved } from "./order/receipt-approved.svg?react";
 import { ReactComponent as ReceiptDeclined } from "./order/receipt-declined.svg?react";
 import { ReactComponent as ReceiptRecheck } from "./order/receipt-recheck.svg?react";
+import { ReactComponent as CatShopping } from "./order/cat-shopping.svg?react";
+import { ReactComponent as CatDocument } from "./order/cat-document.svg?react";
+import { ReactComponent as CatPortrait } from "./order/cat-portrait.svg?react";
+import { ReactComponent as CatShipping } from "./order/cat-shipping.svg?react";
+import { ReactComponent as CatAnalyst } from "./order/cat-analyst.svg?react";
 
 export {
   ErrorHexaIcon,
@@ -130,4 +135,9 @@ export {
   ReceiptApproved,
   ReceiptDeclined,
   ReceiptRecheck,
+  CatShopping,
+  CatDocument,
+  CatPortrait,
+  CatShipping,
+  CatAnalyst,
 };

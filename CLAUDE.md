@@ -42,6 +42,7 @@ Current service functions:
 
 | Function | Endpoint / purpose |
 |---|---|
+| `getDashboardStats(year?)` | Dashboard overview — metrics, monthly revenue, recent orders, status breakdown |
 | `getOrders(params)` | Fetch paginated order list |
 | `getOrder(id)` | Fetch single order detail |
 | `getProductsBulk(...)` | Fetch products by IDs |

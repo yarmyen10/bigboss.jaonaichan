@@ -6,7 +6,12 @@ import {
   BoxCubeIcon,
   BoxIcon,
   CalenderIcon,
+  CatAnalyst,
+  CatDocument,
   CatIcon,
+  CatPortrait,
+  CatShipping,
+  CatShopping,
   ChevronDownIcon,
   FileIcon,
   GridIcon,
@@ -36,7 +41,7 @@ const navItems: NavItem[] = [
     subItems: [{ name: "Ecommerce", path: "/", pro: false }],
   },
   {
-    icon: <CatIcon />,
+    icon: <CatShopping />,
     name: "Jaonaichan - Sales",
     subItems: [
       { name: "Order", path: "/order-jaonaichan", pro: false },
@@ -46,7 +51,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <FileIcon />,
+    icon: <CatDocument />,
     name: "Jaonaichan - Documents",
     subItems: [
       { name: "Invoice / ใบแจ้งหนี้", path: "/jaonaichan/invoice", pro: false },
@@ -54,7 +59,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <BoxIcon />,
+    icon: <CatShipping />,
     name: "Jaonaichan - Inventory",
     subItems: [
       { name: "Pack Order", path: "/barcode-pack", pro: false },
@@ -63,7 +68,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <UserIcon />,
+    icon: <CatPortrait />,
     name: "Jaonaichan - Customers",
     subItems: [
       { name: "ทะเบียนลูกค้า", path: "/jaonaichan/customers", pro: false },
@@ -71,7 +76,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <PieChartIcon />,
+    icon: <CatAnalyst />,
     name: "Jaonaichan - Reports",
     subItems: [
       { name: "รายงานยอดขาย", path: "/jaonaichan/report-sales", pro: false },

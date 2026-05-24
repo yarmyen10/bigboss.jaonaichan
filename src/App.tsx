@@ -24,6 +24,7 @@ import Order from "./pages/Jaonaichan/Order";
 import Bill2UnitPrices from "./pages/Jaonaichan/Bill2UnitPrices";
 import BarcodePack from "./pages/Jaonaichan/BarcodePack";
 import BarcodeImport from "./pages/Jaonaichan/BarcodeImport";
+import Customers from "./pages/Jaonaichan/Customers";
 import { CustomersPage, OrdersPage } from "./components/tables/DataTable/DataTableExample";
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/bill2-unit-prices" element={<ProtectedRoute><Bill2UnitPrices /></ProtectedRoute>} />
             <Route path="/barcode-pack" element={<ProtectedRoute><BarcodePack /></ProtectedRoute>} />
             <Route path="/barcode-import" element={<ProtectedRoute><BarcodeImport /></ProtectedRoute>} />
+            <Route path="/jaonaichan/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
 
             {/* Others Page */}
             <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />

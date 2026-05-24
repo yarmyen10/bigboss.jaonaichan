@@ -1,5 +1,6 @@
 import { apiFetch, apiRequest } from "../api/client";
 import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse, PatchBillResponse } from "../interfaces/order.jaonaichan";
+import type { DashboardStats } from '../interfaces/dashboard.jaonaichan';
 import { PatchProfilePayload, PatchProfileResponse, UserProfile } from "../interfaces/profile.jaonaichan";
 
 export interface GetOrdersParams {
@@ -82,6 +83,32 @@ export async function getProductsBulkByOrders({
             per_page: perPage,
         }),
     });
+}
+
+// =========================================================================
+// Dashboard
+// =========================================================================
+
+export async function getDashboardStats(year?: number): Promise<DashboardStats> {
+    const qs = year ? `?year=${year}` : '';
+    return apiRequest(`/jaonaichan/v1/dashboard${qs}`);
+}
+
+// =========================================================================
+// Customers
+// =========================================================================
+
+import type { CustomerListResponse, GetCustomersParams } from '../interfaces/customer.jaonaichan';
+
+export async function getCustomers(params: GetCustomersParams = {}): Promise<CustomerListResponse> {
+    const { page = 1, perPage = 20, search } = params;
+    const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+    if (search) qs.set('search', search);
+    return apiRequest(`/jaonaichan/v1/customers?${qs}`);
+}
+
+export async function getCustomerOrders(customerId: number): Promise<OrderListResponse> {
+    return apiRequest(`/jaonaichan/v1/customers/${customerId}/orders`);
 }
 
 // =========================================================================
