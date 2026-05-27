@@ -298,7 +298,7 @@ export default function Bill2UnitPrices() {
       setActiveBatchId(firstBatchId);
       applyBatchPrices(firstBatchId, orders);
     } catch (err) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
     } finally {
       setTimeout(() => setIsLoading(false), 100);
     }
@@ -356,7 +356,7 @@ export default function Bill2UnitPrices() {
         setResultVariant("error");
         setResultMessage("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
         openResult();
-        console.error(err);
+        if (import.meta.env.DEV) console.error(err);
       }
     });
   };

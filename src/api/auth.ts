@@ -11,48 +11,57 @@ export interface BigBossUser {
 }
 
 export interface SignInResponse {
-    token?: string;
-    user_nicename?: string;
-    user_email?: string;
-    user_display_name?: string;
-    [key: string]: any
+    success?: boolean;
+    message?: string;
+    user?: {
+        id: number;
+        username: string;
+        email: string;
+        display_name: string;
+        roles: string[];
+        role: string | null;
+        avatar_url: string;
+    };
 }
 
 export async function signIn(username: string, password: string): Promise<SignInResponse> {
-    const res = await fetch(`${JAONAICHAN_API_URL}/jwt-auth/v1/token`, {
+    const res = await fetch(`${JAONAICHAN_API_URL}/bigboss-auth/v1/signin`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
     });
 
     const data: SignInResponse = await res.json();
 
-    if (data.token) {
-        localStorage.setItem(JAONAICHAN_PREFIX + 'Token', data.token);
+    if (data.success && data.user) {
         localStorage.setItem(JAONAICHAN_PREFIX + 'User', JSON.stringify({
-            username: data.user_nicename,
-            email: data.user_email,
-            displayName: data.user_display_name,
-            roles: data.roles,
-            role: data.role,
-            avatarUrl: data.avatar_url,
+            username:    data.user.username,
+            email:       data.user.email,
+            displayName: data.user.display_name,
+            roles:       data.user.roles,
+            role:        data.user.role,
+            avatarUrl:   data.user.avatar_url,
         } satisfies BigBossUser));
     }
 
     return data;
 }
 
-export function signOut(): void {
-    localStorage.removeItem(JAONAICHAN_PREFIX + 'Token');
+export async function signOut(): Promise<void> {
     localStorage.removeItem(JAONAICHAN_PREFIX + 'User');
-}
-
-export function getToken(): string | null {
-    return localStorage.getItem(JAONAICHAN_PREFIX + 'Token');
+    try {
+        await fetch(`${JAONAICHAN_API_URL}/bigboss-auth/v1/signout`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+    } catch {
+        // ignore network errors — localStorage already cleared
+    }
 }
 
 export function isLoggedIn(): boolean {
-    return !!getToken();
+    return !!localStorage.getItem(JAONAICHAN_PREFIX + 'User');
 }
 
 export function getUser(): BigBossUser | null {

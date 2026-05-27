@@ -36,7 +36,7 @@ export default function SignInForm() {
     try {
       const data = await signIn(form.username, form.password);
   
-      if (data.token) {
+      if (data.success) {
         window.location.href = '/';
       } else {
         setError(data.message || 'Login ไม่สำเร็จ');

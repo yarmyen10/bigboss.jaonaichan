@@ -7,6 +7,7 @@
  */
 
 import DataTable, { ColumnDef, FetchParams, FetchResult } from "./DataTable";
+import { apiFetch } from "../../../api/client";
 
 // ─── shared icons ─────────────────────────────────────────────────────────────
 
@@ -141,9 +142,7 @@ async function fetchProducts(params: FetchParams): Promise<FetchResult<WCProduct
     orderby:  params.sortKey === "price" ? "price" : params.sortKey === "name" ? "title" : "date",
     order:    params.sortDir,
   });
-  const res = await fetch(`/wp-json/wc/v3/products?${qs}`, {
-    headers: { Authorization: "Basic " + btoa("ck_xxx:cs_xxx") },
-  });
+  const res = await apiFetch(`/wc/v3/products?${qs}`);
   return { data: await res.json(), total: Number(res.headers.get("X-WP-Total") ?? 0) };
 }
 
@@ -283,9 +282,7 @@ async function fetchOrders(params: FetchParams): Promise<FetchResult<WCOrder>> {
     orderby:  params.sortKey === "number" ? "id" : params.sortKey === "total" ? "total" : "date",
     order:    params.sortDir,
   });
-  const res = await fetch(`/wp-json/wc/v3/orders?${qs}`, {
-    headers: { Authorization: "Basic " + btoa("ck_xxx:cs_xxx") },
-  });
+  const res = await apiFetch(`/wc/v3/orders?${qs}`);
   return { data: await res.json(), total: Number(res.headers.get("X-WP-Total") ?? 0) };
 }
 

@@ -553,7 +553,7 @@ export default function Order() {
       });
       setOrders(Array.isArray(res?.data) ? res.data : []);
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
     } finally {
       setTimeout(() => setIsLoading(false), 100);
     }

@@ -144,7 +144,7 @@ export default function Customers() {
       const res = await getCustomers();
       setCustomers(Array.isArray(res?.data) ? res.data : []);
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
     } finally {
       setTimeout(() => setIsLoading(false), 100);
     }
@@ -165,7 +165,7 @@ export default function Customers() {
       const res = await getCustomerOrders(customer.id);
       setCustomerOrders(Array.isArray(res?.data) ? res.data : []);
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
     } finally {
       setIsOrdersLoading(false);
     }
