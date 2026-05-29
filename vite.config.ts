@@ -10,10 +10,31 @@ export default defineConfig({
     svgr({
       svgrOptions: {
         icon: true,
-        // This will transform your SVG to a React component
         exportType: "named",
         namedExport: "ReactComponent",
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom', 'react-router'],
+          'vendor-charts':   ['apexcharts', 'react-apexcharts'],
+          'vendor-calendar': [
+            '@fullcalendar/core',
+            '@fullcalendar/daygrid',
+            '@fullcalendar/timegrid',
+            '@fullcalendar/list',
+            '@fullcalendar/interaction',
+            '@fullcalendar/react',
+          ],
+          'vendor-maps':     ['@react-jvectormap/core', '@react-jvectormap/world'],
+          'vendor-pdf':      ['jspdf', 'html2canvas-pro'],
+          'vendor-motion':   ['motion'],
+          'vendor-dnd':      ['react-dnd', 'react-dnd-html5-backend', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+        },
+      },
+    },
+  },
 });
