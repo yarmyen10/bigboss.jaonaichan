@@ -27,6 +27,8 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.3.3",
     "flatpickr": "^4.6.13",
+    "html2canvas-pro": "^2.0.4",
+    "jspdf": "^4.2.1",
     "motion": "^12.38.0",
     "react": "^19.0.0",
     "react-apexcharts": "^1.7.0",

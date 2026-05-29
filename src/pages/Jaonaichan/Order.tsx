@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from 'react-dom';
+import { useNavigate } from "react-router";
 import flatpickr from "flatpickr";
 import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -251,7 +252,8 @@ const getOrderColumns = (
   buttonRefs: React.RefObject<Record<string, HTMLButtonElement | null>>,
   openDropdownId: string | null,
   setOpenDropdownId: (id: string | null) => void,
-  onViewMore: (row: OrderIF) => void
+  onViewMore: (row: OrderIF) => void,
+  navigate: (to: string) => void
 ): ColumnDef<OrderIF>[] => [
     {
       key: "id",
@@ -388,6 +390,12 @@ const getOrderColumns = (
                     View More
                   </DropdownItem>
                   <DropdownItem
+                    onItemClick={() => { setOpenDropdownId(null); navigate(`/jaonaichan/invoice/${row.id}`); }}
+                    className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                  >
+                    Invoice
+                  </DropdownItem>
+                  <DropdownItem
                     onItemClick={() => setOpenDropdownId(null)}
                     className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300"
                   >
@@ -495,6 +503,7 @@ const getManageOrderColumns = (
   ];
 
 export default function Order() {
+  const navigate = useNavigate();
   const { spinning, withSpinner } = useSpinner(false);
   const [isLoading, setIsLoading] = useState(false);
   const hasInitialized = useRef(false);
@@ -530,8 +539,8 @@ export default function Order() {
   }, [openDetails]);
 
   const columns = useMemo(
-    () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore),
-    [openDropdownId, handleViewMore]
+    () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore, navigate),
+    [openDropdownId, handleViewMore, navigate]
   );
 
   const manageOrdersColumns = useMemo(

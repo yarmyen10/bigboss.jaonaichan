@@ -124,7 +124,14 @@ Row-level dropdowns (see `Order.tsx`) render via `createPortal` into `document.b
 - **ESLint `naming-convention`** is enforced (see `eslint.config.js`): `PascalCase` for types/components, `camelCase` for functions/variables, `UPPER_CASE` allowed for constants, `snake_case` allowed on interface members (to match WP REST payload shape).
 - `@typescript-eslint/no-explicit-any` is a warning with auto-fix to `unknown`.
 - Styling is Tailwind utilities in JSX, `clsx` / `tailwind-merge` for conditionals. Dark mode is class-based with the `dark:` prefix.
-- TailAdmin design tokens in use: `text-body`, `bg-boxdark`, `dark:border-gray-800`, `text-brand-500`, `shadow-theme-xs`.
+- TailAdmin design tokens in use: `text-body`, `dark:border-gray-800`, `text-brand-500`, `shadow-theme-xs`.
+- **Dark mode** is class-based (`dark` on `<html>`). The custom variant is defined as `@custom-variant dark (&:is(.dark *))` in `index.css`. All colors come from `@theme` in `index.css` — **`bg-boxdark` is a legacy TailAdmin v3 token that is NOT defined in this project's `@theme` and generates no CSS; do not use it.** Correct dark mode color patterns:
+  - Card / panel background: `bg-white dark:bg-white/[0.03]`
+  - Input / textarea background: `bg-white dark:bg-gray-900`
+  - Text primary: `text-gray-900 dark:text-white`
+  - Text secondary: `text-gray-500 dark:text-gray-400`
+  - Text muted: `text-gray-400 dark:text-gray-500`
+  - Border: `border-gray-200 dark:border-gray-700`
 - `tsconfig.app.json` has `strict`, `noUnusedLocals`, `noUnusedParameters` on. `npm run build` swallows TS errors (prebuild `tsc -b || echo ...`), so rely on `npm run type-check` as the gate.
 
 ## Reuse existing components — check before building new
@@ -137,6 +144,7 @@ Before writing raw HTML or custom styles, check if an existing component covers 
 | Select / dropdown | `Select` | `src/components/form/Select.tsx` — uncontrolled (`defaultValue` + `onChange`); pass `key` to reset externally |
 | Text input | `Input` | `src/components/form/input/InputField.tsx` — does **not** forward `ref`; use raw `<input ref={...}>` when flatpickr or direct DOM access is needed |
 | Form label | `Label` | `src/components/form/Label.tsx` |
+| Checkbox | `Checkbox` | `src/components/form/input/Checkbox.tsx` — `checked`, `onChange(checked: boolean)`, optional `label`; renders its own `<label>`, so wrap rows in `<div onClick>` + `stopPropagation` on the checkbox wrapper to avoid double-fire |
 | Badge | `Badge` | `src/components/ui/badge/Badge.tsx` |
 | Modal | `Modal` | `src/components/ui/modal/index.tsx` |
 | Portaled dropdown menu | `Dropdown` + `DropdownItem` | `src/components/ui/dropdown/` |

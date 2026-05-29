@@ -11,7 +11,8 @@ interface InputProps {
   className?: string;
   min?: string;
   max?: string;
-  step?: number;
+  step?: string | number;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
   disabled?: boolean;
   success?: boolean;
   error?: boolean;
@@ -29,6 +30,7 @@ const Input: FC<InputProps> = ({
   min,
   max,
   step,
+  onKeyDown,
   disabled = false,
   success = false,
   error = false,
@@ -58,6 +60,7 @@ const Input: FC<InputProps> = ({
         min={min}
         max={max}
         step={step}
+        onKeyDown={onKeyDown}
         disabled={disabled}
         className={inputClasses}
       />
