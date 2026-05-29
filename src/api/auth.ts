@@ -40,7 +40,7 @@ export async function signIn(username: string, password: string): Promise<SignIn
             email:       data.user.email,
             displayName: data.user.display_name,
             roles:       data.user.roles,
-            role:        data.user.role,
+            role:        data.user.role ?? undefined,
             avatarUrl:   data.user.avatar_url,
         } satisfies BigBossUser));
     }

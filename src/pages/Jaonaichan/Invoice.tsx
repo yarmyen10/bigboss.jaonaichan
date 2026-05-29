@@ -117,7 +117,7 @@ export default function InvoicePage() {
 
   return (
     <>
-      <PageMeta title={`Invoice — Order #${order.number}`} />
+      <PageMeta title={`Invoice — Order #${order.number}`} description={`Invoice for order #${order.number}`} />
       <PageBreadcrumb pageTitle={`Invoice #${order.number}`} />
 
       {/* ── Toolbar ── */}
