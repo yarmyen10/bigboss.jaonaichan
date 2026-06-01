@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Subtle shadow gradient on right side of body -->
+    <linearGradient id="bodyShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a5068" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#363b52" stop-opacity="1"/>
+    </linearGradient>
+    <!-- Shutter slot shadow -->
+    <linearGradient id="shutterShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2e3348" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#2a2f44" stop-opacity="1"/>
+    </linearGradient>
+    <!-- Label gradient (very subtle) -->
+    <linearGradient id="labelShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#c8d0e0" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#b8c2d4" stop-opacity="1"/>
+    </linearGradient>
+    <!-- Cyan stripe gradient -->
+    <linearGradient id="cyanGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5de8e0"/>
+      <stop offset="100%" stop-color="#3dd4c8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ── Body ── rounded rectangle, slate blue -->
+  <rect x="40" y="40" width="432" height="432" rx="52" ry="52" fill="#4a5270"/>
+  <!-- Right-side shadow overlay -->
+  <rect x="40" y="40" width="432" height="432" rx="52" ry="52" fill="url(#bodyShade)" opacity="0.55"/>
+
+  <!-- ── Shutter tab (top centre, dark inset) ── -->
+  <!-- Shutter outer (light lavender) -->
+  <rect x="152" y="40" width="208" height="178" rx="0" ry="0" fill="#c8d0e2"/>
+  <!-- top corners of shutter follow body radius -->
+  <!-- Clip the shutter top corners to match body -->
+  <rect x="152" y="40" width="208" height="52" fill="#4a5270"/>
+  <rect x="152" y="40" width="208" height="178" rx="0" fill="#c8d0e2"/>
+  <!-- Dark slot in shutter -->
+  <rect x="210" y="52" width="92" height="130" rx="6" fill="#38405a"/>
+  <!-- Slot right-shade -->
+  <rect x="210" y="52" width="92" height="130" rx="6" fill="url(#shutterShade)" opacity="0.6"/>
+
+  <!-- ── Label area (big light rounded rect, lower portion) ── -->
+  <rect x="72" y="248" width="368" height="196" rx="14" fill="#c8d0e2"/>
+  <!-- label right-shade -->
+  <rect x="72" y="248" width="368" height="196" rx="14" fill="url(#labelShade)" opacity="0.7"/>
+
+  <!-- ── Cyan / teal stripe at top of label ── -->
+  <rect x="72" y="248" width="368" height="52" rx="0" fill="url(#cyanGrad)"/>
+  <!-- Round only top corners of stripe -->
+  <rect x="72" y="248" width="368" height="30" rx="14" fill="url(#cyanGrad)"/>
+  <rect x="72" y="263" width="368" height="37" fill="url(#cyanGrad)"/>
+
+  <!-- ── Three text lines on label ── -->
+  <!-- Line 1 -->
+  <rect x="110" y="340" width="220" height="22" rx="11" fill="#9aa4b8"/>
+  <!-- Line 2 -->
+  <rect x="110" y="376" width="292" height="22" rx="11" fill="#9aa4b8"/>
+  <!-- Line 3 -->
+  <rect x="110" y="412" width="256" height="22" rx="11" fill="#9aa4b8"/>
+</svg>

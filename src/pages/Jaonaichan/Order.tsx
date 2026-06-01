@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from 'react-dom';
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import flatpickr from "flatpickr";
 import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -10,9 +10,9 @@ import { OrderListResponse, Order as OrderIF, OrderProductsBulkResponse, OrderIt
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
-import { getOrders, getProductsBulkByOrders, patchBill2, patchOrderStatus } from "../../services/jaonaichan";
+import { getOrders, getOrder, getProductsBulkByOrders, patchBill2, patchOrderStatus, deleteSlip } from "../../services/jaonaichan";
 import { resolveManageTabs, hasManageableOrders, STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
-import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
+import { ORDER_STATUS_DETAILS, STATUS_PROGRESS_COLOR } from "../../config/orderStatus.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { CalenderIcon, CheckCircleIcon, MoreDotIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
@@ -23,6 +23,7 @@ import { Modal } from "../../components/ui/modal";
 import { AlertModal } from "../../components/ui/modal/AlertModal";
 import { useModal } from "../../hooks/useModal";
 
+import Checkbox from "../../components/form/input/Checkbox";
 import { useSpinner } from "../../hooks/useSpinner";
 import PageSpinner from "../../components/common/PageSpinner";
 import ComponentTabCard from "../../components/common/ComponentTabCard";
@@ -253,7 +254,8 @@ const getOrderColumns = (
   openDropdownId: string | null,
   setOpenDropdownId: (id: string | null) => void,
   onViewMore: (row: OrderIF) => void,
-  navigate: (to: string) => void
+  navigate: (to: string) => void,
+  onUpdateStatus: (row: OrderIF) => void
 ): ColumnDef<OrderIF>[] => [
     {
       key: "id",
@@ -334,16 +336,17 @@ const getOrderColumns = (
       width: "130px",
       noExport: true,
       render: (_val, row) => {
-        const b1 = row.bill1?.status === "paid";
-        const b2 = row.bill2?.status === "paid";
-        const pct = b2 ? 100 : b1 ? 50 : 0;
-        const barColor = pct === 100 ? "bg-emerald-500" : pct > 0 ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600";
+        const billPct = (b: { status: string } | undefined | null) =>
+          b?.status === "paid" ? 50 : b?.status === "submitted" ? 25 : 0;
+        const pct = billPct(row.bill1) + billPct(row.bill2);
+        const statusColor = ORDER_STATUS_DETAILS[row.status]?.color ?? "primary";
+        const barColor = pct === 0 ? "bg-gray-300 dark:bg-gray-600" : STATUS_PROGRESS_COLOR[statusColor];
         return (
           <div className="flex flex-col gap-1.5 min-w-[100px]">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500 dark:text-gray-400">{pct}%</span>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {b2 ? "2/2" : b1 ? "1/2" : "0/2"}
+                {(row.bill1?.status === "paid" ? 1 : 0) + (row.bill2?.status === "paid" ? 1 : 0)}/2
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700">
@@ -396,10 +399,10 @@ const getOrderColumns = (
                     Invoice
                   </DropdownItem>
                   <DropdownItem
-                    onItemClick={() => setOpenDropdownId(null)}
-                    className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300"
+                    onItemClick={() => { setOpenDropdownId(null); onUpdateStatus(row); }}
+                    className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
                   >
-                    Delete
+                    Update Status
                   </DropdownItem>
                 </Dropdown>
               </div>,
@@ -504,6 +507,7 @@ const getManageOrderColumns = (
 
 export default function Order() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { spinning, withSpinner } = useSpinner(false);
   const [isLoading, setIsLoading] = useState(false);
   const hasInitialized = useRef(false);
@@ -538,9 +542,33 @@ export default function Order() {
     openDetails();
   }, [openDetails]);
 
+  useEffect(() => {
+    const idParam = searchParams.get("orderId");
+    if (!idParam) return;
+    const id = Number(idParam);
+    if (!id) return;
+    setSearchParams(prev => { prev.delete("orderId"); return prev; }, { replace: true });
+    getOrder(id).then(order => {
+      setViewOrder(order as OrderIF);
+      openDetails();
+    }).catch(() => {/* silent */});
+  }, [searchParams, setSearchParams, openDetails]);
+
+  const { isOpen: isUpdateStatusOpen, openModal: openUpdateStatus, closeModal: closeUpdateStatus } = useModal();
+  const [updateStatusOrders, setUpdateStatusOrders] = useState<OrderIF[]>([]);
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [removeSlip, setRemoveSlip] = useState(false);
+
+  const handleOpenUpdateStatus = useCallback((orders: OrderIF[]) => {
+    setUpdateStatusOrders(orders);
+    setNewStatus("");
+    setRemoveSlip(false);
+    openUpdateStatus();
+  }, [openUpdateStatus]);
+
   const columns = useMemo(
-    () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore, navigate),
-    [openDropdownId, handleViewMore, navigate]
+    () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore, navigate, (row) => handleOpenUpdateStatus([row])),
+    [openDropdownId, handleViewMore, navigate, handleOpenUpdateStatus]
   );
 
   const manageOrdersColumns = useMemo(
@@ -615,6 +643,25 @@ export default function Order() {
     });
     openModal();
   }
+
+  const handleConfirmUpdateStatus = () => {
+    if (!newStatus) return;
+    withSpinner(async () => {
+      await Promise.all(
+        updateStatusOrders.map(async (order) => {
+          await patchOrderStatus(order.id, `wc-${newStatus}`);
+          if (removeSlip) {
+            await Promise.allSettled([
+              deleteSlip(order.id, 1),
+              deleteSlip(order.id, 2),
+            ]);
+          }
+        })
+      );
+      closeUpdateStatus();
+      loadOrders(dateFilter);
+    });
+  };
 
   const handleSaveOrders = () => {
     withSpinner(async () => {
@@ -707,6 +754,15 @@ export default function Order() {
                       </DropdownItem>
                     </>
                   )}
+                  <DropdownSectionHeader label="Status" border />
+                  {isAllSelected && (
+                    <DropdownItem onItemClick={() => { close(); handleOpenUpdateStatus(orders); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                      Update status all orders.
+                    </DropdownItem>
+                  )}
+                  <DropdownItem onItemClick={() => { close(); handleOpenUpdateStatus(selected); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
+                    Update status {selected.length} orders.
+                  </DropdownItem>
                   <DropdownSectionHeader label="Cancel" border />
                   {isAllSelected && (
                     <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300">
@@ -825,6 +881,59 @@ export default function Order() {
         variant="warning"
         message="ไม่มี Order ที่สามารถดำเนินการได้ในขณะนี้"
       />
+      {/* Modal Update Status */}
+      <Modal
+        isOpen={isUpdateStatusOpen}
+        onClose={closeUpdateStatus}
+        className="max-w-[420px] p-6 lg:p-8"
+      >
+        <div>
+          <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+            Update Order Status
+          </h4>
+          <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+            Updating {updateStatusOrders.length} order{updateStatusOrders.length !== 1 ? "s" : ""}
+          </p>
+          <div className="mb-5">
+            <Label>New Status</Label>
+            <Select
+              key={isUpdateStatusOpen ? "open" : "closed"}
+              options={Object.entries(ORDER_STATUS_DETAILS).map(([key, detail]) => ({
+                value: key,
+                label: detail.text,
+              }))}
+              placeholder="Select new status"
+              defaultValue={newStatus}
+              onChange={setNewStatus}
+            />
+          </div>
+          <div>
+            <Checkbox
+              label="Remove payment slip"
+              checked={removeSlip}
+              onChange={setRemoveSlip}
+            />
+            <p className="mt-1.5 ml-8 text-xs text-gray-400 dark:text-gray-500">
+              Removes the uploaded payment slip from each order
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-3 mt-6">
+            <button
+              onClick={closeUpdateStatus}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] dark:hover:text-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmUpdateStatus}
+              disabled={!newStatus || spinning}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Update Status
+            </button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

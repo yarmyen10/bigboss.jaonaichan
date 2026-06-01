@@ -2,7 +2,7 @@
 // Shared primitives
 // =============================================================================
 
-export type BillStatus = 'pending' | 'paid' | 'cancelled'
+export type BillStatus = 'pending' | 'submitted' | 'paid' | 'cancelled'
 export type OrderStatus = string // wc statuses e.g. 'processing' | 'completed' | 'on-hold' | ...
 
 export interface Pagination {
@@ -108,6 +108,7 @@ export interface Order {
     total: number
     currency: string
     date: string
+    date_modified?: string
     payment_method: string
     customer: Customer
     billing: Billing

@@ -48,6 +48,18 @@ export async function getBillSlipObjectUrl(orderId: number, bill: 1 | 2): Promis
     return URL.createObjectURL(blob);
 }
 
+export async function deleteSlip(orderId: number, bill: 1 | 2): Promise<unknown> {
+    return apiRequest(`/promptpay/v1/slip/${orderId}/${bill}`, {
+        method: "DELETE",
+    });
+}
+
+export async function reVerifySlip(orderId: number, bill: 1 | 2): Promise<{ success: boolean; message: string }> {
+    return apiRequest(`/promptpay/v1/re-verify/${orderId}/${bill}`, {
+        method: "POST",
+    });
+}
+
 export async function patchBill2(orderId: number, amount: number, status?: string, paidAt?: string, unitPrices?: Record<number, number>, unitPricesId?: string): Promise<PatchBillResponse> {
     return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/2`, {
         method: "PATCH",
@@ -178,6 +190,25 @@ export async function saveBarcodeImport(productId: number, barcode: string): Pro
 }
 
 // =========================================================================
+// Invoices
+// =========================================================================
+
+import type { InvoiceListResponse, SaveInvoicePayload, SaveInvoiceResponse } from '../interfaces/invoice.jaonaichan';
+
+export async function saveInvoice(payload: SaveInvoicePayload): Promise<SaveInvoiceResponse> {
+    return apiRequest('/jaonaichan/v1/invoices', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function getInvoices(params: { page?: number; perPage?: number } = {}): Promise<InvoiceListResponse> {
+    const { page = 1, perPage = 20 } = params;
+    const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+    return apiRequest(`/jaonaichan/v1/invoices?${qs}`);
+}
+
+// =========================================================================
 // Profile
 // =========================================================================
 
@@ -214,4 +245,21 @@ export async function patchProfile(payload: PatchProfilePayload): Promise<PatchP
         body: JSON.stringify(payload),
     });
     return { ...raw, data: mapProfile(raw.data) };
+}
+
+// =========================================================================
+// PromptPay QR Plugin Config
+// =========================================================================
+
+import type { PromptPayConfig, UpdatePromptPayConfigResponse } from '../interfaces/promptpay.jaonaichan';
+
+export async function getPromptPayConfig(): Promise<PromptPayConfig> {
+    return apiRequest('/promptpay/v1/config');
+}
+
+export async function updatePromptPayConfig(payload: Partial<PromptPayConfig>): Promise<UpdatePromptPayConfigResponse> {
+    return apiRequest('/promptpay/v1/config', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
 }

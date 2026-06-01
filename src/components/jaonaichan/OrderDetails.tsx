@@ -4,7 +4,7 @@ import { Modal } from "../ui/modal";
 import Badge, { BadgeColor } from "../ui/badge/Badge";
 import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
 import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
-import { getBillSlipObjectUrl, getOrder } from "../../services/jaonaichan";
+import { getBillSlipObjectUrl, getOrder, reVerifySlip } from "../../services/jaonaichan";
 import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import { BoxIcon, ReceiptApproved, ReceiptBill, ReceiptDeclined } from "../../icons";
 
@@ -57,10 +57,13 @@ interface HistoryEvent {
   subtitle: string;
   date: string | null;
   slipUrl?: string | null;
+  canReVerify?: boolean;
+  bill?: 1 | 2;
 }
 
 const BILL_STYLE: Record<string, { Icon: React.FC<React.SVGProps<SVGSVGElement>>; iconBg: string; iconColor: string }> = {
   paid:      { Icon: ReceiptApproved, iconBg: "bg-green-50 dark:bg-green-500/10",  iconColor: "text-green-500" },
+  submitted: { Icon: ReceiptBill,     iconBg: "bg-blue-50 dark:bg-blue-500/10",    iconColor: "text-blue-500" },
   pending:   { Icon: ReceiptBill,     iconBg: "bg-amber-50 dark:bg-amber-500/10",  iconColor: "text-amber-500" },
   cancelled: { Icon: ReceiptDeclined, iconBg: "bg-gray-100 dark:bg-gray-800",      iconColor: "text-gray-400 dark:text-gray-500" },
 };
@@ -83,20 +86,29 @@ function buildHistory(
     date: displayed.date,
   };
 
-  for (const [key, bill, slip] of [
-    ["bill1", displayed.bill1, slip1],
-    ["bill2", displayed.bill2, slip2],
-  ] as const) {
-    const style = BILL_STYLE[bill.status] ?? BILL_STYLE.pending;
+  for (const [key, bill, slip, billNum] of [
+    ["bill1", displayed.bill1, slip1, 1],
+    ["bill2", displayed.bill2, slip2, 2],
+  ] as [string, typeof displayed.bill1, string | null, 1 | 2][]) {
+    const hasStoredSlip = bill.status === "submitted" && slip !== null;
+    const style = hasStoredSlip
+      ? { Icon: ReceiptBill, iconBg: "bg-blue-50 dark:bg-blue-500/10", iconColor: "text-blue-500" }
+      : (BILL_STYLE[bill.status] ?? BILL_STYLE.pending);
     const label = key === "bill1" ? "Bill 1" : "Bill 2";
-    const statusLabel = bill.status === "paid" ? "Paid" : bill.status === "cancelled" ? "Cancelled" : "Pending";
+    const statusLabel =
+      bill.status === "paid"      ? "Paid"           :
+      bill.status === "cancelled" ? "Cancelled"      :
+      hasStoredSlip               ? "Waiting Verify" :
+                                    "Pending";
     const event: HistoryEvent = {
       id: key,
       ...style,
       title: `${label} · ${statusLabel}`,
       subtitle: `฿${Number(bill.amount).toLocaleString()}`,
       date: bill.paid_at,
-      slipUrl: bill.status === "paid" ? slip : null,
+      slipUrl: slip,
+      canReVerify: hasStoredSlip,
+      bill: billNum,
     };
     if (bill.paid_at) paidEvents.push(event);
     else pendingEvents.push(event);
@@ -110,15 +122,26 @@ function buildHistory(
 function OrderHistoryTimeline({
   events,
   onPreviewSlip,
+  onReVerify,
+  reVerifying,
+  reVerifyError,
 }: {
   events: HistoryEvent[];
   onPreviewSlip: (url: string) => void;
+  onReVerify: (bill: 1 | 2) => void;
+  reVerifying: boolean;
+  reVerifyError: string | null;
 }) {
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
       <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
         Order History
       </p>
+      {reVerifyError && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+          {reVerifyError}
+        </div>
+      )}
       <div>
         {events.map((event, i) => {
           const d = event.date ? new Date(event.date) : null;
@@ -146,6 +169,23 @@ function OrderHistoryTimeline({
                       className="mt-1 text-xs text-brand-500 hover:underline"
                     >
                       View Slip
+                    </button>
+                  )}
+                  {event.canReVerify && event.bill && (
+                    <button
+                      type="button"
+                      onClick={() => onReVerify(event.bill!)}
+                      disabled={reVerifying}
+                      className="mt-1 flex items-center gap-1 text-xs text-amber-500 hover:underline disabled:opacity-50"
+                    >
+                      {reVerifying ? (
+                        <>
+                          <span className="inline-block h-3 w-3 animate-spin rounded-full border border-amber-500 border-t-transparent" />
+                          Verifying…
+                        </>
+                      ) : (
+                        "Re-verify Slip"
+                      )}
                     </button>
                   )}
                 </div>
@@ -219,11 +259,14 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
   const [slip1, setSlip1] = useState<string | null>(null);
   const [slip2, setSlip2] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [reVerifying, setReVerifying] = useState(false);
+  const [reVerifyError, setReVerifyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !order) return;
     setLoading(true);
     setDetail(null);
+    setReVerifyError(null);
     getOrder(order.id)
       .then(setDetail)
       .catch(console.error)
@@ -265,6 +308,25 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
       for (const u of created) URL.revokeObjectURL(u);
     };
   }, [isOpen, displayed?.id]);
+
+  const handleReVerify = async (bill: 1 | 2) => {
+    if (!displayed) return;
+    setReVerifying(true);
+    setReVerifyError(null);
+    try {
+      const res = await reVerifySlip(displayed.id, bill);
+      if (!res.success) throw new Error(res.message);
+      // Reload order detail so bill status + icon update
+      const fresh = await getOrder(displayed.id);
+      setDetail(fresh);
+    } catch (err: unknown) {
+      const msg =
+        (err as { message?: string })?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
+      setReVerifyError(msg);
+    } finally {
+      setReVerifying(false);
+    }
+  };
 
   const statusInfo = displayed
     ? (ORDER_STATUS_DETAILS[displayed.status] ?? { color: "light" as BadgeColor, text: displayed.status })
@@ -367,6 +429,9 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                 <OrderHistoryTimeline
                   events={buildHistory(displayed, slip1, slip2)}
                   onPreviewSlip={setPreviewUrl}
+                  onReVerify={handleReVerify}
+                  reVerifying={reVerifying}
+                  reVerifyError={reVerifyError}
                 />
               </div>
             </div>

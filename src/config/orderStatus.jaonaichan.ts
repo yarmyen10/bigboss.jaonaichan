@@ -12,6 +12,18 @@ export interface OrderStatusDetail {
   text: string;
 }
 
+export const STATUS_PROGRESS_COLOR: Record<BadgeColor, string> = {
+  primary: "bg-brand-500",
+  success: "bg-success-500",
+  error:   "bg-error-500",
+  warning: "bg-warning-500",
+  info:    "bg-blue-light-500",
+  light:   "bg-gray-400",
+  dark:    "bg-gray-700",
+  amber:   "bg-amber-500",
+  emerald: "bg-emerald-500",
+};
+
 export const ORDER_STATUS_DETAILS: Record<string, OrderStatusDetail> = {
   "pending":             { color: "primary", text: "Pending payment" },
   "processing":          { color: "warning", text: "Processing" },

@@ -49,7 +49,12 @@ export async function signIn(username: string, password: string): Promise<SignIn
 }
 
 export async function signOut(): Promise<void> {
+    // Auth
+    localStorage.removeItem(JAONAICHAN_PREFIX + 'Token');
     localStorage.removeItem(JAONAICHAN_PREFIX + 'User');
+    // Notifications (bb_notif_status, bb_notif_items — see useNotifications.ts)
+    localStorage.removeItem('bb_notif_status');
+    localStorage.removeItem('bb_notif_items');
     try {
         await fetch(`${JAONAICHAN_API_URL}/bigboss-auth/v1/signout`, {
             method: 'POST',

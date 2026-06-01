@@ -68,6 +68,7 @@ import { ReactComponent as CatDocument } from "./order/cat-document.svg?react";
 import { ReactComponent as CatPortrait } from "./order/cat-portrait.svg?react";
 import { ReactComponent as CatShipping } from "./order/cat-shipping.svg?react";
 import { ReactComponent as CatAnalyst } from "./order/cat-analyst.svg?react";
+import { ReactComponent as Diskette } from "./diskette.svg?react";
 
 export {
   ErrorHexaIcon,
@@ -140,4 +141,5 @@ export {
   CatPortrait,
   CatShipping,
   CatAnalyst,
+  Diskette
 };

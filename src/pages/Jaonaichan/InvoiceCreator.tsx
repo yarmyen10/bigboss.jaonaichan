@@ -5,11 +5,11 @@ import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import Button from "../../components/ui/button/Button";
 import Checkbox from "../../components/form/input/Checkbox";
-import { getCustomers } from "../../services/jaonaichan";
+import { getCustomers, saveInvoice } from "../../services/jaonaichan";
 import type { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import Input from "../../components/form/input/InputField";
 import TextArea from "../../components/form/input/TextArea";
-import { FileIcon, PlusIcon } from "../../icons";
+import { CheckCircleIcon, Diskette, FileIcon, PlusIcon } from "../../icons";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +77,33 @@ export default function InvoiceCreatorPage() {
 
   // PDF export
   const [exporting, setExporting] = useState(false);
+
+  // Save to DB
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (saving || savedId !== null || items.length === 0) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await saveInvoice({
+        invoice_number: invoiceNumber,
+        invoice_date: invoiceDate,
+        customer_ids: [...selected],
+        items,
+        total,
+        notes,
+        status: "draft",
+      });
+      setSavedId(res.data.id);
+    } catch {
+      setSaveError("บันทึกไม่สำเร็จ กรุณาลองใหม่");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function exportPDF() {
     const el = document.getElementById("invoice-printable");
@@ -220,7 +247,19 @@ export default function InvoiceCreatorPage() {
       <div className="flex flex-col xl:flex-row gap-6 print:block">
         {/* ── Left: Invoice editor + printable ── */}
         <div className="flex-1 min-w-0">
-          <div className="flex justify-end mb-4 print:hidden">
+          <div className="flex justify-end items-center gap-2 mb-4 print:hidden">
+            {saveError && (
+              <span className="text-xs text-red-500">{saveError}</span>
+            )}
+            <Button
+              size="sm"
+              variant={savedId !== null ? "primary" : "outline"}
+              startIcon={savedId !== null ? <CheckCircleIcon className="size-5" /> : <Diskette className="size-5" />}
+              onClick={handleSave}
+              disabled={saving || savedId !== null || items.length === 0}
+            >
+              {saving ? "กำลังบันทึก..." : savedId !== null ? "บันทึกแล้ว" : "บันทึก"}
+            </Button>
             <Button size="sm" startIcon={<FileIcon className="size-5" />} onClick={exportPDF} disabled={exporting}>
               {exporting ? "กำลัง export..." : "Export PDF"}
             </Button>

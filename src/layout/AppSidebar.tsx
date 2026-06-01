@@ -12,6 +12,7 @@ import {
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
+  PlugInIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 // import SidebarWidget from "./SidebarWidget";
@@ -70,6 +71,13 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "รายงานยอดขาย", path: "/jaonaichan/report-sales", pro: false },
       { name: "รายงานสต็อก", path: "/jaonaichan/report-stock", pro: false },
+    ],
+  },
+  {
+    icon: <PlugInIcon />,
+    name: "Settings",
+    subItems: [
+      { name: "PromptPay QR", path: "/jaonaichan/settings/promptpay", pro: false },
     ],
   },
   {

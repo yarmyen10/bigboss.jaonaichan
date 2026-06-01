@@ -18,7 +18,8 @@ const BarcodePack     = lazy(() => import("./pages/Jaonaichan/BarcodePack"));
 const BarcodeImport   = lazy(() => import("./pages/Jaonaichan/BarcodeImport"));
 const Customers       = lazy(() => import("./pages/Jaonaichan/Customers"));
 const InvoicePage     = lazy(() => import("./pages/Jaonaichan/Invoice"));
-const InvoiceCreatorPage = lazy(() => import("./pages/Jaonaichan/InvoiceCreator"));
+const InvoiceCreatorPage  = lazy(() => import("./pages/Jaonaichan/InvoiceCreator"));
+const PromptPaySettings   = lazy(() => import("./pages/Jaonaichan/PromptPaySettings"));
 const UserProfiles    = lazy(() => import("./pages/UserProfiles"));
 const Calendar        = lazy(() => import("./pages/Calendar"));
 const Blank           = lazy(() => import("./pages/Blank"));
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="/jaonaichan/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
               <Route path="/jaonaichan/invoice" element={<ProtectedRoute><InvoiceCreatorPage /></ProtectedRoute>} />
               <Route path="/jaonaichan/invoice/:orderId" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
+              <Route path="/jaonaichan/settings/promptpay" element={<ProtectedRoute><PromptPaySettings /></ProtectedRoute>} />
 
               {/* Others Page */}
               <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />

@@ -7,6 +7,7 @@ import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { signIn } from '../../api/auth';
 import DOMPurify from "dompurify";
+import PageSpinner from "../common/PageSpinner";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,6 +17,7 @@ export default function SignInForm() {
   const [errorUsername, setErrorUsername] = useState(false);
   const [errorPassword, setErrorPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(e: any) {
     e.preventDefault();
@@ -34,19 +36,24 @@ export default function SignInForm() {
     }
 
     try {
+      setIsLoading(true);
       const data = await signIn(form.username, form.password);
-  
+
       if (data.success) {
         window.location.href = '/';
       } else {
         setError(data.message || 'Login ไม่สำเร็จ');
+        setIsLoading(false);
       }
-    } catch (error) {
+    } catch {
       setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+      setIsLoading(false);
     }
   }
 
   return (
+    <>
+    {isLoading && <PageSpinner />}
     <div className="flex flex-col flex-1">
       <div className="w-full max-w-md pt-10 mx-auto">
         <Link
@@ -208,5 +215,6 @@ export default function SignInForm() {
         </div>
       </div>
     </div>
+    </>
   );
 }
