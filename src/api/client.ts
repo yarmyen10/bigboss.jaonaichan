@@ -18,7 +18,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestOptions = 
 
     if (res.status === 401 || res.status === 403) {
         signOut();
-        window.location.href = '/signin';
+        window.dispatchEvent(new Event('auth:unauthorized'));
         throw new Error('Unauthorized');
     }
 
@@ -36,7 +36,7 @@ export async function apiFetch(endpoint: string, options: RequestOptions = {}): 
 
     if (res.status === 401 || res.status === 403) {
         signOut();
-        window.location.href = '/signin';
+        window.dispatchEvent(new Event('auth:unauthorized'));
         throw new Error('Unauthorized');
     }
 

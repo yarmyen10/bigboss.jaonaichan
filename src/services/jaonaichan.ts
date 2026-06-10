@@ -253,8 +253,39 @@ export async function patchProfile(payload: PatchProfilePayload): Promise<PatchP
 
 import type { PromptPayConfig, UpdatePromptPayConfigResponse } from '../interfaces/promptpay.jaonaichan';
 
+export interface PromptPayQRResponse {
+    phone: string;
+    amount: number;
+    qr_url: string;
+}
+
+export interface VerifySlipResponse {
+    success: boolean;
+    message: string;
+    redirect?: string;
+}
+
 export async function getPromptPayConfig(): Promise<PromptPayConfig> {
     return apiRequest('/promptpay/v1/config');
+}
+
+export async function getPromptPayQR(amount: number): Promise<PromptPayQRResponse> {
+    return apiRequest(`/promptpay/v1/qr?amount=${amount}`);
+}
+
+export async function verifySlipForInvoice(file: File, amount: number): Promise<VerifySlipResponse> {
+    const form = new FormData();
+    form.append('slip', file);
+    form.append('amount', String(amount));
+    const res = await apiFetch('/promptpay/v1/verify-slip', { method: 'POST', body: form });
+    return res.json();
+}
+
+export async function patchInvoice(id: number, status: 'draft' | 'sent' | 'paid'): Promise<SaveInvoiceResponse> {
+    return apiRequest(`/jaonaichan/v1/invoices/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+    });
 }
 
 export async function updatePromptPayConfig(payload: Partial<PromptPayConfig>): Promise<UpdatePromptPayConfigResponse> {

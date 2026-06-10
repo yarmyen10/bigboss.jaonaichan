@@ -43,44 +43,45 @@ export default function App() {
         <ScrollToTop />
         <Suspense fallback={null}>
           <Routes>
-            {/* Dashboard Layout */}
-            <Route element={<AppLayout />}>
-              <Route index path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            {/* Dashboard Layout — ProtectedRoute คลุม AppLayout ทั้งหมด
+                เพื่อให้ Header/NotificationDropdown render หลัง auth confirmed เท่านั้น */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route index path="/" element={<Home />} />
 
               {/* Jaonaichan */}
-              <Route path="/order-jaonaichan" element={<ProtectedRoute><Order /></ProtectedRoute>} />
-              <Route path="/bill2-unit-prices" element={<ProtectedRoute><Bill2UnitPrices /></ProtectedRoute>} />
-              <Route path="/barcode-pack" element={<ProtectedRoute><BarcodePack /></ProtectedRoute>} />
-              <Route path="/barcode-import" element={<ProtectedRoute><BarcodeImport /></ProtectedRoute>} />
-              <Route path="/jaonaichan/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-              <Route path="/jaonaichan/invoice" element={<ProtectedRoute><InvoiceCreatorPage /></ProtectedRoute>} />
-              <Route path="/jaonaichan/invoice/:orderId" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
-              <Route path="/jaonaichan/settings/promptpay" element={<ProtectedRoute><PromptPaySettings /></ProtectedRoute>} />
+              <Route path="/order-jaonaichan" element={<Order />} />
+              <Route path="/bill2-unit-prices" element={<Bill2UnitPrices />} />
+              <Route path="/barcode-pack" element={<BarcodePack />} />
+              <Route path="/barcode-import" element={<BarcodeImport />} />
+              <Route path="/jaonaichan/customers" element={<Customers />} />
+              <Route path="/jaonaichan/invoice" element={<InvoiceCreatorPage />} />
+              <Route path="/jaonaichan/invoice/:orderId" element={<InvoicePage />} />
+              <Route path="/jaonaichan/settings/promptpay" element={<PromptPaySettings />} />
 
               {/* Others Page */}
-              <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />
-              <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-              <Route path="/blank" element={<ProtectedRoute><Blank /></ProtectedRoute>} />
+              <Route path="/profile" element={<UserProfiles />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/blank" element={<Blank />} />
 
               {/* Forms */}
-              <Route path="/form-elements" element={<ProtectedRoute><FormElements /></ProtectedRoute>} />
+              <Route path="/form-elements" element={<FormElements />} />
 
               {/* Tables */}
-              <Route path="/basic-tables" element={<ProtectedRoute><BasicTables /></ProtectedRoute>} />
-              <Route path="/customers-tables-ex" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
-              <Route path="/orders-tables-ex" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+              <Route path="/basic-tables" element={<BasicTables />} />
+              <Route path="/customers-tables-ex" element={<CustomersPage />} />
+              <Route path="/orders-tables-ex" element={<OrdersPage />} />
 
               {/* Ui Elements */}
-              <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-              <Route path="/avatars" element={<ProtectedRoute><Avatars /></ProtectedRoute>} />
-              <Route path="/badge" element={<ProtectedRoute><Badges /></ProtectedRoute>} />
-              <Route path="/buttons" element={<ProtectedRoute><Buttons /></ProtectedRoute>} />
-              <Route path="/images" element={<ProtectedRoute><Images /></ProtectedRoute>} />
-              <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/avatars" element={<Avatars />} />
+              <Route path="/badge" element={<Badges />} />
+              <Route path="/buttons" element={<Buttons />} />
+              <Route path="/images" element={<Images />} />
+              <Route path="/videos" element={<Videos />} />
 
               {/* Charts */}
-              <Route path="/line-chart" element={<ProtectedRoute><LineChart /></ProtectedRoute>} />
-              <Route path="/bar-chart" element={<ProtectedRoute><BarChart /></ProtectedRoute>} />
+              <Route path="/line-chart" element={<LineChart />} />
+              <Route path="/bar-chart" element={<BarChart />} />
             </Route>
 
             {/* Auth Layout */}

@@ -5,7 +5,7 @@ import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import Button from "../../components/ui/button/Button";
 import Checkbox from "../../components/form/input/Checkbox";
-import { getCustomers, saveInvoice } from "../../services/jaonaichan";
+import { getCustomers, saveInvoice, getPromptPayQR, verifySlipForInvoice, patchInvoice } from "../../services/jaonaichan";
 import type { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import Input from "../../components/form/input/InputField";
 import TextArea from "../../components/form/input/TextArea";
@@ -120,13 +120,14 @@ export default function InvoiceCreatorPage() {
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (canvas.height * pageW) / canvas.width;
-      // multi-page support if invoice is taller than one A4 page
+      const margin = 12;
+      const contentW = pageW - 2 * margin;
+      const imgH = (canvas.height * contentW) / canvas.width;
       let y = 0;
       while (y < imgH) {
         if (y > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, -y, pageW, imgH);
-        y += pageH;
+        pdf.addImage(imgData, "PNG", margin, margin - y, contentW, imgH);
+        y += pageH - 2 * margin;
       }
       pdf.save(`${invoiceNumber}.pdf`);
     } finally {
@@ -135,10 +136,21 @@ export default function InvoiceCreatorPage() {
     }
   }
 
+  // Payment panel
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreview, setSlipPreview] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<{ success: boolean; message: string } | null>(null);
+  const [invoiceStatus, setInvoiceStatus] = useState<"draft" | "sent" | "paid">("draft");
+
   // Mock send state
   const [sentFacebook, setSentFacebook] = useState(false);
   const [sentLine, setSentLine] = useState(false);
   const [sentEmail, setSentEmail] = useState(false);
+
+  const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
   const hasInit = useRef(false);
 
@@ -149,6 +161,45 @@ export default function InvoiceCreatorPage() {
       .then((res) => setCustomers(res.data))
       .finally(() => setCustLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (savedId === null || total <= 0) return;
+    setQrLoading(true);
+    getPromptPayQR(total)
+      .then((res) => setQrUrl(res.qr_url))
+      .catch(() => setQrUrl(null))
+      .finally(() => setQrLoading(false));
+  }, [savedId, total]);
+
+  useEffect(() => {
+    return () => { if (slipPreview) URL.revokeObjectURL(slipPreview); };
+  }, [slipPreview]);
+
+  function handleSlipFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (slipPreview) URL.revokeObjectURL(slipPreview);
+    setSlipFile(file);
+    setSlipPreview(file ? URL.createObjectURL(file) : null);
+    setVerifyMsg(null);
+  }
+
+  async function handleVerify() {
+    if (!slipFile || savedId === null || verifying) return;
+    setVerifying(true);
+    setVerifyMsg(null);
+    try {
+      const res = await verifySlipForInvoice(slipFile, total);
+      setVerifyMsg({ success: res.success, message: res.message });
+      if (res.success) {
+        await patchInvoice(savedId, "paid");
+        setInvoiceStatus("paid");
+      }
+    } catch {
+      setVerifyMsg({ success: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   // ── Line items ─────────────────────────────────────────────────────────
 
@@ -169,8 +220,6 @@ export default function InvoiceCreatorPage() {
   function removeItem(id: string) {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
-
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
   // ── Recipients ─────────────────────────────────────────────────────────
 
@@ -267,194 +316,197 @@ export default function InvoiceCreatorPage() {
 
           <div
             id="invoice-printable"
-            className="
-              bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-gray-700
-              shadow-theme-xs p-6 md:p-10 space-y-8
-              print:shadow-none print:border-0 print:rounded-none print:p-0
-            "
+            className={`overflow-hidden ${exporting ? "rounded-none border-0 shadow-none" : "rounded-2xl border border-pink-200 dark:border-pink-900/40 shadow-theme-xs"}`}
           >
-            {/* Invoice header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            {/* Dark header band */}
+            <div
+              className="px-8 py-6 flex items-center justify-between"
+              style={{ background: "linear-gradient(90deg, rgb(255, 240, 246) 0%, rgb(252, 231, 243) 55%, rgb(253, 244, 255) 100%)" }}
+            >
+              <img
+                src="/images/logo/jaonai_pastel_final.png"
+                alt="Jaonaichan"
+                className="h-20 w-auto object-contain"
+              />
+              <div className="text-right">
+                <span className="text-xs font-semibold uppercase tracking-widest text-pink-400 block mb-1">Invoice</span>
+                <p className="font-mono text-sm font-semibold text-pink-500">#{invoiceNumber}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{invoiceDate}</p>
+              </div>
+            </div>
+
+            {/* Accent line */}
+            <div className="h-1" style={{ background: "linear-gradient(90deg, #f9a8d4 0%, #e879f9 55%, #c084fc 100%)" }} />
+
+            {/* Paper content */}
+            <div className="bg-white dark:bg-gray-900 p-6 md:p-10 space-y-8">
+
+              {/* 3-col meta: Bill To / From / Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500 mb-1.5">Bill To</p>
+                  {selectedCustomers.length > 0 ? (
+                    selectedCustomers.map((c) => (
+                      <div key={c.id} className="space-y-0.5">
+                        <p className="font-medium text-gray-900 dark:text-white">{c.name}</p>
+                        {c.email && <p className="text-xs text-gray-500 dark:text-gray-400">{c.email}</p>}
+                      </div>
+                    ))
+                  ) : (
+                    !exporting && <p className="text-xs text-gray-400 dark:text-gray-500 italic">ยังไม่ได้เลือกผู้รับ</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500 mb-1.5">From</p>
+                  <p className="font-medium text-gray-900 dark:text-white">Jaonaichan</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">jaonaichan.com</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500 mb-1.5">Invoice Details</p>
+                  <p className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">#{invoiceNumber}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{invoiceDate}</p>
+                </div>
+              </div>
+
+              {/* Line items */}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invoice</h1>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">#{invoiceNumber}</p>
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 sm:text-right">
-                <p className="font-medium text-gray-700 dark:text-gray-300">Jaonaichan</p>
-                <p>{invoiceDate}</p>
-              </div>
-            </div>
+                {items.length === 0 && !exporting && (
+                  <p className="text-sm text-gray-400 dark:text-gray-500 italic py-4">ยังไม่มีรายการ — เพิ่มด้านล่าง</p>
+                )}
 
-            <hr className="border-gray-200 dark:border-gray-700" />
-
-            {/* Recipients — print only */}
-            {selectedCustomers.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  To
-                </p>
-                {selectedCustomers.map((c) => (
-                  <p key={c.id} className="text-sm text-gray-800 dark:text-white/90">
-                    {c.name}
-                    {c.email ? ` — ${c.email}` : ""}
-                  </p>
-                ))}
-              </div>
-            )}
-            {selectedCustomers.length > 0 && (
-              <hr className="border-gray-200 dark:border-gray-700" />
-            )}
-
-            {/* Line items */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
-                รายการ
-              </p>
-
-              {items.length === 0 && !exporting && (
-                <p className="text-sm text-gray-400 dark:text-gray-500 italic">
-                  ยังไม่มีรายการ — เพิ่มด้านล่าง
-                </p>
-              )}
-
-              {items.length > 0 && (
-                <div className="overflow-x-auto -mx-6 px-6 md:-mx-10 md:px-10">
-                <table className="w-full text-sm min-w-80">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500 uppercase">
-                      <th className="text-left pb-2 font-medium">ชื่อรายการ</th>
-                      <th className="text-right pb-2 font-medium w-16">จำนวน</th>
-                      <th className="text-right pb-2 font-medium w-28">ราคา/หน่วย</th>
-                      <th className="text-right pb-2 font-medium w-28">รวม</th>
-                      {!exporting && <th className="w-8" />}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="py-2.5 pr-4 font-medium text-gray-800 dark:text-white/90">
-                          {item.name}
-                        </td>
-                        <td className="py-2.5 text-right text-gray-600 dark:text-gray-300">
-                          {item.quantity}
-                        </td>
-                        <td className="py-2.5 text-right text-gray-600 dark:text-gray-300">
-                          {fmt(item.unitPrice)}
-                        </td>
-                        <td className="py-2.5 text-right font-medium text-gray-800 dark:text-white/90">
-                          {fmt(item.quantity * item.unitPrice)}
-                        </td>
-                        {!exporting && (
-                          <td className="py-2.5 text-center">
-                            <button
-                              onClick={() => removeItem(item.id)}
-                              className="text-gray-400 hover:text-red-500 transition-colors"
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              )}
-
-              {/* Add item row */}
-              {!exporting && (
-                <div className="mt-4 space-y-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-gray-400 dark:text-gray-500">ชื่อรายการ</label>
-                    <Input
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addItem()}
-                      placeholder="เช่น ค่าบริการออกแบบ"
-                      className="sm:w-64"
-                    />
+                {items.length > 0 && (
+                  <div className="overflow-x-auto rounded-lg border border-pink-100 dark:border-pink-900/30">
+                    <table className="w-full text-sm min-w-80">
+                      <thead>
+                        <tr className="text-xs uppercase tracking-wider text-pink-800 dark:text-pink-200" style={{ background: "linear-gradient(90deg, rgb(255, 240, 246) 0%, rgb(252, 231, 243) 55%, rgb(253, 244, 255) 100%)" }}>
+                          <th className="text-left px-4 py-3 font-semibold">ชื่อรายการ</th>
+                          <th className="text-right px-4 py-3 font-semibold w-16">จำนวน</th>
+                          <th className="text-right px-4 py-3 font-semibold w-28">ราคา/หน่วย</th>
+                          <th className="text-right px-4 py-3 font-semibold w-28">รวม</th>
+                          {!exporting && <th className="w-8" />}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item, idx) => (
+                          <tr key={item.id} className={idx % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-pink-50/40 dark:bg-pink-900/10"}>
+                            <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 border-b border-pink-100 dark:border-pink-900/20">{item.name}</td>
+                            <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 border-b border-pink-100 dark:border-pink-900/20">{item.quantity}</td>
+                            <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 border-b border-pink-100 dark:border-pink-900/20">{fmt(item.unitPrice)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200 border-b border-pink-100 dark:border-pink-900/20">{fmt(item.quantity * item.unitPrice)}</td>
+                            {!exporting && (
+                              <td className="px-4 py-3 text-center border-b border-pink-100 dark:border-pink-900/20">
+                                <button onClick={() => removeItem(item.id)} className="text-pink-200 dark:text-pink-900 hover:text-red-500 transition-colors">✕</button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="flex gap-2 items-end">
+                )}
+
+                {/* Add item row */}
+                {!exporting && (
+                  <div className="mt-4 space-y-2">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400 dark:text-gray-500">จำนวน</label>
+                      <label className="text-xs text-gray-400 dark:text-gray-500">ชื่อรายการ</label>
                       <Input
-                        type="number"
-                        min="0.01"
-                        step="any"
-                        value={newQty}
-                        onChange={(e) => setNewQty(e.target.value)}
-                        className="w-20"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1 flex-1 sm:flex-none">
-                      <label className="text-xs text-gray-400 dark:text-gray-500">ราคา/หน่วย (฿)</label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={newPrice}
-                        onChange={(e) => setNewPrice(e.target.value)}
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && addItem()}
-                        placeholder="0.00"
-                        className="sm:w-28"
+                        placeholder="เช่น ค่าบริการออกแบบ"
+                        className="sm:w-64"
                       />
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      startIcon={<PlusIcon className="size-5 shrink-0" />}
-                      className="relative"
-                      onClick={addItem}
-                    >
-                      <span className="hidden sm:inline">เพิ่มรายการ</span>
-                    </Button>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-gray-400 dark:text-gray-500">จำนวน</label>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          value={newQty}
+                          onChange={(e) => setNewQty(e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+                        <label className="text-xs text-gray-400 dark:text-gray-500">ราคา/หน่วย (฿)</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={newPrice}
+                          onChange={(e) => setNewPrice(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && addItem()}
+                          placeholder="0.00"
+                          className="sm:w-28"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        startIcon={<PlusIcon className="size-5 shrink-0" />}
+                        className="relative"
+                        onClick={addItem}
+                      >
+                        <span className="hidden sm:inline">เพิ่มรายการ</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Summary — bottom-right */}
+              <div className="flex justify-end">
+                <div className="w-full sm:w-64 space-y-1">
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 py-2 border-t border-pink-100 dark:border-pink-900/20">
+                    <span>ยอดรวมสุทธิ</span>
+                    <span>{fmt(total)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-white px-4 py-2.5 rounded-lg font-bold text-sm" style={{ background: "linear-gradient(90deg, #f472b6 0%, #e879f9 55%, #a855f7 100%)" }}>
+                    <span>TOTAL</span>
+                    <span>{fmt(total)}</span>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <hr className="border-gray-200 dark:border-gray-700" />
-
-            {/* Notes */}
-            <div>
-              {!exporting && (
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 block">
-                    หมายเหตุ
-                  </label>
-                  <TextArea
-                    value={notes}
-                    onChange={setNotes}
-                    placeholder="หมายเหตุเพิ่มเติม..."
-                    rows={2}
-                    className="resize-none"
-                  />
-                </div>
-              )}
-              {exporting && notes && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    หมายเหตุ
-                  </p>
-                  <p className="text-sm text-gray-700 dark:text-white/90">{notes}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Total */}
-            <div className="flex justify-end">
-              <div className="w-full sm:w-64">
-                <div className="flex justify-between text-base font-bold text-gray-900 dark:text-white border-t border-gray-200 dark:border-gray-700 pt-2">
-                  <span>ยอดรวม</span>
-                  <span>{fmt(total)}</span>
+              {/* Footer: notes + bank info */}
+              <div className="pt-6 border-t border-pink-100 dark:border-pink-900/20">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
+                  <div>
+                    {!exporting ? (
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500 block">หมายเหตุ</label>
+                        <TextArea
+                          value={notes}
+                          onChange={setNotes}
+                          placeholder="หมายเหตุเพิ่มเติม..."
+                          rows={2}
+                          className="resize-none"
+                        />
+                      </div>
+                    ) : notes ? (
+                      <div className="space-y-1">
+                        <p className="font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500">หมายเหตุ</p>
+                        <p className="text-gray-600 dark:text-gray-400">{notes}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500 mb-1.5">ชำระเงิน</p>
+                    <p className="text-gray-600 dark:text-gray-400">PromptPay พร้อมเพย์</p>
+                    <p className="text-gray-400 dark:text-gray-500 mt-1">ขอบคุณที่ใช้บริการ Jaonaichan</p>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
 
-        {/* ── Right: Recipients panel ── */}
-        <div className="xl:w-80 shrink-0 print:hidden">
+        {/* ── Right: Recipients + Payment panel ── */}
+        <div className="xl:w-80 shrink-0 print:hidden space-y-4">
           <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-gray-700 shadow-theme-xs p-5 space-y-4 xl:sticky xl:top-4">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -516,7 +568,7 @@ export default function InvoiceCreatorPage() {
 
             {/* Send buttons */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              <p className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500">
                 ส่งให้ผู้รับ
               </p>
               {selected.size === 0 && (
@@ -545,6 +597,95 @@ export default function InvoiceCreatorPage() {
               />
             </div>
           </div>
+
+          {/* ── Payment panel ── */}
+        {savedId !== null && total > 0 && (
+          <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-gray-700 shadow-theme-xs p-5 space-y-4">
+            {/* QR */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">PromptPay QR</p>
+                {invoiceStatus === "paid" && (
+                  <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full font-medium">
+                    ✓ ชำระแล้ว
+                  </span>
+                )}
+              </div>
+              {qrLoading ? (
+                <div className="h-36 flex items-center justify-center text-gray-400 text-xs">
+                  กำลังโหลด QR...
+                </div>
+              ) : qrUrl ? (
+                <div className="flex flex-col items-center gap-2">
+                  <img src={qrUrl} alt="PromptPay QR" className="w-36 h-36 object-contain rounded-lg" />
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{fmt(total)}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 text-center py-4">โหลด QR ไม่ได้ — ตรวจสอบการตั้งค่า PromptPay</p>
+              )}
+            </div>
+
+            {invoiceStatus !== "paid" && (
+              <>
+                <hr className="border-gray-200 dark:border-gray-700" />
+
+                {/* Slip upload */}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500">
+                    ตรวจสอบสลิป
+                  </p>
+
+                  <label className="block cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleSlipFile}
+                    />
+                    <div className={`
+                      flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed
+                      transition-colors min-h-24 text-center px-3
+                      ${slipPreview
+                        ? "border-brand-400 dark:border-brand-600"
+                        : "border-gray-300 dark:border-gray-600 hover:border-brand-400 dark:hover:border-brand-600"
+                      }
+                    `}>
+                      {slipPreview ? (
+                        <img
+                          src={slipPreview}
+                          alt="slip preview"
+                          className="max-h-32 object-contain rounded-lg"
+                        />
+                      ) : (
+                        <>
+                          <span className="text-2xl">🧾</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            คลิกเพื่อเลือกรูปสลิป
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </label>
+
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={!slipFile || verifying}
+                    onClick={handleVerify}
+                  >
+                    {verifying ? "กำลังตรวจสอบ..." : "ตรวจสอบสลิป"}
+                  </Button>
+
+                  {verifyMsg && (
+                    <p className={`text-xs text-center ${verifyMsg.success ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
+                      {verifyMsg.message}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         </div>
       </div>
 

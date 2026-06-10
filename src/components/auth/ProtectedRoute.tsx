@@ -13,19 +13,17 @@ export default function ProtectedRoute({ children }: Props) {
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            const checkAuth = async () => {
-                try {
-                    const token = isLoggedIn();
-                    setIsAuthenticated(!!token);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-
-            checkAuth();
+            setIsAuthenticated(isLoggedIn());
+            setIsLoading(false);
         }, 100);
 
-        return () => clearTimeout(timer);
+        const handleUnauth = () => setIsAuthenticated(false);
+        window.addEventListener('auth:unauthorized', handleUnauth);
+
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('auth:unauthorized', handleUnauth);
+        };
     }, []);
 
     if (isLoading) {
