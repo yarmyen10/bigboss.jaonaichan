@@ -294,3 +294,21 @@ export async function updatePromptPayConfig(payload: Partial<PromptPayConfig>): 
         body: JSON.stringify(payload),
     });
 }
+
+// =========================================================================
+// Social Login Plugin Settings
+// =========================================================================
+
+import type { SocialLoginSettings, SocialLoginSettingsApiResponse } from '../interfaces/social-login.jaonaichan';
+
+export async function getSocialLoginSettings(): Promise<SocialLoginSettings> {
+    const res = await apiRequest<SocialLoginSettingsApiResponse>('/bigboss-auth/v1/social-login-settings');
+    return res.data;
+}
+
+export async function updateSocialLoginSettings(payload: Partial<SocialLoginSettings>): Promise<SocialLoginSettingsApiResponse> {
+    return apiRequest('/bigboss-auth/v1/social-login-settings', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}

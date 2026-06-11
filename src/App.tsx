@@ -19,7 +19,8 @@ const BarcodeImport   = lazy(() => import("./pages/Jaonaichan/BarcodeImport"));
 const Customers       = lazy(() => import("./pages/Jaonaichan/Customers"));
 const InvoicePage     = lazy(() => import("./pages/Jaonaichan/Invoice"));
 const InvoiceCreatorPage  = lazy(() => import("./pages/Jaonaichan/InvoiceCreator"));
-const PromptPaySettings   = lazy(() => import("./pages/Jaonaichan/PromptPaySettings"));
+const PromptPaySettings     = lazy(() => import("./pages/Jaonaichan/PromptPaySettings"));
+const SocialLoginSettings   = lazy(() => import("./pages/Jaonaichan/SocialLoginSettings"));
 const UserProfiles    = lazy(() => import("./pages/UserProfiles"));
 const Calendar        = lazy(() => import("./pages/Calendar"));
 const Blank           = lazy(() => import("./pages/Blank"));
@@ -57,6 +58,7 @@ export default function App() {
               <Route path="/jaonaichan/invoice" element={<InvoiceCreatorPage />} />
               <Route path="/jaonaichan/invoice/:orderId" element={<InvoicePage />} />
               <Route path="/jaonaichan/settings/promptpay" element={<PromptPaySettings />} />
+              <Route path="/jaonaichan/settings/social-login" element={<SocialLoginSettings />} />
 
               {/* Others Page */}
               <Route path="/profile" element={<UserProfiles />} />

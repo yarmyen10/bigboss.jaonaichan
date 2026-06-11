@@ -78,6 +78,7 @@ const navItems: NavItem[] = [
     name: "Settings",
     subItems: [
       { name: "PromptPay QR", path: "/jaonaichan/settings/promptpay", pro: false },
+      { name: "Social Login", path: "/jaonaichan/settings/social-login", pro: false },
     ],
   },
   {
