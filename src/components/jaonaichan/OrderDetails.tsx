@@ -4,9 +4,9 @@ import { Modal } from "../ui/modal";
 import Badge, { BadgeColor } from "../ui/badge/Badge";
 import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
 import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
-import { getBillSlipObjectUrl, getOrder, reVerifySlip } from "../../services/jaonaichan";
+import { getBillSlipObjectUrl, getOrder, patchOrderShipping, reVerifySlip } from "../../services/jaonaichan";
 import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
-import { BoxIcon, ReceiptApproved, ReceiptBill, ReceiptDeclined } from "../../icons";
+import { BoxIcon, PencilIcon, ReceiptApproved, ReceiptBill, ReceiptDeclined } from "../../icons";
 
 interface OrderDetailsProps {
   order: Order | null;
@@ -262,6 +262,10 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
   const [reVerifying, setReVerifying] = useState(false);
   const [reVerifyError, setReVerifyError] = useState<string | null>(null);
 
+  const [editShippingOpen, setEditShippingOpen] = useState(false);
+  const [shippingInput, setShippingInput] = useState({ name: "", phone: "", address: "" });
+  const [savingShipping, setSavingShipping] = useState(false);
+
   useEffect(() => {
     if (!isOpen || !order) return;
     setLoading(true);
@@ -328,6 +332,32 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
     }
   };
 
+  const handleEditShipping = () => {
+    if (!displayed || !displayed.shipping) return;
+    setShippingInput({
+      name: displayed.shipping.name || "",
+      phone: displayed.shipping.phone || "",
+      address: displayed.shipping.address || "",
+    });
+    setEditShippingOpen(true);
+  };
+
+  const handleSaveShipping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!displayed) return;
+    setSavingShipping(true);
+    try {
+      await patchOrderShipping(displayed.id, shippingInput);
+      const fresh = await getOrder(displayed.id);
+      setDetail(fresh);
+      setEditShippingOpen(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to update shipping");
+    } finally {
+      setSavingShipping(false);
+    }
+  };
+
   const statusInfo = displayed
     ? (ORDER_STATUS_DETAILS[displayed.status] ?? { color: "light" as BadgeColor, text: displayed.status })
     : null;
@@ -391,23 +421,62 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                   )}
                 </SectionCard>
 
-                <SectionCard title="Billing & Payment">
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-gray-400 dark:text-gray-500">Address</span>
-                    {displayed.billing.address ? (
-                      parseAddressLines(displayed.billing.address).map((line, i) => (
-                        <span key={i} className="text-sm font-medium text-gray-800 dark:text-white/90 break-words">
-                          {line}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
-                    )}
-                  </div>
-                  <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
-                    <InfoRow label="Payment method">
-                      {PAYMENT_LABEL[displayed.payment_method] ?? displayed.payment_method}
-                    </InfoRow>
+                <SectionCard title="Billing & Shipping">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Left: Billing */}
+                    <div className="flex flex-col gap-3 min-w-0">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">Billing Address</span>
+                        {displayed.billing.address ? (
+                          parseAddressLines(displayed.billing.address).map((line, i) => (
+                            <span key={i} className="text-sm font-medium text-gray-800 dark:text-white/90 break-words">
+                              {line}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
+                        )}
+                      </div>
+                      <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-auto">
+                        <InfoRow label="Payment method">
+                          {PAYMENT_LABEL[displayed.payment_method] ?? displayed.payment_method}
+                        </InfoRow>
+                      </div>
+                    </div>
+
+                    {/* Right: Shipping */}
+                    <div className="flex flex-col gap-3 min-w-0 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-gray-800 pt-4 sm:pt-0 sm:pl-4 relative">
+                      <button
+                        type="button"
+                        onClick={handleEditShipping}
+                        className="absolute top-0 sm:top-[-4px] right-0 p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-md transition"
+                        title="Edit Shipping"
+                      >
+                        <PencilIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 pr-6">Shipping Info</span>
+                        {displayed.shipping && (displayed.shipping.name || displayed.shipping.address) ? (
+                          <>
+                            <span className="text-sm font-medium text-gray-800 dark:text-white/90 break-words mt-1">
+                              {displayed.shipping.name}
+                            </span>
+                            {displayed.shipping.phone && (
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {displayed.shipping.phone}
+                              </span>
+                            )}
+                            {displayed.shipping.address && (
+                              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line mt-1">
+                                {displayed.shipping.address}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-sm text-amber-500 mt-1 italic">รอข้อมูลจัดส่ง</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </SectionCard>
               </div>
@@ -483,6 +552,75 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
         </div>,
         document.body
       )}
+
+      {/* Edit Shipping Modal */}
+      <Modal isOpen={editShippingOpen} onClose={() => !savingShipping && setEditShippingOpen(false)} className="max-w-md w-full">
+        <form onSubmit={handleSaveShipping} className="flex flex-col bg-white dark:bg-gray-900 rounded-xl">
+          <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-5 py-4">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">แก้ไขข้อมูลจัดส่ง</h3>
+            <button
+              type="button"
+              onClick={() => !savingShipping && setEditShippingOpen(false)}
+              className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path fillRule="evenodd" clipRule="evenodd" d="M6.04289 16.5413C5.65237 16.9318 5.65237 17.565 6.04289 17.9555C6.43342 18.346 7.06658 18.346 7.45711 17.9555L11.9987 13.4139L16.5408 17.956C16.9313 18.3466 17.5645 18.3466 17.955 17.956C18.3455 17.5655 18.3455 16.9323 17.955 16.5418L13.4129 11.9997L17.955 7.4576C18.3455 7.06707 18.3455 6.43391 17.955 6.04338C17.5645 5.65286 16.9313 5.65286 16.5408 6.04338L11.9987 10.5855L7.45711 6.0439C7.06658 5.65338 6.43342 5.65338 6.04289 6.0439C5.65237 6.43442 5.65237 7.06759 6.04289 7.45811L10.5845 11.9997L6.04289 16.5413Z" fill="currentColor" /></svg>
+            </button>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">ชื่อผู้รับ</label>
+              <input
+                type="text"
+                required
+                value={shippingInput.name}
+                onChange={e => setShippingInput(s => ({ ...s, name: e.target.value }))}
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">เบอร์โทรศัพท์</label>
+              <input
+                type="tel"
+                required
+                value={shippingInput.phone}
+                onChange={e => setShippingInput(s => ({ ...s, phone: e.target.value }))}
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">ที่อยู่จัดส่ง</label>
+              <textarea
+                required
+                rows={3}
+                value={shippingInput.address}
+                onChange={e => setShippingInput(s => ({ ...s, address: e.target.value }))}
+                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition resize-none custom-scrollbar"
+              ></textarea>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 dark:border-gray-800 p-5 flex gap-3 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl">
+            <button
+              type="button"
+              onClick={() => setEditShippingOpen(false)}
+              disabled={savingShipping}
+              className="flex-1 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={savingShipping}
+              className="flex-1 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition flex items-center justify-center"
+            >
+              {savingShipping ? (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                "บันทึกข้อมูล"
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </Modal>
   );
 }

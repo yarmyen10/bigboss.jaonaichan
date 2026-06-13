@@ -80,6 +80,17 @@ export async function patchOrderStatus(orderId: number, status: string): Promise
     });
 }
 
+export async function patchOrderShipping(orderId: number, shipping: { name: string, phone: string, address: string }): Promise<unknown> {
+    return apiRequest(`/jaonaichan/v1/orders/${orderId}/shipping`, {
+        method: "PATCH",
+        body: JSON.stringify({
+            shipping_name: shipping.name,
+            shipping_phone: shipping.phone,
+            shipping_address: shipping.address,
+        }),
+    });
+}
+
 export async function getProductsBulkByOrders({
     orderIds,
     statuses,

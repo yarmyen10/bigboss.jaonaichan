@@ -27,6 +27,12 @@ export interface Billing {
     address: string
 }
 
+export interface Shipping {
+    name: string
+    phone: string
+    address: string
+}
+
 /** bill1 / bill2 — full version (มี paid_at) */
 export interface Bill {
     status: BillStatus
@@ -112,6 +118,7 @@ export interface Order {
     payment_method: string
     customer: Customer
     billing: Billing
+    shipping: Shipping
     bill1: Bill
     bill2: Bill
     items?: OrderItem[] // มีเฉพาะ GET /orders/{id} (with_items = true)
