@@ -15,13 +15,10 @@ export function useSpinner(initial = false) {
         setSpinning((prev) => !prev);
     }, []);
 
-    const withSpinner = useCallback(async (asyncFn: () => Promise<any>) => {
+    const withSpinner = useCallback(async (asyncFn: () => Promise<unknown>) => {
+        setSpinning(true);
         try {
-            setSpinning(true);
-            const result = await asyncFn();
-            return result;
-        } catch (error) {
-            throw error;
+            return await asyncFn();
         } finally {
             setSpinning(false);
         }

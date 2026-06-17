@@ -2,20 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
-import { getOrder } from "../../services/jaonaichan";
+import { getOrder, patchOrderInvoiceItems } from "../../services/jaonaichan";
 import { OrderDetailResponse } from "../../interfaces/order.jaonaichan";
+import type { InvoiceLineItem } from "../../interfaces/invoice.jaonaichan";
 import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import Badge from "../../components/ui/badge/Badge";
 import Button from "../../components/ui/button/Button";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface CustomLineItem {
-  id: string;
-  name: string;
-  quantity: number;
-  unitPrice: number;
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,10 +46,11 @@ export default function InvoicePage() {
   const [error, setError] = useState<string | null>(null);
 
   // custom line items
-  const [customItems, setCustomItems] = useState<CustomLineItem[]>([]);
+  const [customItems, setCustomItems] = useState<InvoiceLineItem[]>([]);
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
   const [newPrice, setNewPrice] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const hasInit = useRef(false);
 
@@ -70,7 +65,12 @@ export default function InvoicePage() {
       return;
     }
     getOrder(id)
-      .then(setOrder)
+      .then((data) => {
+        setOrder(data);
+        if (data.invoice_items) {
+          setCustomItems(data.invoice_items);
+        }
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load order"))
       .finally(() => setLoading(false));
   }, [orderId]);
@@ -91,6 +91,20 @@ export default function InvoicePage() {
 
   function removeCustomItem(id: string) {
     setCustomItems((prev) => prev.filter((item) => item.id !== id));
+  }
+
+  async function saveItems() {
+    if (!order) return;
+    setIsSaving(true);
+    try {
+      await patchOrderInvoiceItems(order.id, customItems);
+      // Optional: add toast notification here
+      console.log("Saved custom items successfully");
+    } catch (e: any) {
+      alert("Failed to save: " + e.message);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const orderTotal = order?.items.reduce((sum, item) => sum + item.total, 0) ?? 0;
@@ -125,9 +139,14 @@ export default function InvoicePage() {
         <Button size="sm" variant="outline" onClick={() => navigate(-1)}>
           ← Back
         </Button>
-        <Button size="sm" onClick={() => window.print()}>
-          Print / Save PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={saveItems} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Items"}
+          </Button>
+          <Button size="sm" onClick={() => window.print()}>
+            Print / Save PDF
+          </Button>
+        </div>
       </div>
 
       {/* ── Invoice card ── */}

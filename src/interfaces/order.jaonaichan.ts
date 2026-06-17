@@ -2,6 +2,8 @@
 // Shared primitives
 // =============================================================================
 
+import type { InvoiceLineItem } from './invoice.jaonaichan'
+
 export type BillStatus = 'pending' | 'submitted' | 'paid' | 'cancelled'
 export type OrderStatus = string // wc statuses e.g. 'processing' | 'completed' | 'on-hold' | ...
 
@@ -122,6 +124,7 @@ export interface Order {
     bill1: Bill
     bill2: Bill
     items?: OrderItem[] // มีเฉพาะ GET /orders/{id} (with_items = true)
+    invoice_items?: InvoiceLineItem[]
 }
 
 // =============================================================================

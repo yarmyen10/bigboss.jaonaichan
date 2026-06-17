@@ -44,7 +44,8 @@ const navItems: NavItem[] = [
     icon: <CatDocument />,
     name: "Jaonaichan - Documents",
     subItems: [
-      { name: "Invoice / ใบแจ้งหนี้", path: "/jaonaichan/invoice", pro: false },
+      { name: "ประวัติใบแจ้งหนี้", path: "/jaonaichan/invoices", pro: false },
+      { name: "สร้างใบแจ้งหนี้ใหม่", path: "/jaonaichan/invoice", pro: false },
       { name: "ใบเสร็จ / Receipt", path: "/jaonaichan/receipt", pro: false },
     ],
   },

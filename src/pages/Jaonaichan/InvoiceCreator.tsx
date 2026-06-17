@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
+import { useSearchParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import Button from "../../components/ui/button/Button";
 import Checkbox from "../../components/form/input/Checkbox";
-import { getCustomers, saveInvoice, getPromptPayQR, verifySlipForInvoice, patchInvoice } from "../../services/jaonaichan";
+import { getCustomers, saveInvoice, getPromptPayQR, verifySlipForInvoice, patchInvoice, getInvoice } from "../../services/jaonaichan";
 import type { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import Input from "../../components/form/input/InputField";
 import TextArea from "../../components/form/input/TextArea";
@@ -57,8 +58,12 @@ function SendButton({
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function InvoiceCreatorPage() {
-  const [invoiceNumber] = useState(generateInvoiceNumber);
-  const [invoiceDate] = useState(() =>
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("id");
+  const isViewMode = !!editId;
+
+  const [invoiceNumber, setInvoiceNumber] = useState(generateInvoiceNumber);
+  const [invoiceDate, setInvoiceDate] = useState(() =>
     new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "long", year: "numeric" })
   );
   const [notes, setNotes] = useState("");
@@ -160,7 +165,22 @@ export default function InvoiceCreatorPage() {
     getCustomers({ perPage: 100 })
       .then((res) => setCustomers(res.data))
       .finally(() => setCustLoading(false));
-  }, []);
+      
+    if (editId) {
+      getInvoice(Number(editId))
+        .then((res) => {
+          const inv = res.data;
+          setSavedId(inv.id);
+          setInvoiceNumber(inv.invoice_number);
+          setInvoiceDate(inv.invoice_date);
+          setNotes(inv.notes);
+          setItems(inv.items);
+          setSelected(new Set(inv.customer_ids));
+          setInvoiceStatus(inv.status);
+        })
+        .catch(() => alert("ไม่สามารถโหลดข้อมูล Invoice ได้"));
+    }
+  }, [editId]);
 
   useEffect(() => {
     if (savedId === null || total <= 0) return;
@@ -234,7 +254,8 @@ export default function InvoiceCreatorPage() {
   function toggleSelect(id: number) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -300,15 +321,17 @@ export default function InvoiceCreatorPage() {
             {saveError && (
               <span className="text-xs text-red-500">{saveError}</span>
             )}
-            <Button
-              size="sm"
-              variant={savedId !== null ? "primary" : "outline"}
-              startIcon={savedId !== null ? <CheckCircleIcon className="size-5" /> : <Diskette className="size-5" />}
-              onClick={handleSave}
-              disabled={saving || savedId !== null || items.length === 0}
-            >
-              {saving ? "กำลังบันทึก..." : savedId !== null ? "บันทึกแล้ว" : "บันทึก"}
-            </Button>
+            {!isViewMode && (
+              <Button
+                size="sm"
+                variant={savedId !== null ? "primary" : "outline"}
+                startIcon={savedId !== null ? <CheckCircleIcon className="size-5" /> : <Diskette className="size-5" />}
+                onClick={handleSave}
+                disabled={saving || savedId !== null || items.length === 0}
+              >
+                {saving ? "กำลังบันทึก..." : savedId !== null ? "บันทึกแล้ว" : "บันทึก"}
+              </Button>
+            )}
             <Button size="sm" startIcon={<FileIcon className="size-5" />} onClick={exportPDF} disabled={exporting}>
               {exporting ? "กำลัง export..." : "Export PDF"}
             </Button>
@@ -370,7 +393,7 @@ export default function InvoiceCreatorPage() {
 
               {/* Line items */}
               <div>
-                {items.length === 0 && !exporting && (
+                {items.length === 0 && !exporting && !isViewMode && (
                   <p className="text-sm text-gray-400 dark:text-gray-500 italic py-4">ยังไม่มีรายการ — เพิ่มด้านล่าง</p>
                 )}
 
@@ -383,7 +406,7 @@ export default function InvoiceCreatorPage() {
                           <th className="text-right px-4 py-3 font-semibold w-16">จำนวน</th>
                           <th className="text-right px-4 py-3 font-semibold w-28">ราคา/หน่วย</th>
                           <th className="text-right px-4 py-3 font-semibold w-28">รวม</th>
-                          {!exporting && <th className="w-8" />}
+                          {!exporting && !isViewMode && <th className="w-8" />}
                         </tr>
                       </thead>
                       <tbody>
@@ -393,7 +416,7 @@ export default function InvoiceCreatorPage() {
                             <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 border-b border-pink-100 dark:border-pink-900/20">{item.quantity}</td>
                             <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 border-b border-pink-100 dark:border-pink-900/20">{fmt(item.unitPrice)}</td>
                             <td className="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200 border-b border-pink-100 dark:border-pink-900/20">{fmt(item.quantity * item.unitPrice)}</td>
-                            {!exporting && (
+                            {!exporting && !isViewMode && (
                               <td className="px-4 py-3 text-center border-b border-pink-100 dark:border-pink-900/20">
                                 <button onClick={() => removeItem(item.id)} className="text-pink-200 dark:text-pink-900 hover:text-red-500 transition-colors">✕</button>
                               </td>
@@ -406,7 +429,7 @@ export default function InvoiceCreatorPage() {
                 )}
 
                 {/* Add item row */}
-                {!exporting && (
+                {!exporting && !isViewMode && (
                   <div className="mt-4 space-y-2">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-gray-400 dark:text-gray-500">ชื่อรายการ</label>
@@ -475,7 +498,7 @@ export default function InvoiceCreatorPage() {
               <div className="pt-6 border-t border-pink-100 dark:border-pink-900/20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
                   <div>
-                    {!exporting ? (
+                    {!exporting && !isViewMode ? (
                       <div className="space-y-2">
                         <label className="text-xs font-semibold uppercase tracking-wider text-pink-400 dark:text-pink-500 block">หมายเหตุ</label>
                         <TextArea
@@ -519,14 +542,16 @@ export default function InvoiceCreatorPage() {
             </div>
 
             {/* Search */}
-            <Input
-              value={custSearch}
-              onChange={(e) => setCustSearch(e.target.value)}
-              placeholder="ค้นหาชื่อ / อีเมล..."
-            />
+            {!isViewMode && (
+              <Input
+                value={custSearch}
+                onChange={(e) => setCustSearch(e.target.value)}
+                placeholder="ค้นหาชื่อ / อีเมล..."
+              />
+            )}
 
             {/* Toggle all */}
-            {filtered.length > 0 && (
+            {!isViewMode && filtered.length > 0 && (
               <button onClick={toggleAll} className="text-xs text-brand-500 hover:underline">
                 {allFilteredSelected
                   ? `ยกเลิกเลือก (${filtered.length})`
@@ -541,18 +566,20 @@ export default function InvoiceCreatorPage() {
               ) : filtered.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-6">ไม่พบลูกค้า</p>
               ) : (
-                filtered.map((c) => (
+                (isViewMode ? selectedCustomers : filtered).map((c) => (
                   <div
                     key={c.id}
-                    className="flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    onClick={() => toggleSelect(c.id)}
+                    className={`flex items-center gap-3 px-2 py-2 rounded-lg transition-colors ${!isViewMode ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''}`}
+                    onClick={() => !isViewMode && toggleSelect(c.id)}
                   >
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selected.has(c.id)}
-                        onChange={() => toggleSelect(c.id)}
-                      />
-                    </div>
+                    {!isViewMode && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selected.has(c.id)}
+                          onChange={() => toggleSelect(c.id)}
+                        />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
                         {c.name}

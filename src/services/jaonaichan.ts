@@ -2,6 +2,7 @@ import { apiFetch, apiRequest } from "../api/client";
 import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse, PatchBillResponse } from "../interfaces/order.jaonaichan";
 import type { DashboardStats } from '../interfaces/dashboard.jaonaichan';
 import { PatchProfilePayload, PatchProfileResponse, UserProfile } from "../interfaces/profile.jaonaichan";
+import type { InvoiceLineItem } from "../interfaces/invoice.jaonaichan";
 
 export interface GetOrdersParams {
     page?: number;
@@ -88,6 +89,13 @@ export async function patchOrderShipping(orderId: number, shipping: { name: stri
             shipping_phone: shipping.phone,
             shipping_address: shipping.address,
         }),
+    });
+}
+
+export async function patchOrderInvoiceItems(orderId: number, items: InvoiceLineItem[]): Promise<unknown> {
+    return apiRequest(`/jaonaichan/v1/orders/${orderId}/invoice-items`, {
+        method: "PATCH",
+        body: JSON.stringify({ items }),
     });
 }
 
@@ -204,7 +212,7 @@ export async function saveBarcodeImport(productId: number, barcode: string): Pro
 // Invoices
 // =========================================================================
 
-import type { InvoiceListResponse, SaveInvoicePayload, SaveInvoiceResponse } from '../interfaces/invoice.jaonaichan';
+import type { InvoiceListResponse, SaveInvoicePayload, SaveInvoiceResponse, InvoiceRecord } from '../interfaces/invoice.jaonaichan';
 
 export async function saveInvoice(payload: SaveInvoicePayload): Promise<SaveInvoiceResponse> {
     return apiRequest('/jaonaichan/v1/invoices', {
@@ -213,10 +221,15 @@ export async function saveInvoice(payload: SaveInvoicePayload): Promise<SaveInvo
     });
 }
 
-export async function getInvoices(params: { page?: number; perPage?: number } = {}): Promise<InvoiceListResponse> {
-    const { page = 1, perPage = 20 } = params;
+export async function getInvoices(params: { page?: number; perPage?: number; search?: string } = {}): Promise<InvoiceListResponse> {
+    const { page = 1, perPage = 20, search } = params;
     const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+    if (search) qs.set("search", search);
     return apiRequest(`/jaonaichan/v1/invoices?${qs}`);
+}
+
+export async function getInvoice(id: number): Promise<{ success: boolean; data: InvoiceRecord }> {
+    return apiRequest(`/jaonaichan/v1/invoices/${id}`);
 }
 
 // =========================================================================

@@ -27,6 +27,11 @@ export default tseslint.config(
 
       '@typescript-eslint/no-explicit-any': ['warn', { fixToUnknown: true }],
 
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { varsIgnorePattern: '^_', argsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
+
       '@typescript-eslint/naming-convention': [
         'error',
         {
@@ -54,8 +59,8 @@ export default tseslint.config(
           format: ['camelCase', 'PascalCase'],
         },
         {
-          selector: 'interface ',
-          format: ['camelCase', 'snake_case'],
+          selector: 'interface',
+          format: ['PascalCase'],
         },
         {
           selector: 'function',
@@ -68,7 +73,17 @@ export default tseslint.config(
           trailingUnderscore: 'allow',
         },
         {
+          selector: 'typeProperty',
+          format: ['camelCase', 'PascalCase', 'snake_case', 'UPPER_CASE'],
+          leadingUnderscore: 'allow',
+        },
+        {
           selector: 'objectLiteralProperty',
+          format: ['camelCase', 'PascalCase', 'snake_case'],
+          leadingUnderscore: 'allowDouble',
+        },
+        {
+          selector: 'objectLiteralMethod',
           format: ['camelCase', 'PascalCase'],
         },
         {

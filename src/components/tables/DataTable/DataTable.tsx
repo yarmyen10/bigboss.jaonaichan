@@ -449,16 +449,16 @@ export default function DataTable<T extends object>({
   const toggleAll = () =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      allSelected
-        ? visibleRows.forEach((r) => next.delete(getId(r)))
-        : visibleRows.forEach((r) => next.add(getId(r)));
+      if (allSelected) visibleRows.forEach((r) => next.delete(getId(r)));
+      else visibleRows.forEach((r) => next.add(getId(r)));
       return next;
     });
 
   const toggleRow = (id: unknown) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
