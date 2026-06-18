@@ -116,6 +116,20 @@ export async function getProductsBulkByOrders({
     });
 }
 
+export async function createCustomer(payload: { email: string; first_name: string; last_name: string; phone?: string }): Promise<{ success: boolean; data: any; message?: string }> {
+    return apiRequest('/jaonaichan/v1/customers', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function updateCustomer(id: number, payload: { email: string; first_name: string; last_name: string; phone?: string }): Promise<{ success: boolean; data?: any; message?: string }> {
+    return apiRequest(`/jaonaichan/v1/customers/${id}`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
 // =========================================================================
 // Dashboard
 // =========================================================================

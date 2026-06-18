@@ -30,7 +30,7 @@ export default function InvoiceListPage() {
       key: "invoice_number",
       label: "Invoice #",
       sortable: false,
-      render: (v, row) => (
+      render: (_v, row) => (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -70,7 +70,7 @@ export default function InvoiceListPage() {
       label: "Actions",
       align: "right",
       sortable: false,
-      render: (v, row) => (
+      render: (_v, row) => (
         <Button size="sm" variant="outline" onClick={(e) => {
           e.stopPropagation();
           navigate(`/jaonaichan/invoice?id=${row.id}`);

@@ -28,6 +28,7 @@
     "dompurify": "^3.3.3",
     "flatpickr": "^4.6.13",
     "html2canvas-pro": "^2.0.4",
+    "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
     "motion": "^12.38.0",
     "react": "^19.0.0",

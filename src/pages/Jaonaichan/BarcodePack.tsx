@@ -78,34 +78,54 @@ export default function BarcodePack() {
 
             let scanner: Html5QrcodeInstance | undefined;
             try {
+                const el = document.getElementById(SCANNER_ELEMENT_ID);
+                if (!el) {
+                    setToast("Scanner element not ready yet.");
+                    setCameraOpen(false);
+                    return;
+                }
                 scanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
                 scannerRef.current = scanner;
                 const capturedScanner = scanner;
 
-                await capturedScanner.start(
-                    { facingMode: 'environment' },
-                    { fps: 10, qrbox: { width: 280, height: 150 } },
-                    async (barcode) => {
-                        if (stopped) return;
-                        stopped = true;
-                        try { await capturedScanner.stop(); } catch { /* scanner already stopped */ }
-                        scannerRef.current = null;
-                        setCameraOpen(false);
+                const onScanSuccess = async (barcode: string) => {
+                    if (stopped) return;
+                    stopped = true;
+                    try { await capturedScanner.stop(); } catch { /* scanner already stopped */ }
+                    scannerRef.current = null;
+                    setCameraOpen(false);
 
-                        try {
-                            const res = await validateBarcode(barcode);
-                            setScanned((prev) => ({
-                                ...prev,
-                                [res.product_id]: [...(prev[res.product_id] ?? []), barcode],
-                            }));
-                            setScanResult({ ok: true, name: res.product_name });
-                        } catch {
-                            setScanResult({ ok: false });
-                        }
-                    },
-                    () => { /* per-frame decode error — intentionally ignored */ }
-                );
-            } catch {
+                    try {
+                        const res = await validateBarcode(barcode);
+                        setScanned((prev) => ({
+                            ...prev,
+                            [res.product_id]: [...(prev[res.product_id] ?? []), barcode],
+                        }));
+                        setScanResult({ ok: true, name: res.product_name });
+                    } catch {
+                        setScanResult({ ok: false });
+                    }
+                };
+
+                try {
+                    await capturedScanner.start(
+                        { facingMode: 'environment' },
+                        { fps: 10, qrbox: { width: 280, height: 150 } },
+                        onScanSuccess,
+                        () => { /* ignore per-frame decode errors */ }
+                    );
+                } catch (err1) {
+                    console.warn("Failed to open environment camera, trying user camera...", err1);
+                    await capturedScanner.start(
+                        { facingMode: 'user' },
+                        { fps: 10, qrbox: { width: 280, height: 150 } },
+                        onScanSuccess,
+                        () => { /* ignore per-frame decode errors */ }
+                    );
+                }
+            } catch (err: any) {
+                console.error("Camera start error:", err);
+                setToast(err?.message || "Failed to open camera. Please check permissions or use HTTPS.");
                 setCameraOpen(false);
             }
         }, 150);
@@ -202,7 +222,7 @@ export default function BarcodePack() {
                         className="!text-base"
                     />
                 </div>
-                <Button size="sm" disabled={loadingItems || !orderId.trim()}>
+                <Button size="sm" onClick={handleLoadItems} disabled={loadingItems || !orderId.trim()}>
                     {loadingItems ? 'Loading…' : 'Load'}
                 </Button>
             </form>

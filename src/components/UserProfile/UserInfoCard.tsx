@@ -149,7 +149,7 @@ export default function UserInfoCard({ profile, onProfileChange }: Props) {
               </div>
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>Close</Button>
+              <Button size="sm" variant="outline" onClick={(e) => { e.preventDefault(); closeModal(); }}>Close</Button>
               <Button size="sm" onClick={handleSave} disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
               </Button>

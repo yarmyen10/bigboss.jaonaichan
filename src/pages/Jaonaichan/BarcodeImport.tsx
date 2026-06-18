@@ -4,21 +4,9 @@ import { Modal } from '../../components/ui/modal';
 import { searchProductsForImport, getProductVariations, saveBarcodeImport } from '../../services/jaonaichan';
 import type { ProductSearchResult, ProductVariation } from '../../interfaces/barcode.jaonaichan';
 
+import { Html5Qrcode } from 'html5-qrcode';
+
 const SCANNER_ELEMENT_ID = 'barcode-import-reader';
-
-interface Html5QrcodeInstance {
-    start(
-        cameraConfig: { facingMode: string },
-        config: { fps: number; qrbox: { width: number; height: number } },
-        onScanSuccess: (decodedText: string) => void,
-        onScanError: (error: string) => void
-    ): Promise<void>;
-    stop(): Promise<void>;
-}
-
-type WindowWithScanner = Window & {
-    Html5Qrcode?: new (id: string) => Html5QrcodeInstance;
-};
 
 interface ScanResult {
     ok: boolean;
@@ -41,8 +29,7 @@ export default function BarcodeImport() {
     const [loadingVariations, setLoadingVariations] = useState(false);
     const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
 
-    const hasInitialized = useRef(false);
-    const scannerRef = useRef<Html5QrcodeInstance | null>(null);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const selectedProductRef = useRef<ProductSearchResult | null>(null);
@@ -57,16 +44,7 @@ export default function BarcodeImport() {
         selectedVariationRef.current = selectedVariation;
     }, [selectedVariation]);
 
-    // Inject Html5Qrcode CDN script once on mount
-    useEffect(() => {
-        if (hasInitialized.current) return;
-        hasInitialized.current = true;
-        if (document.getElementById('html5qrcode-script')) return;
-        const script = document.createElement('script');
-        script.id = 'html5qrcode-script';
-        script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-        document.body.appendChild(script);
-    }, []);
+
 
     // Clear debounce timer on unmount
     useEffect(() => {
@@ -93,13 +71,7 @@ export default function BarcodeImport() {
         let stopped = false;
 
         const timer = setTimeout(async () => {
-            const Html5Qrcode = (window as WindowWithScanner).Html5Qrcode;
-            if (!Html5Qrcode) {
-                setCameraOpen(false);
-                return;
-            }
-
-            let scanner: Html5QrcodeInstance | undefined;
+            let scanner: Html5Qrcode | undefined;
             try {
                 scanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
                 scannerRef.current = scanner;
