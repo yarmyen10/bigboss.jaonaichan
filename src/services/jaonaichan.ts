@@ -167,6 +167,8 @@ import type {
     GetVariationsResponse,
     ProductSearchResponse,
     ValidateBarcodeResponse,
+    BarcodeListResponse,
+    BarcodeDeleteResponse,
 } from '../interfaces/barcode.jaonaichan';
 
 const BARCODE_PACK_ENDPOINT = '/jaonaichan/v1/barcode-pack';
@@ -219,6 +221,20 @@ export async function saveBarcodeImport(productId: number, barcode: string): Pro
     return apiRequest(BARCODE_IMPORT_ENDPOINT, {
         method: 'POST',
         body: JSON.stringify({ action: 'save_barcode', product_id: productId, barcode }),
+    });
+}
+
+export async function getBarcodes(page = 1, perPage = 20, search?: string): Promise<BarcodeListResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_barcodes', page, per_page: perPage, search }),
+    });
+}
+
+export async function deleteBarcode(id: number): Promise<BarcodeDeleteResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'delete_barcode', id }),
     });
 }
 

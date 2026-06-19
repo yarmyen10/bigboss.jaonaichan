@@ -50,3 +50,23 @@ export interface BarcodeImportSaveResponse {
     message: string;
     barcode_count?: number;
 }
+
+export interface BarcodeRecord {
+    id: number;
+    barcode: string;
+    product_id: number;
+    product_name: string;
+    status: 'available' | 'packed' | 'cancelled';
+    created_at: string;
+}
+
+export interface BarcodeListResponse {
+    barcodes: BarcodeRecord[];
+    total: number;
+    total_pages: number;
+}
+
+export interface BarcodeDeleteResponse {
+    success: boolean;
+    message?: string;
+}

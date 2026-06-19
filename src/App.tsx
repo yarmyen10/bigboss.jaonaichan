@@ -16,6 +16,7 @@ const Order           = lazy(() => import("./pages/Jaonaichan/Order"));
 const Bill2UnitPrices = lazy(() => import("./pages/Jaonaichan/Bill2UnitPrices"));
 const BarcodePack     = lazy(() => import("./pages/Jaonaichan/BarcodePack"));
 const BarcodeImport   = lazy(() => import("./pages/Jaonaichan/BarcodeImport"));
+const BarcodeManagement = lazy(() => import("./pages/Jaonaichan/BarcodeManagement"));
 const Customers       = lazy(() => import("./pages/Jaonaichan/Customers"));
 const InvoicePage     = lazy(() => import("./pages/Jaonaichan/Invoice"));
 const InvoiceCreatorPage  = lazy(() => import("./pages/Jaonaichan/InvoiceCreator"));
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="/bill2-unit-prices" element={<Bill2UnitPrices />} />
               <Route path="/barcode-pack" element={<BarcodePack />} />
               <Route path="/barcode-import" element={<BarcodeImport />} />
+              <Route path="/barcode-management" element={<BarcodeManagement />} />
               <Route path="/jaonaichan/customers" element={<Customers />} />
               <Route path="/jaonaichan/invoices" element={<InvoiceListPage />} />
               <Route path="/jaonaichan/invoice" element={<InvoiceCreatorPage />} />

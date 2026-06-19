@@ -55,6 +55,7 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Pack Order", path: "/barcode-pack", pro: false },
       { name: "Barcode Import", path: "/barcode-import", pro: false },
+      { name: "Barcode Management", path: "/barcode-management", pro: false },
       { name: "จัดการสต็อก", path: "/jaonaichan/stock", pro: false },
     ],
   },

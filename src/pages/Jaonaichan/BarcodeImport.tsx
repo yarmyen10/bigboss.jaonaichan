@@ -24,6 +24,7 @@ export default function BarcodeImport() {
     const [cameraOpen, setCameraOpen] = useState(false);
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [saving, setSaving] = useState(false);
+    const [manualBarcode, setManualBarcode] = useState('');
     const [sessionBarcodes, setSessionBarcodes] = useState<string[]>([]);
     const [variations, setVariations] = useState<ProductVariation[]>([]);
     const [loadingVariations, setLoadingVariations] = useState(false);
@@ -64,6 +65,44 @@ export default function BarcodeImport() {
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
+    const processBarcode = async (barcode: string) => {
+        const product = selectedProductRef.current;
+        if (!product) return false;
+        const targetId = selectedVariationRef.current?.variation_id ?? product.product_id;
+
+        setSaving(true);
+        try {
+            const res = await saveBarcodeImport(targetId, barcode);
+            if (res.success) {
+                setScanResult({ ok: true, barcode });
+                const newCount = res.barcode_count;
+                if (newCount !== undefined) {
+                    setBarcodeCount(newCount);
+                    const vid = selectedVariationRef.current?.variation_id;
+                    if (vid !== undefined) {
+                        setVariations((prev) =>
+                            prev.map((v) =>
+                                v.variation_id === vid ? { ...v, barcode_count: newCount } : v
+                            )
+                        );
+                    }
+                } else {
+                    setBarcodeCount((c) => c + 1);
+                }
+                setSessionBarcodes((prev) => [...prev, barcode]);
+                return true;
+            } else {
+                setScanResult({ ok: false, message: res.message });
+                return false;
+            }
+        } catch {
+            setScanResult({ ok: false, message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' });
+            return false;
+        } finally {
+            setSaving(false);
+        }
+    };
+
     // Camera lifecycle — start when cameraOpen becomes true, stop on false/unmount
     useEffect(() => {
         if (!cameraOpen) return;
@@ -89,36 +128,8 @@ export default function BarcodeImport() {
 
                         const product = selectedProductRef.current;
                         if (!product) return;
-                        const targetId = selectedVariationRef.current?.variation_id ?? product.product_id;
 
-                        setSaving(true);
-                        try {
-                            const res = await saveBarcodeImport(targetId, barcode);
-                            if (res.success) {
-                                setScanResult({ ok: true, barcode });
-                                const newCount = res.barcode_count;
-                                if (newCount !== undefined) {
-                                    setBarcodeCount(newCount);
-                                    const vid = selectedVariationRef.current?.variation_id;
-                                    if (vid !== undefined) {
-                                        setVariations((prev) =>
-                                            prev.map((v) =>
-                                                v.variation_id === vid ? { ...v, barcode_count: newCount } : v
-                                            )
-                                        );
-                                    }
-                                } else {
-                                    setBarcodeCount((c) => c + 1);
-                                }
-                                setSessionBarcodes((prev) => [...prev, barcode]);
-                            } else {
-                                setScanResult({ ok: false, message: res.message });
-                            }
-                        } catch {
-                            setScanResult({ ok: false, message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' });
-                        } finally {
-                            setSaving(false);
-                        }
+                        await processBarcode(barcode);
                     },
                     () => { /* per-frame decode error — intentionally ignored */ }
                 );
@@ -191,6 +202,15 @@ export default function BarcodeImport() {
     const handleOpenCamera = () => {
         setScanResult(null);
         setCameraOpen(true);
+    };
+
+    const handleManualSubmit = async () => {
+        const barcode = manualBarcode.trim();
+        if (!barcode || saving) return;
+        const success = await processBarcode(barcode);
+        if (success) {
+            setManualBarcode('');
+        }
     };
 
     const isHttps = window.location.protocol === 'https:';
@@ -355,6 +375,29 @@ export default function BarcodeImport() {
                             กำลังบันทึก…
                         </div>
                     )}
+
+                    {/* Manual Entry */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <input
+                            type="text"
+                            value={manualBarcode}
+                            onChange={(e) => setManualBarcode(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleManualSubmit();
+                            }}
+                            placeholder="ป้อน Barcode ด้วยตนเอง"
+                            className="flex-1 h-12 rounded-xl border border-gray-300 bg-white px-4 text-base text-gray-800 placeholder-gray-400 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90 dark:placeholder-gray-500"
+                            disabled={saving}
+                        />
+                        <button
+                            type="button"
+                            onClick={handleManualSubmit}
+                            disabled={saving || !manualBarcode.trim()}
+                            className="h-12 rounded-xl bg-brand-500 px-6 font-medium text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            บันทึก
+                        </button>
+                    </div>
                 </div>
             )}
 
