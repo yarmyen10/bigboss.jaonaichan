@@ -58,6 +58,7 @@ export interface BarcodeRecord {
     product_name: string;
     status: 'available' | 'packed' | 'cancelled';
     created_at: string;
+    image_base64?: string | null;
 }
 
 export interface BarcodeListResponse {

@@ -217,17 +217,17 @@ export async function getProductVariations(productId: number): Promise<GetVariat
     });
 }
 
-export async function saveBarcodeImport(productId: number, barcode: string): Promise<BarcodeImportSaveResponse> {
+export async function saveBarcodeImport(productId: number, barcode: string, imageBase64?: string): Promise<BarcodeImportSaveResponse> {
     return apiRequest(BARCODE_IMPORT_ENDPOINT, {
         method: 'POST',
-        body: JSON.stringify({ action: 'save_barcode', product_id: productId, barcode }),
+        body: JSON.stringify({ action: 'save_barcode', product_id: productId, barcode, image: imageBase64 }),
     });
 }
 
-export async function getBarcodes(page = 1, perPage = 20, search?: string): Promise<BarcodeListResponse> {
+export async function getBarcodes(page = 1, perPage = 20, search?: string, productId?: number): Promise<BarcodeListResponse> {
     return apiRequest(BARCODE_IMPORT_ENDPOINT, {
         method: 'POST',
-        body: JSON.stringify({ action: 'get_barcodes', page, per_page: perPage, search }),
+        body: JSON.stringify({ action: 'get_barcodes', page, per_page: perPage, search, product_id: productId }),
     });
 }
 

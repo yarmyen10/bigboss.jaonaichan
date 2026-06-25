@@ -14,6 +14,13 @@ interface ScanResult {
     message?: string;
 }
 
+interface SessionScan {
+    barcode: string;
+    image?: string;
+    ok: boolean;
+    message?: string;
+}
+
 export default function BarcodeImport() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
@@ -25,7 +32,7 @@ export default function BarcodeImport() {
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [saving, setSaving] = useState(false);
     const [manualBarcode, setManualBarcode] = useState('');
-    const [sessionBarcodes, setSessionBarcodes] = useState<string[]>([]);
+    const [sessionScans, setSessionScans] = useState<SessionScan[]>([]);
     const [variations, setVariations] = useState<ProductVariation[]>([]);
     const [loadingVariations, setLoadingVariations] = useState(false);
     const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
@@ -65,14 +72,30 @@ export default function BarcodeImport() {
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
-    const processBarcode = async (barcode: string) => {
+    const captureImage = (): string | undefined => {
+        const video = document.querySelector<HTMLVideoElement>(`#${SCANNER_ELEMENT_ID} video`);
+        if (!video) return undefined;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return undefined;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', 0.6);
+        } catch {
+            return undefined;
+        }
+    };
+
+    const processBarcode = async (barcode: string, imageBase64?: string) => {
         const product = selectedProductRef.current;
         if (!product) return false;
         const targetId = selectedVariationRef.current?.variation_id ?? product.product_id;
 
         setSaving(true);
         try {
-            const res = await saveBarcodeImport(targetId, barcode);
+            const res = await saveBarcodeImport(targetId, barcode, imageBase64);
             if (res.success) {
                 setScanResult({ ok: true, barcode });
                 const newCount = res.barcode_count;
@@ -89,14 +112,16 @@ export default function BarcodeImport() {
                 } else {
                     setBarcodeCount((c) => c + 1);
                 }
-                setSessionBarcodes((prev) => [...prev, barcode]);
+                setSessionScans((prev) => [...prev, { barcode, image: imageBase64, ok: true }]);
                 return true;
             } else {
                 setScanResult({ ok: false, message: res.message });
+                setSessionScans((prev) => [...prev, { barcode, image: imageBase64, ok: false, message: res.message }]);
                 return false;
             }
         } catch {
             setScanResult({ ok: false, message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' });
+            setSessionScans((prev) => [...prev, { barcode, image: imageBase64, ok: false, message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' }]);
             return false;
         } finally {
             setSaving(false);
@@ -121,6 +146,7 @@ export default function BarcodeImport() {
                     { fps: 10, qrbox: { width: 280, height: 150 } },
                     async (barcode) => {
                         if (stopped) return;
+                        const imageBase64 = captureImage();
                         stopped = true;
                         try { await capturedScanner.stop(); } catch { /* already stopped */ }
                         scannerRef.current = null;
@@ -129,7 +155,7 @@ export default function BarcodeImport() {
                         const product = selectedProductRef.current;
                         if (!product) return;
 
-                        await processBarcode(barcode);
+                        await processBarcode(barcode, imageBase64);
                     },
                     () => { /* per-frame decode error — intentionally ignored */ }
                 );
@@ -184,7 +210,7 @@ export default function BarcodeImport() {
         setScanResult(null);
         setVariations([]);
         setSelectedVariation(null);
-        setSessionBarcodes([]);
+        setSessionScans([]);
 
         if (product.type === 'variable') {
             setLoadingVariations(true);
@@ -317,7 +343,7 @@ export default function BarcodeImport() {
                                         setSelectedVariation(v);
                                         setBarcodeCount(v.barcode_count);
                                         setScanResult(null);
-                                        setSessionBarcodes([]);
+                                        setSessionScans([]);
                                     }}
                                     className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                                         selectedVariation?.variation_id === v.variation_id
@@ -426,22 +452,52 @@ export default function BarcodeImport() {
             </Modal>
 
             {/* Session barcode list */}
-            {sessionBarcodes.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <div className="mb-3 flex items-center justify-between">
+            {sessionScans.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 shadow-sm">
+                    <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700/50 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">
                         <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                            Barcode ที่ scan ในรอบนี้
+                            รายการที่ Scan ในรอบนี้
                         </h2>
                         <Badge color="primary" size="sm">
-                            {sessionBarcodes.length} รายการ
+                            {sessionScans.length} รายการ
                         </Badge>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {sessionBarcodes.map((bc, i) => (
-                            <Badge key={`${bc}-${i}`} color="light" size="sm">
-                                {bc}
-                            </Badge>
-                        ))}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
+                            <thead className="bg-gray-50/50 text-xs text-gray-500 dark:bg-gray-700/30 dark:text-gray-400">
+                                <tr>
+                                    <th className="px-4 py-3 font-medium whitespace-nowrap">รูปภาพ</th>
+                                    <th className="px-4 py-3 font-medium whitespace-nowrap">Barcode</th>
+                                    <th className="px-4 py-3 font-medium whitespace-nowrap">สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                                {sessionScans.map((scan, i) => (
+                                    <tr key={`${scan.barcode}-${i}`} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/30 transition-colors">
+                                        <td className="px-4 py-2 w-20">
+                                            {scan.image ? (
+                                                <img src={scan.image} alt="scanned" className="h-10 w-16 rounded object-cover shadow-sm border border-gray-200/50 dark:border-gray-600" />
+                                            ) : (
+                                                <div className="flex h-10 w-16 items-center justify-center rounded bg-gray-100 text-[10px] text-gray-400 dark:bg-gray-700">ไม่มีรูป</div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                                            {scan.barcode}
+                                        </td>
+                                        <td className="px-4 py-2 w-24">
+                                            {scan.ok ? (
+                                                <Badge color="success" size="sm">สำเร็จ</Badge>
+                                            ) : (
+                                                <span className="inline-flex flex-col gap-0.5">
+                                                    <Badge color="error" size="sm">ผิดพลาด</Badge>
+                                                    <span className="text-[10px] text-error-600 dark:text-error-400 line-clamp-1" title={scan.message}>{scan.message}</span>
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
