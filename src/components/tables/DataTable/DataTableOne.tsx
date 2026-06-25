@@ -216,6 +216,8 @@ export interface DataTableProps<T extends object> {
     exportFilename?: string;
     /** Replaces the inert Filter button in the card header */
     headerFilter?: ReactNode;
+    /** Custom search input component to replace the default header search */
+    customHeaderSearch?: ReactNode;
     /** Extra content rendered at the right end of the toolbar (after export button) */
     toolbarExtra?: ReactNode;
     pageSizeOptions?: number[];
@@ -325,6 +327,7 @@ export default function DataTableOne<T extends object>({
     exportable = "",
     exportFilename = "export.csv",
     headerFilter,
+    customHeaderSearch,
     toolbarExtra,
     pageSizeOptions = [10, 25, 50],
     defaultPageSize = 10,
@@ -528,7 +531,11 @@ export default function DataTableOne<T extends object>({
             classNameBodyInner={fillHeight ? "lg:flex lg:flex-col lg:flex-1 lg:min-h-0" : undefined}
             divider={(
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-4 sm:py-5">
-                    {searchable === 'header' && (
+                    {customHeaderSearch ? (
+                        <div className="relative min-w-[140px] flex-1">
+                            {customHeaderSearch}
+                        </div>
+                    ) : searchable === 'header' && (
                         <div className="relative min-w-[140px] flex-1">
                             <span className="absolute z-1 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                                 <SearchOneIcon />

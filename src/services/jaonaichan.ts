@@ -12,12 +12,14 @@ export interface GetOrdersParams {
     createDate?: string;
     createDateM?: number;
     createDateY?: number;
+    unitPricesId?: string;
 }
 
 export async function getOrders(params: GetOrdersParams = {}): Promise<OrderListResponse> {
-    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY } = params;
+    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY, unitPricesId } = params;
     const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     if (status) qs.set("status", status);
+    if (unitPricesId) qs.set("unit_prices_id", unitPricesId);
     if (createDate) {
         qs.set("create_date", createDate);
     } else {

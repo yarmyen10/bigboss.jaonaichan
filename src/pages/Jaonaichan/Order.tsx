@@ -14,7 +14,7 @@ import { getOrders, getOrder, getProductsBulkByOrders, patchBill2, patchOrderSta
 import { resolveManageTabs, hasManageableOrders, STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
 import { ORDER_STATUS_DETAILS, STATUS_PROGRESS_COLOR } from "../../config/orderStatus.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
-import { CalenderIcon, CheckCircleIcon, MoreDotIcon } from "../../icons";
+import { CalenderIcon, CheckCircleIcon, MoreDotIcon, SearchOneIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
 import Select from "../../components/form/Select";
 import Label from "../../components/form/Label";
@@ -324,11 +324,21 @@ const getOrderColumns = (
       label: "Total",
       sortable: true,
       align: "left",
-      render: (val) => (
-        <span className="font-semibold text-black dark:text-white">
-          ฿{Number(val).toLocaleString()}
-        </span>
-      ),
+      render: (val, row) => {
+        let displayTotal = Number(val);
+        const s = row.status;
+        if (["pending-payment-1", "wait-verify-1", "paid-1", "waiting-transfer"].includes(s)) {
+          displayTotal = Number(row.bill1?.amount || 0);
+        } else if (["pending-payment-2", "wait-verify-2", "paid-2"].includes(s)) {
+          displayTotal = Number(row.bill2?.amount || 0);
+        }
+
+        return (
+          <span className="font-semibold text-black dark:text-white">
+            ฿{displayTotal.toLocaleString()}
+          </span>
+        );
+      },
     },
     {
       key: "progress",
@@ -505,6 +515,100 @@ const getManageOrderColumns = (
 
   ];
 
+function SmartSearchInput({
+  searchType,
+  setSearchType,
+  searchValue,
+  setSearchValue
+}: {
+  searchType: "general" | "batch";
+  setSearchType: (type: "general" | "batch") => void;
+  searchValue: string;
+  setSearchValue: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
+  const handleSelect = (type: "general" | "batch") => {
+    setSearchType(type);
+    setOpen(false);
+  };
+
+  const clearBadge = () => {
+    setSearchType("general");
+    setSearchValue("");
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full xl:w-[350px]">
+      <div className="flex h-11 items-center rounded-lg border border-gray-300 bg-transparent shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 focus-within:ring-3 focus-within:ring-brand-500/10 focus-within:border-brand-300 dark:focus-within:border-brand-800 transition-shadow px-3 gap-2">
+        <span className="text-gray-500 dark:text-gray-400 shrink-0 flex items-center justify-center">
+          <SearchOneIcon />
+        </span>
+        
+        {searchType !== "general" && (
+          <span className="flex items-center gap-1 bg-brand-500/10 text-brand-500 text-xs font-medium px-2 py-1 rounded">
+            {searchType === "batch" ? "Batch ID" : searchType}
+            <button type="button" onClick={clearBadge} className="hover:text-brand-700 transition">
+              <svg className="size-3" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </span>
+        )}
+
+        <input
+          type="text"
+          placeholder={searchType === "general" ? "Search orders..." : "Enter value..."}
+          value={searchValue}
+          onChange={(e) => {
+            setSearchValue(e.target.value);
+            if (searchType === "general" && e.target.value) setOpen(true);
+            else setOpen(false);
+          }}
+          onFocus={() => {
+            if (searchType === "general" && searchValue) setOpen(true);
+          }}
+          className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none dark:text-white/90 dark:placeholder:text-white/30 w-full min-w-0"
+        />
+      </div>
+
+      {open && searchValue && searchType === "general" && (
+        <div className="absolute left-0 top-full mt-1.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 overflow-hidden">
+          <ul className="py-1">
+            <li
+              className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer flex items-center gap-3"
+              onClick={() => handleSelect("general")}
+            >
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                <SearchOneIcon />
+              </div>
+              <span className="truncate">Search general for <span className="font-semibold text-black dark:text-white">"{searchValue}"</span></span>
+            </li>
+            <li
+              className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer flex items-center gap-3"
+              onClick={() => handleSelect("batch")}
+            >
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-500/10 text-brand-500">
+                <CheckCircleIcon />
+              </div>
+              <span className="truncate">Search Batch ID for <span className="font-semibold text-black dark:text-white">"{searchValue}"</span></span>
+            </li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Order() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -520,6 +624,30 @@ export default function Order() {
   }));
 
   const [statusTab, setStatusTab] = useState<string>("all");
+
+  const [searchType, setSearchType] = useState<"general" | "batch">("general");
+  const [searchValue, setSearchValue] = useState<string>("");
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState<string>("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchValue(searchValue);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchValue]);
+
+  const displayOrders = useMemo(() => {
+    if (searchType === "general" && debouncedSearchValue) {
+      const q = debouncedSearchValue.toLowerCase();
+      return orders.filter(row => 
+        String(row.id).toLowerCase().includes(q) ||
+        row.customer.name.toLowerCase().includes(q) ||
+        row.customer.email.toLowerCase().includes(q) ||
+        (row.number && row.number.toLowerCase().includes(q))
+      );
+    }
+    return orders;
+  }, [orders, searchType, debouncedSearchValue]);
 
   const [products, setProducts] = useState<OrderItemProduct[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
@@ -576,7 +704,14 @@ export default function Order() {
     [unitPrices]
   );
 
-  const loadOrders = async (filter: DateFilter, tab: string = statusTab) => {
+  const lastFetchedBatchId = useRef("");
+
+  const loadOrders = async (
+    filter: DateFilter, 
+    tab: string = statusTab, 
+    bId: string = searchType === "batch" ? debouncedSearchValue : ""
+  ) => {
+    lastFetchedBatchId.current = bId;
     try {
       setIsLoading(true);
       const res: OrderListResponse = await getOrders({
@@ -587,6 +722,7 @@ export default function Order() {
             ...(filter.year ? { createDateY: Number(filter.year) } : {}),
           }),
         ...(TAB_STATUS[tab] ? { status: TAB_STATUS[tab] } : {}),
+        ...(bId ? { unitPricesId: bId } : {}),
       });
       setOrders(Array.isArray(res?.data) ? res.data : []);
     } catch (error) {
@@ -611,6 +747,15 @@ export default function Order() {
     hasInitialized.current = true;
     loadOrders(dateFilter);
   }, []);
+
+  useEffect(() => {
+    if (!hasInitialized.current) return;
+    
+    const targetBatchId = searchType === "batch" ? debouncedSearchValue : "";
+    if (targetBatchId !== lastFetchedBatchId.current) {
+      loadOrders(dateFilter, statusTab, targetBatchId);
+    }
+  }, [debouncedSearchValue, searchType]);
 
   const { isOpen, openModal, closeModal } = useModal();
   const { isOpen: isAlertOpen, openModal: openAlert, closeModal: closeAlert } = useModal();
@@ -714,11 +859,19 @@ export default function Order() {
           title="Orders"
           subtitle="Manage and track all customer orders."
           columns={columns}
-          data={orders}
+          data={displayOrders}
           rowKey="id"
           selectable
           searchable="header"
           exportable="header"
+          customHeaderSearch={
+            <SmartSearchInput
+              searchType={searchType}
+              setSearchType={setSearchType}
+              searchValue={searchValue}
+              setSearchValue={setSearchValue}
+            />
+          }
           headerFilter={<DateFilterDropdown value={dateFilter} onChange={handleFilterChange} />}
           tabs={[
             { value: "all", label: "All Order" },
