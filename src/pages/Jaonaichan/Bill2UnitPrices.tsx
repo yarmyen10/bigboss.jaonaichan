@@ -23,6 +23,7 @@ import {
   getProductsBulkByOrders,
   patchBill2,
   patchOrderStatus,
+  deleteBill2Batch,
 } from "../../services/jaonaichan";
 import { CheckCircleIcon, EyeIcon } from "../../icons";
 
@@ -42,9 +43,49 @@ interface BatchGroup {
   orders: OrderIF[];
 }
 
+const renderFeeInput = (
+  value: string,
+  setValue: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  rowId: number
+) => (
+  <div
+    className="relative w-full min-w-[150px]"
+    onClick={(e) => e.stopPropagation()}
+  >
+    <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+      ฿
+    </span>
+    <input
+      type="text"
+      inputMode="decimal"
+      placeholder="0.00"
+      value={value}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d.]/g, "");
+        const parts = raw.split(".");
+        const next = parts.length > 1
+          ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`
+          : raw;
+        setValue((prev) => {
+          if (next === "") {
+            const { [rowId]: _removed, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [rowId]: next };
+        });
+      }}
+      className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+    />
+  </div>
+);
+
 const getProductColumns = (
   unitPrices: Record<number, string>,
   setUnitPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  chinaShippingPrices: Record<number, string>,
+  setChinaShippingPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  importFeePrices: Record<number, string>,
+  setImportFeePrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
   onViewDetails: (product: OrderItemProduct) => void
 ): ColumnDef<OrderItemProduct>[] => [
   {
@@ -91,43 +132,23 @@ const getProductColumns = (
   {
     key: "unit_price",
     label: "Unit Price (Bill 2)",
-    width: "160px",
+    width: "150px",
     noExport: true,
-    render: (_val, row) => {
-      const value = unitPrices[row.id] ?? "";
-      return (
-        <div
-          className="relative w-full min-w-[150px]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-            ฿
-          </span>
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={value}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/[^\d.]/g, "");
-              const parts = raw.split(".");
-              const next =
-                parts.length > 1
-                  ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`
-                  : raw;
-              setUnitPrices((prev) => {
-                if (next === "") {
-                  const { [row.id]: _removed, ...rest } = prev;
-                  return rest;
-                }
-                return { ...prev, [row.id]: next };
-              });
-            }}
-            className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-          />
-        </div>
-      );
-    },
+    render: (_val, row) => renderFeeInput(unitPrices[row.id] ?? "", setUnitPrices, row.id),
+  },
+  {
+    key: "china_shipping",
+    label: "China Shipping (Total)",
+    width: "150px",
+    noExport: true,
+    render: (_val, row) => renderFeeInput(chinaShippingPrices[row.id] ?? "", setChinaShippingPrices, row.id),
+  },
+  {
+    key: "import_fee",
+    label: "Import Fee (Total)",
+    width: "150px",
+    noExport: true,
+    render: (_val, row) => renderFeeInput(importFeePrices[row.id] ?? "", setImportFeePrices, row.id),
   },
   {
     key: "action",
@@ -155,11 +176,15 @@ export default function Bill2UnitPrices() {
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [unitPrices, setUnitPrices] = useState<Record<number, string>>({});
   const savedUnitPrices = useRef<Record<number, string>>({});
+  const [chinaShippingPrices, setChinaShippingPrices] = useState<Record<number, string>>({});
+  const [importFeePrices, setImportFeePrices] = useState<Record<number, string>>({});
+  const [localShippingPrice, setLocalShippingPrice] = useState<string>("");
   const [modalProduct, setModalProduct] = useState<OrderItemProduct | null>(null);
 
   const { isOpen: isConfirmOpen, openModal: openConfirm, closeModal: closeConfirm } = useModal();
   const { isOpen: isResultOpen, openModal: openResult, closeModal: closeResult } = useModal();
   const { isOpen: isDetailsOpen, openModal: openDetails, closeModal: closeDetails } = useModal();
+  const { isOpen: isDeleteOpen, openModal: openDelete, closeModal: closeDelete } = useModal();
   const [resultVariant, setResultVariant] = useState<"success" | "error">("success");
   const [resultMessage, setResultMessage] = useState("");
 
@@ -203,34 +228,70 @@ export default function Bill2UnitPrices() {
     }
     const activeIds = new Set(activeBatchOrders.map((o) => o.id));
     const orderItemsMap = new Map<number, OrderProductsBulkItem[]>();
+    const productTotalQuantity: Record<number, number> = {};
     for (const item of bulkItems) {
       if (!activeIds.has(item.id)) continue;
       if (!orderItemsMap.has(item.id)) orderItemsMap.set(item.id, []);
       orderItemsMap.get(item.id)!.push(item);
+      productTotalQuantity[item.product.id] = (productTotalQuantity[item.product.id] || 0) + item.quantity;
     }
+    
+    const useNewChina = Object.keys(chinaShippingPrices).length > 0;
+    const useNewImport = Object.keys(importFeePrices).length > 0;
+    const useNewLocal = localShippingPrice.trim() !== "";
+    const parsedLocal = parseFloat(localShippingPrice) || 0;
+
     return Array.from(orderItemsMap.entries()).map(([orderId, items]) => {
       let total = 0;
-      for (const item of items) total += (numericPrices[item.product.id] ?? 0) * item.quantity;
+      let orderChinaShipping = 0;
+      let orderImportFee = 0;
+
+      for (const item of items) {
+        total += (numericPrices[item.product.id] ?? 0) * item.quantity;
+        if (useNewChina) {
+          const totalChina = parseFloat(chinaShippingPrices[item.product.id]) || 0;
+          const totalQty = productTotalQuantity[item.product.id] || 1;
+          orderChinaShipping += (totalChina / totalQty) * item.quantity;
+        }
+        if (useNewImport) {
+          const totalImport = parseFloat(importFeePrices[item.product.id]) || 0;
+          const totalQty = productTotalQuantity[item.product.id] || 1;
+          orderImportFee += (totalImport / totalQty) * item.quantity;
+        }
+      }
       const info = activeBatchOrders.find((o) => o.id === orderId);
+      
+      if (!useNewChina) orderChinaShipping = info?.bill2?.china_shipping ?? 0;
+      if (!useNewImport) orderImportFee = info?.bill2?.import_fee ?? 0;
+      const orderLocalShipping = useNewLocal ? parsedLocal : (info?.bill2?.local_shipping ?? 0);
+
+      const finalTotal = total + orderChinaShipping + orderImportFee + orderLocalShipping;
+
       return {
         orderId,
         orderNumber: info?.number ?? String(orderId),
         customerName: info?.customer.name ?? "—",
-        total,
+        total: finalTotal,
         itemCount: items.length,
+        orderChinaShipping: useNewChina ? orderChinaShipping : undefined,
+        orderImportFee: useNewImport ? orderImportFee : undefined,
+        orderLocalShipping: useNewLocal ? parsedLocal : undefined,
       };
     });
-  }, [bulkItems, unitPrices, activeBatchOrders]);
+  }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, localShippingPrice]);
 
   const pricedCount = Object.keys(unitPrices).length;
 
   const hasChanges = useMemo(() => {
+    if (Object.keys(chinaShippingPrices).length > 0) return true;
+    if (Object.keys(importFeePrices).length > 0) return true;
+    if (localShippingPrice.trim() !== "") return true;
     const saved = savedUnitPrices.current;
     const currentKeys = Object.keys(unitPrices).sort();
     const savedKeys = Object.keys(saved).sort();
     if (currentKeys.length !== savedKeys.length) return true;
     return currentKeys.some((k) => unitPrices[Number(k)] !== saved[Number(k)]);
-  }, [unitPrices]);
+  }, [unitPrices, chinaShippingPrices, importFeePrices, localShippingPrice]);
   const totalBill2 = orderTotals.reduce((s, o) => s + o.total, 0);
   const isNewBatch = activeBatchId === null;
 
@@ -240,8 +301,13 @@ export default function Bill2UnitPrices() {
   }, [openDetails]);
 
   const productColumns = useMemo(
-    () => getProductColumns(unitPrices, setUnitPrices, handleViewDetails),
-    [unitPrices, handleViewDetails]
+    () => getProductColumns(
+      unitPrices, setUnitPrices, 
+      chinaShippingPrices, setChinaShippingPrices, 
+      importFeePrices, setImportFeePrices, 
+      handleViewDetails
+    ),
+    [unitPrices, chinaShippingPrices, importFeePrices, handleViewDetails]
   );
 
   const applyBatchPrices = useCallback((batchId: string | null, orders: OrderIF[]) => {
@@ -256,6 +322,9 @@ export default function Bill2UnitPrices() {
     }
     savedUnitPrices.current = merged;
     setUnitPrices(merged);
+    setChinaShippingPrices({});
+    setImportFeePrices({});
+    setLocalShippingPrice("");
   }, []);
 
   const handleBatchSelect = useCallback(
@@ -310,6 +379,26 @@ export default function Bill2UnitPrices() {
     loadData();
   }, [loadData]);
 
+  const handleDeleteBatch = () => {
+    if (!activeBatchId) return;
+    withSpinner(async () => {
+      try {
+        await deleteBill2Batch(activeBatchId);
+        closeDelete();
+        setResultVariant("success");
+        setResultMessage(`ลบรอบบิล ${formatBatchDate(activeBatchId)} เรียบร้อยแล้ว`);
+        openResult();
+        await loadData();
+      } catch (err) {
+        closeDelete();
+        setResultVariant("error");
+        setResultMessage("เกิดข้อผิดพลาดในการลบรอบบิล");
+        openResult();
+        if (import.meta.env.DEV) console.error(err);
+      }
+    });
+  };
+
   const handleSave = () => {
     withSpinner(async () => {
       try {
@@ -329,17 +418,26 @@ export default function Bill2UnitPrices() {
         }
 
         await Promise.all(
-          Array.from(orderItemsMap.entries()).map(async ([orderId, items]) => {
+          orderTotals.map(async (info) => {
             const orderPrices: Record<number, number> = {};
-            let total = 0;
+            const items = bulkItems.filter(i => i.id === info.orderId);
             for (const item of items) {
               const price = numericPrices[item.product.id] ?? 0;
               if (price > 0) orderPrices[item.product.id] = price;
-              total += price * item.quantity;
             }
-            await patchBill2(orderId, total, "pending", undefined, orderPrices, batchId);
+            await patchBill2(
+              info.orderId, 
+              info.total, 
+              "pending", 
+              undefined, 
+              orderPrices, 
+              batchId,
+              info.orderChinaShipping,
+              info.orderImportFee,
+              info.orderLocalShipping
+            );
             if (isNewBatch) {
-              await patchOrderStatus(orderId, "wc-pending-payment-2");
+              await patchOrderStatus(info.orderId, "wc-pending-payment-2");
             }
           })
         );
@@ -372,43 +470,63 @@ export default function Bill2UnitPrices() {
       <PageBreadcrumb pageTitle="Bill 2 Unit Prices" />
 
       {/* Batch selector */}
-      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-          เลือกรอบ
-        </p>
-        {isLoading ? (
-          <div className="h-8 w-48 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
-        ) : batches.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">ไม่มี Orders</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {batches.map((batch) => {
-              const isActive = (batch.batchId ?? "") === (activeBatchId ?? "");
-              return (
-                <button
-                  key={batch.batchId ?? "__new__"}
-                  onClick={() => handleBatchSelect(batch.batchId)}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-brand-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  {batch.batchId ? formatBatchDate(batch.batchId) : "ยังไม่ได้ตั้งราคา"}
-                  <span
-                    className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs ${
+      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            เลือกรอบ
+          </p>
+          {isLoading ? (
+            <div className="h-8 w-48 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+          ) : batches.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500">ไม่มี Orders</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {batches.map((batch) => {
+                const isActive = (batch.batchId ?? "") === (activeBatchId ?? "");
+                return (
+                  <button
+                    key={batch.batchId ?? "__new__"}
+                    onClick={() => handleBatchSelect(batch.batchId)}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       isActive
-                        ? "bg-white/20 text-white"
-                        : "bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                        ? "bg-brand-500 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                     }`}
                   >
-                    {batch.orders.length}
-                  </span>
-                </button>
-              );
-            })}
+                    {batch.batchId ? formatBatchDate(batch.batchId) : "ยังไม่ได้ตั้งราคา"}
+                    <span
+                      className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs ${
+                        isActive
+                          ? "bg-white/20 text-white"
+                          : "bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                      }`}
+                    >
+                      {batch.orders.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="shrink-0 flex flex-col md:items-end">
+          <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+            Local Shipping (per order)
+          </label>
+          <div className="relative w-full md:w-48">
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              ฿
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="ใช้ค่าเดิม (ปล่อยว่าง)"
+              value={localShippingPrice}
+              onChange={(e) => setLocalShippingPrice(e.target.value.replace(/[^\d.]/g, ""))}
+              className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+            />
           </div>
-        )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
@@ -429,6 +547,17 @@ export default function Bill2UnitPrices() {
               scrollable
               fillHeight
             />
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800/30 dark:bg-blue-900/20 dark:text-blue-300">
+              <p className="font-semibold mb-1">สูตรคำนวณยอดบิล 2 (ต่อออเดอร์):</p>
+              <p className="font-mono text-xs opacity-90 mb-1.5">
+                ยอดรวม = Σ(ราคาต่อหน่วย × จำนวน) + Σ(ค่าส่งจีนเฉลี่ยต่อชิ้น × จำนวน) + Σ(ค่านำเข้าเฉลี่ยต่อชิ้น × จำนวน) + ค่าจัดส่งพัสดุ
+              </p>
+              <ul className="list-disc pl-5 text-xs opacity-80 space-y-0.5">
+                <li>หากกรอกค่าส่งจีน/นำเข้าใหม่ จะถูกนำมาเฉลี่ยต่อชิ้นและอัปเดตทับค่าเดิมใน Batch นี้ทั้งหมด</li>
+                <li>หากปล่อยว่าง ระบบจะใช้ค่ายอดรวมเดิมของแต่ละออเดอร์ในการคำนวณ (ไม่แก้ไขของเดิม)</li>
+                <li>ค่าจัดส่งพัสดุ = ยอดตามที่ระบุด้านบน (คิดต่อ 1 ออเดอร์) หากปล่อยว่างจะใช้ค่าเดิม</li>
+              </ul>
+            </div>
           </CardFrame>
         </div>
 
@@ -548,6 +677,16 @@ export default function Bill2UnitPrices() {
                   Reset
                 </Button>
               </div>
+              {!isNewBatch && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openDelete}
+                  className="w-full justify-center mt-2 text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20"
+                >
+                  ลบรอบบิลนี้
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -569,6 +708,18 @@ export default function Bill2UnitPrices() {
         message={`${isNewBatch ? "บันทึก" : "อัปเดต"} Unit Prices สำหรับ ${activeBatchOrders.length} orders ใช่หรือไม่? รวม Bill 2: ฿${totalBill2.toLocaleString()}`}
         onConfirm={handleSave}
         confirmLabel="ยืนยัน"
+        cancelLabel="ยกเลิก"
+      />
+
+      {/* Confirm delete */}
+      <AlertModal
+        isOpen={isDeleteOpen}
+        onClose={closeDelete}
+        variant="error"
+        title="ยืนยันการลบรอบบิล"
+        message={`คุณต้องการลบรอบบิล ${formatBatchDate(activeBatchId ?? "")} ใช่หรือไม่? ข้อมูลค่าส่งต่างๆ และ Unit Prices จะถูกล้าง และสถานะออเดอร์จะกลับไปเป็น 'ชำระบิลแรกแล้ว'`}
+        onConfirm={handleDeleteBatch}
+        confirmLabel="ลบรอบบิล"
         cancelLabel="ยกเลิก"
       />
 

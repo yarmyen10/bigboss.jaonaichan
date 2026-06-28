@@ -33,6 +33,13 @@ export async function getOrder(id: number): Promise<OrderDetailResponse> {
     return apiRequest(`/jaonaichan/v1/orders/${id}?with_items=true`);
 }
 
+export async function deleteOrder(id: number): Promise<unknown> {
+    return apiRequest(`/jaonaichan/v1/orders/${id}`, {
+        method: "DELETE",
+    });
+}
+
+
 export async function getProductsBulk(statuses = "all", page = 1, perPage = 10): Promise<any> {
     return apiRequest(`/jaonaichan/v1/orders/products/bulk?statuses=${statuses}&page=${page}&per_page=${perPage}`);
 }
@@ -63,7 +70,17 @@ export async function reVerifySlip(orderId: number, bill: 1 | 2): Promise<{ succ
     });
 }
 
-export async function patchBill2(orderId: number, amount: number, status?: string, paidAt?: string, unitPrices?: Record<number, number>, unitPricesId?: string): Promise<PatchBillResponse> {
+export async function patchBill2(
+    orderId: number,
+    amount: number,
+    status?: string,
+    paidAt?: string,
+    unitPrices?: Record<number, number>,
+    unitPricesId?: string,
+    chinaShipping?: number,
+    importFee?: number,
+    localShipping?: number
+): Promise<PatchBillResponse> {
     return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/2`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -72,6 +89,9 @@ export async function patchBill2(orderId: number, amount: number, status?: strin
             ...(paidAt && { paid_at: paidAt }),
             ...(unitPrices && { unit_prices: unitPrices }),
             ...(unitPricesId && { unit_prices_id: unitPricesId }),
+            ...(chinaShipping !== undefined && { china_shipping: chinaShipping }),
+            ...(importFee !== undefined && { import_fee: importFee }),
+            ...(localShipping !== undefined && { local_shipping: localShipping }),
         }),
     });
 }
@@ -80,6 +100,12 @@ export async function patchOrderStatus(orderId: number, status: string): Promise
     return apiRequest(`/jaonaichan/v1/orders/${orderId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
+    });
+}
+
+export async function deleteBill2Batch(batchId: string): Promise<unknown> {
+    return apiRequest(`/jaonaichan/v1/bill2-batch/${batchId}`, {
+        method: "DELETE",
     });
 }
 

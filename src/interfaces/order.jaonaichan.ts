@@ -42,6 +42,9 @@ export interface Bill {
     paid_at: string | null
     unit_prices?: Record<number, number>
     unit_prices_id?: string | null
+    china_shipping?: number
+    import_fee?: number
+    local_shipping?: number
 }
 
 /** bill1 / bill2 — summary version (ไม่มี paid_at) ใช้ใน bulk / flat */
@@ -50,6 +53,9 @@ export interface BillSummary {
     amount: number
     unit_prices?: Record<number, number>
     unit_prices_id?: string | null
+    china_shipping?: number
+    import_fee?: number
+    local_shipping?: number
 }
 
 // =============================================================================

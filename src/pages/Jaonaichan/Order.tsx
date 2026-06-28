@@ -6,19 +6,19 @@ import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataTableOne";
-import { OrderListResponse, Order as OrderIF, OrderProductsBulkResponse, OrderItemProduct, OrderProductsBulkItem } from "../../interfaces/order.jaonaichan"
+import { Order as OrderIF, OrderItemProduct } from "../../interfaces/order.jaonaichan"
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
-import { getOrders, getOrder, getProductsBulkByOrders, patchBill2, patchOrderStatus, deleteSlip } from "../../services/jaonaichan";
-import { resolveManageTabs, hasManageableOrders, STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
+import { getOrder } from "../../services/jaonaichan";
+import { STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
 import { ORDER_STATUS_DETAILS, STATUS_PROGRESS_COLOR } from "../../config/orderStatus.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
-import { CalenderIcon, CheckCircleIcon, MoreDotIcon, SearchOneIcon } from "../../icons";
+import { CalenderIcon, CheckCircleIcon, MoreDotIcon, SearchOneIcon, BoxIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
 import Select from "../../components/form/Select";
 import Label from "../../components/form/Label";
-import { BulkActionsDropdown, DropdownSectionHeader } from "../../components/ui/dropdown/BulkActionsDropdown";
+
 import { Modal } from "../../components/ui/modal";
 import { AlertModal } from "../../components/ui/modal/AlertModal";
 import { useModal } from "../../hooks/useModal";
@@ -30,6 +30,9 @@ import ComponentTabCard from "../../components/common/ComponentTabCard";
 import ProductDetailsCard from "../../components/jaonaichan/ProductDetailsCard";
 import OrderDetails from "../../components/jaonaichan/OrderDetails";
 import BottomSheet from "../../components/ui/bottom-sheet/BottomSheet";
+import { DateFilter, useOrderList } from "../../hooks/jaonaichan/useOrderList";
+import { useManageProducts } from "../../hooks/jaonaichan/useManageProducts";
+import { useOrderModals } from "../../hooks/jaonaichan/useOrderModals";
 
 
 
@@ -64,19 +67,7 @@ const PAYMENT_METHOD_DETAILS: Record<PaymentMethod, Details> = {
 
 // ── Tab → status mapping ──────────────────────────────────────────────────────
 
-const TAB_STATUS: Record<string, string | undefined> = {
-  all:    undefined,
-  unpaid: "waiting-transfer,pending-payment-1,wait-verify-1,pending-payment-2,wait-verify-2",
-  paid:   "paid-1,paid-2,completed",
-};
 
-// ── Date filter ──────────────────────────────────────────────────────────────
-
-interface DateFilter {
-  month: string;  // "" = All, "1"–"12"
-  year: string;   // "yyyy"
-  date: string;   // "" = no day override, "dd/mm/yyyy"
-}
 
 
 function parseDMY(s: string): Date | undefined {
@@ -262,7 +253,17 @@ const getOrderColumns = (
       label: "Order #",
       sortable: true,
       width: "80px",
-      render: (val) => <span className="text-theme-xs font-medium text-gray-700 group-hover:underline dark:text-gray-400">#{val as string}</span>,
+      render: (val, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewMore(row);
+          }}
+          className="text-theme-xs font-medium text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300 transition-colors cursor-pointer text-left"
+        >
+          #{val as string}
+        </button>
+      ),
     },
     {
       key: "date",
@@ -425,16 +426,57 @@ const getOrderColumns = (
   ];
 
 
+const renderFeeInput = (
+  value: string,
+  setValue: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  rowId: number,
+  setSelectedProductId: React.Dispatch<React.SetStateAction<number | null>>
+) => (
+  <div
+    className="relative w-full min-w-[150px]"
+    onClick={(e) => e.stopPropagation()}
+  >
+    <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+      ฿
+    </span>
+    <input
+      type="text"
+      inputMode="decimal"
+      placeholder="0.00"
+      value={value}
+      onFocus={() => setSelectedProductId(rowId)}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d.]/g, "");
+        const parts = raw.split(".");
+        const next = parts.length > 1
+          ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`
+          : raw;
+        setValue((prev) => {
+          if (next === "") {
+            const { [rowId]: _removed, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [rowId]: next };
+        });
+      }}
+      className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+    />
+  </div>
+);
+
 const getManageOrderColumns = (
   unitPrices: Record<number, string>,
   setUnitPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  chinaShippingPrices: Record<number, string>,
+  setChinaShippingPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  importFeePrices: Record<number, string>,
+  setImportFeePrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
   setSelectedProductId: React.Dispatch<React.SetStateAction<number | null>>
 ): ColumnDef<OrderItemProduct>[] => [
     {
       key: "name",
       label: "Product",
       sortable: true,
-      // width: "1000px",
       render: (val, row) => (
         <div className="flex items-center gap-3">
           <img
@@ -453,7 +495,6 @@ const getManageOrderColumns = (
       key: "price",
       label: "Price",
       sortable: true,
-      // width: "1000px",
       render: (val) => (
         <span className="font-semibold text-black dark:text-white">
           ฿{Number(val).toLocaleString()}
@@ -464,7 +505,6 @@ const getManageOrderColumns = (
       key: "stock",
       label: "Stock",
       sortable: true,
-      // width: "1000px",
       render: (val, row) => (
         val !== null
           ? <span className="text-sm text-gray-700 dark:text-gray-300">{val as number}</span>
@@ -476,43 +516,22 @@ const getManageOrderColumns = (
       label: "Unit Price",
       width: "150px",
       noExport: true,
-      render: (_val, row) => {
-        const value = unitPrices[row.id] ?? "";
-        return (
-          <div
-            className="relative w-full min-w-[150px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-              ฿
-            </span>
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={value}
-              onFocus={() => setSelectedProductId(row.id)}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/[^\d.]/g, "");
-                const parts = raw.split(".");
-                const next = parts.length > 1
-                  ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`
-                  : raw;
-                setUnitPrices((prev) => {
-                  if (next === "") {
-                    const { [row.id]: _removed, ...rest } = prev;
-                    return rest;
-                  }
-                  return { ...prev, [row.id]: next };
-                });
-              }}
-              className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-            />
-          </div>
-        );
-      },
+      render: (_val, row) => renderFeeInput(unitPrices[row.id] ?? "", setUnitPrices, row.id, setSelectedProductId),
     },
-
+    {
+      key: "china_shipping",
+      label: "China Shipping (Total)",
+      width: "150px",
+      noExport: true,
+      render: (_val, row) => renderFeeInput(chinaShippingPrices[row.id] ?? "", setChinaShippingPrices, row.id, setSelectedProductId),
+    },
+    {
+      key: "import_fee",
+      label: "Import Fee (Total)",
+      width: "150px",
+      noExport: true,
+      render: (_val, row) => renderFeeInput(importFeePrices[row.id] ?? "", setImportFeePrices, row.id, setSelectedProductId),
+    },
   ];
 
 function SmartSearchInput({
@@ -582,27 +601,46 @@ function SmartSearchInput({
       </div>
 
       {open && searchValue && searchType === "general" && (
-        <div className="absolute left-0 top-full mt-1.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 overflow-hidden">
-          <ul className="py-1">
-            <li
-              className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer flex items-center gap-3"
+        <div className="absolute left-0 top-full mt-2 w-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-theme-lg z-50 overflow-hidden">
+          <div className="p-1">
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 group"
               onClick={() => handleSelect("general")}
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-white dark:group-hover:bg-gray-600 shadow-theme-xs transition-colors">
                 <SearchOneIcon />
               </div>
-              <span className="truncate">Search general for <span className="font-semibold text-black dark:text-white">"{searchValue}"</span></span>
-            </li>
-            <li
-              className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer flex items-center gap-3"
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  Search general for <span className="text-brand-500">"{searchValue}"</span>
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Search across all fields
+                </p>
+              </div>
+            </button>
+
+            <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2" />
+
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-colors hover:bg-brand-50 dark:hover:bg-brand-500/10 group"
               onClick={() => handleSelect("batch")}
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-500/10 text-brand-500">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 group-hover:bg-white dark:group-hover:bg-brand-500/30 shadow-theme-xs transition-colors">
                 <CheckCircleIcon />
               </div>
-              <span className="truncate">Search Batch ID for <span className="font-semibold text-black dark:text-white">"{searchValue}"</span></span>
-            </li>
-          </ul>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  Search Batch ID <span className="text-brand-500">"{searchValue}"</span>
+                </p>
+                <p className="text-xs text-brand-600/70 dark:text-brand-400/70">
+                  Find orders matching exact batch
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -613,62 +651,76 @@ export default function Order() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { spinning, withSpinner } = useSpinner(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const hasInitialized = useRef(false);
-  const [orders, setOrders] = useState<OrderIF[]>([]);
-
-  const [dateFilter, setDateFilter] = useState<DateFilter>(() => ({
-    month: "",
-    year: String(new Date().getFullYear()),
-    date: "",
-  }));
-
-  const [statusTab, setStatusTab] = useState<string>("all");
-
-  const [searchType, setSearchType] = useState<"general" | "batch">("general");
-  const [searchValue, setSearchValue] = useState<string>("");
-  const [debouncedSearchValue, setDebouncedSearchValue] = useState<string>("");
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchValue(searchValue);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [searchValue]);
-
-  const displayOrders = useMemo(() => {
-    if (searchType === "general" && debouncedSearchValue) {
-      const q = debouncedSearchValue.toLowerCase();
-      return orders.filter(row => 
-        String(row.id).toLowerCase().includes(q) ||
-        row.customer.name.toLowerCase().includes(q) ||
-        row.customer.email.toLowerCase().includes(q) ||
-        (row.number && row.number.toLowerCase().includes(q))
-      );
-    }
-    return orders;
-  }, [orders, searchType, debouncedSearchValue]);
-
-  const [products, setProducts] = useState<OrderItemProduct[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  const selectedProduct = products.find(p => p.id === selectedProductId) ?? null;
-
-  const [sheetProductId, setSheetProductId] = useState<number | null>(null);
-  const sheetProduct = products.find(p => p.id === sheetProductId) ?? null;
-
-  const [unitPrices, setUnitPrices] = useState<Record<number, string>>({});
-
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-
-  const [viewOrder, setViewOrder] = useState<OrderIF | null>(null);
-  const { isOpen: isDetailsOpen, openModal: openDetails, closeModal: closeDetails } = useModal();
-
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const handleViewMore = useCallback((row: OrderIF) => {
-    setViewOrder(row);
-    openDetails();
-  }, [openDetails]);
+  const {
+    orders,
+    displayOrders,
+    isLoading,
+    dateFilter,
+    handleFilterChange,
+    statusTab,
+    handleTabChange,
+    searchType,
+    setSearchType,
+    searchValue,
+    setSearchValue,
+    loadOrders
+  } = useOrderList();
+
+  const handleSaved = useCallback(() => {
+    loadOrders(dateFilter);
+  }, [loadOrders, dateFilter]);
+
+  const {
+    viewOrder,
+    setViewOrder,
+    isDetailsOpen,
+    openDetails,
+    closeDetails,
+    handleViewMore,
+    isUpdateStatusOpen,
+    closeUpdateStatus,
+    updateStatusOrders,
+    newStatus,
+    setNewStatus,
+    removeSlip,
+    setRemoveSlip,
+    handleOpenUpdateStatus,
+    handleConfirmUpdateStatus,
+    isDeleteOpen,
+    closeDelete,
+    deleteTargetOrders,
+    handleOpenDelete,
+    handleConfirmDelete,
+  } = useOrderModals({ withSpinner, onSaved: handleSaved });
+
+  const { isOpen, openModal, closeModal } = useModal();
+  const { isOpen: isAlertOpen, openModal: openAlert, closeModal: closeAlert } = useModal();
+
+  const {
+    products,
+    selectedProductId,
+    setSelectedProductId,
+    selectedProduct,
+    sheetProductId,
+    setSheetProductId,
+    sheetProduct,
+    unitPrices,
+    setUnitPrices,
+    chinaShippingPrices,
+    setChinaShippingPrices,
+    importFeePrices,
+    setImportFeePrices,
+    localShippingPrice,
+    setLocalShippingPrice,
+    manageOrdersTabs,
+    activeManageTab,
+    setActiveManageTab,
+    initialManageOrders,
+    handleSaveOrders
+  } = useManageProducts({ withSpinner, openModal, closeModal, openAlert, onSaved: handleSaved });
 
   useEffect(() => {
     const idParam = searchParams.get("orderId");
@@ -676,23 +728,11 @@ export default function Order() {
     const id = Number(idParam);
     if (!id) return;
     setSearchParams(prev => { prev.delete("orderId"); return prev; }, { replace: true });
-    getOrder(id).then(order => {
-      setViewOrder(order as OrderIF);
+    getOrder(id).then((order: OrderIF) => {
+      setViewOrder(order);
       openDetails();
     }).catch(() => {/* silent */});
-  }, [searchParams, setSearchParams, openDetails]);
-
-  const { isOpen: isUpdateStatusOpen, openModal: openUpdateStatus, closeModal: closeUpdateStatus } = useModal();
-  const [updateStatusOrders, setUpdateStatusOrders] = useState<OrderIF[]>([]);
-  const [newStatus, setNewStatus] = useState<string>("");
-  const [removeSlip, setRemoveSlip] = useState(false);
-
-  const handleOpenUpdateStatus = useCallback((orders: OrderIF[]) => {
-    setUpdateStatusOrders(orders);
-    setNewStatus("");
-    setRemoveSlip(false);
-    openUpdateStatus();
-  }, [openUpdateStatus]);
+  }, [searchParams, setSearchParams, openDetails, setViewOrder]);
 
   const columns = useMemo(
     () => getOrderColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore, navigate, (row) => handleOpenUpdateStatus([row])),
@@ -700,148 +740,19 @@ export default function Order() {
   );
 
   const manageOrdersColumns = useMemo(
-    () => getManageOrderColumns(unitPrices, setUnitPrices, setSelectedProductId),
-    [unitPrices]
+    () => getManageOrderColumns(
+      unitPrices, setUnitPrices,
+      chinaShippingPrices, setChinaShippingPrices,
+      importFeePrices, setImportFeePrices,
+      setSelectedProductId
+    ),
+    [
+      unitPrices, setUnitPrices,
+      chinaShippingPrices, setChinaShippingPrices,
+      importFeePrices, setImportFeePrices,
+      setSelectedProductId
+    ]
   );
-
-  const lastFetchedBatchId = useRef("");
-
-  const loadOrders = async (
-    filter: DateFilter, 
-    tab: string = statusTab, 
-    bId: string = searchType === "batch" ? debouncedSearchValue : ""
-  ) => {
-    lastFetchedBatchId.current = bId;
-    try {
-      setIsLoading(true);
-      const res: OrderListResponse = await getOrders({
-        ...(filter.date
-          ? { createDate: filter.date }
-          : {
-            ...(filter.month ? { createDateM: Number(filter.month) } : {}),
-            ...(filter.year ? { createDateY: Number(filter.year) } : {}),
-          }),
-        ...(TAB_STATUS[tab] ? { status: TAB_STATUS[tab] } : {}),
-        ...(bId ? { unitPricesId: bId } : {}),
-      });
-      setOrders(Array.isArray(res?.data) ? res.data : []);
-    } catch (error) {
-      if (import.meta.env.DEV) console.error(error);
-    } finally {
-      setTimeout(() => setIsLoading(false), 100);
-    }
-  };
-
-  const handleFilterChange = (newFilter: DateFilter) => {
-    setDateFilter(newFilter);
-    loadOrders(newFilter);
-  };
-
-  const handleTabChange = (tab: string) => {
-    setStatusTab(tab);
-    loadOrders(dateFilter, tab);
-  };
-
-  useEffect(() => {
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
-    loadOrders(dateFilter);
-  }, []);
-
-  useEffect(() => {
-    if (!hasInitialized.current) return;
-    
-    const targetBatchId = searchType === "batch" ? debouncedSearchValue : "";
-    if (targetBatchId !== lastFetchedBatchId.current) {
-      loadOrders(dateFilter, statusTab, targetBatchId);
-    }
-  }, [debouncedSearchValue, searchType]);
-
-  const { isOpen, openModal, closeModal } = useModal();
-  const { isOpen: isAlertOpen, openModal: openAlert, closeModal: closeAlert } = useModal();
-  const [manageOrdersTabs, setManageOrdersTabs] = useState([] as TabOption[]);
-  const [manageOrderItems, setManageOrderItems] = useState<OrderProductsBulkItem[]>([]);
-  const [activeManageTab, setActiveManageTab] = useState<string>("");
-  const initialManageOrders = (selectedOrders: OrderIF[]) => {
-    withSpinner(async () => {
-      const orderIds = selectedOrders.map(o => o.id);
-      const res: OrderProductsBulkResponse = await getProductsBulkByOrders({ orderIds });
-
-      const manageable = (res?.data ?? []).filter(item =>
-        (STATUS_MANAGE_ACTIONS[item.status]?.length ?? 0) > 0 && !item.bill2.unit_prices_id
-      );
-      if (manageable.length === 0) { openAlert(); return; }
-      setManageOrderItems(manageable);
-
-      const uniqueProducts = new Map<number, OrderItemProduct>();
-      for (const item of manageable) {
-        if (!uniqueProducts.has(item.product.id)) {
-          uniqueProducts.set(item.product.id, item.product);
-        }
-      }
-      setProducts(Array.from(uniqueProducts.values()));
-
-      const tabs = resolveManageTabs(selectedOrders);
-      setManageOrdersTabs(tabs);
-      setActiveManageTab(tabs[0]?.value ?? "");
-      setUnitPrices({});
-    });
-    openModal();
-  }
-
-  const handleConfirmUpdateStatus = () => {
-    if (!newStatus) return;
-    withSpinner(async () => {
-      await Promise.all(
-        updateStatusOrders.map(async (order) => {
-          await patchOrderStatus(order.id, `wc-${newStatus}`);
-          if (removeSlip) {
-            await Promise.allSettled([
-              deleteSlip(order.id, 1),
-              deleteSlip(order.id, 2),
-            ]);
-          }
-        })
-      );
-      closeUpdateStatus();
-      loadOrders(dateFilter);
-    });
-  };
-
-  const handleSaveOrders = () => {
-    withSpinner(async () => {
-      if (activeManageTab === "bill2") {
-        const numericPrices: Record<number, number> = {};
-        for (const [pid, raw] of Object.entries(unitPrices)) {
-          const price = parseFloat(raw) || 0;
-          if (price > 0) numericPrices[Number(pid)] = price;
-        }
-        const now = new Date();
-        const p = (n: number, l = 2) => String(n).padStart(l, '0');
-        const batchId = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
-        const orderItemsMap = new Map<number, typeof manageOrderItems>();
-        for (const item of manageOrderItems) {
-          if (!orderItemsMap.has(item.id)) orderItemsMap.set(item.id, []);
-          orderItemsMap.get(item.id)!.push(item);
-        }
-        await Promise.all(
-          Array.from(orderItemsMap.entries()).map(async ([orderId, items]) => {
-            const orderPrices: Record<number, number> = {};
-            let total = 0;
-            for (const item of items) {
-              const price = numericPrices[item.product.id] ?? 0;
-              if (price > 0) orderPrices[item.product.id] = price;
-              total += price * item.quantity;
-            }
-            await patchBill2(orderId, total, 'pending', undefined, orderPrices, batchId);
-            await patchOrderStatus(orderId, 'wc-pending-payment-2');
-          })
-        );
-      }
-      closeModal();
-      loadOrders(dateFilter);
-    });
-  }
 
   if (spinning) {
     return <PageSpinner />;
@@ -890,45 +801,59 @@ export default function Order() {
           //     { label: "Backorder", value: "onbackorder" },
           //   ],
           // }]}
-          bulkActions={(selected, isAllSelected) => (
-            <BulkActionsDropdown label="Actions">
-              {(close) => (
-                <>
-                  {hasManageableOrders(selected.map(o => o.status)) && (
-                    <>
-                      <DropdownSectionHeader label="Manage" />
-                      {isAllSelected && hasManageableOrders(orders.map(o => o.status)) && (
-                        <DropdownItem onItemClick={() => { close(); initialManageOrders(orders); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
-                          Manage all orders.
-                        </DropdownItem>
-                      )}
-                      <DropdownItem onItemClick={() => { close(); initialManageOrders(selected); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
-                        Manage {selected.length} orders.
-                      </DropdownItem>
-                    </>
-                  )}
-                  <DropdownSectionHeader label="Status" border />
-                  {isAllSelected && (
-                    <DropdownItem onItemClick={() => { close(); handleOpenUpdateStatus(orders); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
-                      Update status all orders.
-                    </DropdownItem>
-                  )}
-                  <DropdownItem onItemClick={() => { close(); handleOpenUpdateStatus(selected); }} className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300">
-                    Update status {selected.length} orders.
-                  </DropdownItem>
-                  <DropdownSectionHeader label="Cancel" border />
-                  {isAllSelected && (
-                    <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300">
-                      Cancel all orders.
-                    </DropdownItem>
-                  )}
-                  <DropdownItem onItemClick={close} className="flex w-full font-normal text-left text-red-500 rounded-lg hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-white/5 dark:hover:text-red-300">
-                    Cancel {selected.length} orders.
-                  </DropdownItem>
-                </>
-              )}
-            </BulkActionsDropdown>
-          )}
+          bulkActions={(selected, isAllSelected) => {
+            const targetOrders = isAllSelected ? orders : selected;
+            
+            const manageableOrders = targetOrders.filter(o => 
+              (STATUS_MANAGE_ACTIONS[o.status]?.length ?? 0) > 0 && !o.bill2?.unit_prices_id
+            );
+            const canManage = manageableOrders.length > 0;
+            
+            return (
+              <div className="flex items-center gap-2">
+                {canManage && (
+                  <div className="group relative">
+                    <button
+                      onClick={() => initialManageOrders(manageableOrders)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-brand-500 hover:bg-brand-50 hover:text-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-brand-500 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors shadow-sm"
+                    >
+                      <BoxIcon className="size-5" />
+                    </button>
+                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none dark:bg-gray-700 hidden sm:block">
+                      Manage {manageableOrders.length} Orders
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="group relative">
+                  <button
+                    onClick={() => handleOpenUpdateStatus(targetOrders)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-brand-500 hover:bg-brand-50 hover:text-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-brand-500 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors shadow-sm"
+                  >
+                    <PencilIcon className="size-5" />
+                  </button>
+                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none dark:bg-gray-700 hidden sm:block">
+                    Update {isAllSelected ? "All" : selected.length} Orders
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                  </div>
+                </div>
+
+                <div className="group relative">
+                  <button
+                    onClick={() => handleOpenDelete(targetOrders)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-red-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors shadow-sm"
+                  >
+                    <TrashBinIcon className="size-5" />
+                  </button>
+                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-red-600 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none dark:bg-red-500 hidden sm:block">
+                    Cancel {isAllSelected ? "All" : selected.length} Orders
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-red-600 dark:border-t-red-500"></div>
+                  </div>
+                </div>
+              </div>
+            );
+          }}
         />
       </CardFrame>
       {/* Modal Manage Orders */}
@@ -941,13 +866,35 @@ export default function Order() {
         <div className="fixed inset-0 bg-white dark:bg-gray-900">
           <div className="flex h-full flex-col p-6 lg:p-10">
             {/* Header */}
-            <div className="shrink-0 px-2 pr-14">
-              <h4 className="mb-3 font-semibold text-gray-800 text-title-sm dark:text-white/90">
-                Manage Orders
-              </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Update your details to keep your profile up-to-date.
-              </p>
+            <div className="shrink-0 px-2 pr-14 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h4 className="mb-3 font-semibold text-gray-800 text-title-sm dark:text-white/90">
+                  Manage Orders
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Update your details to keep your profile up-to-date.
+                </p>
+              </div>
+              
+              {activeManageTab === "bill2" && (
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Local Shipping (per order)
+                  </label>
+                  <div className="relative w-32">
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                      ฿
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={localShippingPrice}
+                      onChange={(e) => setLocalShippingPrice(e.target.value.replace(/[^\d.]/g, ""))}
+                      className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Content */}
@@ -962,26 +909,39 @@ export default function Order() {
               >
                 {/* min-h-0 on grid items overrides the default min-height:auto so explicit lg:h-full wins over intrinsic content height */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6 lg:gap-8 md:h-full md:min-h-0">
-                  <div className="md:col-span-3 min-[1025px]:col-span-2 md:h-full md:min-h-0 md:min-w-0">
+                  <div className="md:col-span-3 min-[1025px]:col-span-2 flex flex-col md:h-full md:min-h-0 md:min-w-0">
                     {/* Unique products By Orders */}
-                    <DataTableOne<OrderItemProduct>
-                      title="Products"
-                      subtitle="Manage and track all customer orders."
-                      columns={manageOrdersColumns}
-                      data={products}
-                      rowKey="id"
-                      searchable="header"
-                      exportable="header"
-                      selectedRowKey={selectedProductId ?? undefined}
-                      onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
-                      onRowLongPress={(row) => setSheetProductId(row.id)}
-                      scrollable
-                      fillHeight
-                    // stickyFirstColumn
-                    // defaultPageSize={10}
-                    // rowHeight={75}
-                    // scrollMaxHeight={350}
-                    />
+                    <div className="flex-1 min-h-0">
+                      <DataTableOne<OrderItemProduct>
+                        title="Products"
+                        subtitle="Manage and track all customer orders."
+                        columns={manageOrdersColumns}
+                        data={products}
+                        rowKey="id"
+                        searchable="header"
+                        exportable="header"
+                        selectedRowKey={selectedProductId ?? undefined}
+                        onRowClick={(row) => setSelectedProductId(prev => prev === row.id ? null : row.id)}
+                        onRowLongPress={(row) => setSheetProductId(row.id)}
+                        scrollable
+                        fillHeight
+                      // rowHeight={75}
+                      // scrollMaxHeight={350}
+                      />
+                    </div>
+                    
+                    {activeManageTab === "bill2" && (
+                      <div className="mt-3 shrink-0 rounded-lg border border-blue-100 bg-blue-50 p-3.5 text-sm text-blue-800 dark:border-blue-800/30 dark:bg-blue-900/20 dark:text-blue-300">
+                        <p className="font-semibold mb-1">สูตรคำนวณยอดบิล 2 (ต่อออเดอร์):</p>
+                        <p className="font-mono text-xs opacity-90 mb-1.5">
+                          ยอดรวม = Σ(ราคาต่อหน่วย × จำนวน) + Σ(ค่าส่งจีนเฉลี่ยต่อชิ้น × จำนวน) + Σ(ค่านำเข้าเฉลี่ยต่อชิ้น × จำนวน) + ค่าจัดส่งพัสดุ
+                        </p>
+                        <ul className="list-disc pl-5 text-xs opacity-80 space-y-0.5">
+                          <li>ค่าส่งจีนและค่านำเข้าเฉลี่ยต่อชิ้น = ยอดรวมของสินค้าที่กรอก ÷ จำนวนชิ้นทั้งหมดในรอบนี้</li>
+                          <li>ค่าจัดส่งพัสดุ = ยอดตามที่ระบุด้านบนสุด (คิดต่อ 1 ออเดอร์)</li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   {/* flex flex-col h-full so ProductDetailsCard stretches to grid row height */}
                   <div className="hidden min-[1025px]:flex flex-col md:h-full md:min-h-0 md:min-w-0">
@@ -1083,6 +1043,37 @@ export default function Order() {
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Status
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Delete Orders */}
+      <Modal
+        isOpen={isDeleteOpen}
+        onClose={closeDelete}
+        className="max-w-[400px] p-6 lg:p-8"
+      >
+        <div>
+          <h4 className="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">
+            Cancel Orders
+          </h4>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+            Are you sure you want to permanently delete {deleteTargetOrders.length} order{deleteTargetOrders.length !== 1 ? "s" : ""}? This action cannot be undone.
+          </p>
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={closeDelete}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] dark:hover:text-gray-300"
+            >
+              Close
+            </button>
+            <button
+              onClick={handleConfirmDelete}
+              disabled={spinning}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm text-white shadow-theme-xs transition hover:bg-red-600 disabled:opacity-50"
+            >
+              Delete Permanently
             </button>
           </div>
         </div>
