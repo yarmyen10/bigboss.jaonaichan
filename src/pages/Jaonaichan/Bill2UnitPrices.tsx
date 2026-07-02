@@ -26,6 +26,8 @@ import {
   deleteBill2Batch,
 } from "../../services/jaonaichan";
 import { CheckCircleIcon, EyeIcon } from "../../icons";
+import { roundUp, PreviewOrder, PreviewProductLine } from "../../hooks/jaonaichan/useManageProducts";
+import BillPreviewTable from "../../components/jaonaichan/BillPreviewTable";
 
 function generateBatchId(): string {
   const now = new Date();
@@ -247,25 +249,25 @@ export default function Bill2UnitPrices() {
       let orderImportFee = 0;
 
       for (const item of items) {
-        total += (numericPrices[item.product.id] ?? 0) * item.quantity;
+        total += roundUp((numericPrices[item.product.id] ?? 0) * item.quantity);
         if (useNewChina) {
           const totalChina = parseFloat(chinaShippingPrices[item.product.id]) || 0;
           const totalQty = productTotalQuantity[item.product.id] || 1;
-          orderChinaShipping += (totalChina / totalQty) * item.quantity;
+          orderChinaShipping += roundUp((totalChina / totalQty) * item.quantity);
         }
         if (useNewImport) {
           const totalImport = parseFloat(importFeePrices[item.product.id]) || 0;
           const totalQty = productTotalQuantity[item.product.id] || 1;
-          orderImportFee += (totalImport / totalQty) * item.quantity;
+          orderImportFee += roundUp((totalImport / totalQty) * item.quantity);
         }
       }
       const info = activeBatchOrders.find((o) => o.id === orderId);
-      
+
       if (!useNewChina) orderChinaShipping = info?.bill2?.china_shipping ?? 0;
       if (!useNewImport) orderImportFee = info?.bill2?.import_fee ?? 0;
       const orderLocalShipping = useNewLocal ? parsedLocal : (info?.bill2?.local_shipping ?? 0);
 
-      const finalTotal = total + orderChinaShipping + orderImportFee + orderLocalShipping;
+      const finalTotal = roundUp(total + orderChinaShipping + orderImportFee + orderLocalShipping);
 
       return {
         orderId,
@@ -276,6 +278,79 @@ export default function Bill2UnitPrices() {
         orderChinaShipping: useNewChina ? orderChinaShipping : undefined,
         orderImportFee: useNewImport ? orderImportFee : undefined,
         orderLocalShipping: useNewLocal ? parsedLocal : undefined,
+      };
+    });
+  }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, localShippingPrice]);
+
+  /** Read-only breakdown (incl. per-product lines) shown in the confirm preview — separate from
+   * orderTotals above because handleSave relies on orderTotals' `undefined` sentinels to know
+   * which fields to actually send (partial update), which a display-only shape doesn't need. */
+  const previewOrders = useMemo<PreviewOrder[]>(() => {
+    const numericPrices: Record<number, number> = {};
+    for (const [pid, raw] of Object.entries(unitPrices)) {
+      const price = parseFloat(raw) || 0;
+      if (price > 0) numericPrices[Number(pid)] = price;
+    }
+    const activeIds = new Set(activeBatchOrders.map((o) => o.id));
+    const orderItemsMap = new Map<number, OrderProductsBulkItem[]>();
+    const productTotalQuantity: Record<number, number> = {};
+    for (const item of bulkItems) {
+      if (!activeIds.has(item.id)) continue;
+      if (!orderItemsMap.has(item.id)) orderItemsMap.set(item.id, []);
+      orderItemsMap.get(item.id)!.push(item);
+      productTotalQuantity[item.product.id] = (productTotalQuantity[item.product.id] || 0) + item.quantity;
+    }
+
+    const useNewChina = Object.keys(chinaShippingPrices).length > 0;
+    const useNewImport = Object.keys(importFeePrices).length > 0;
+    const useNewLocal = localShippingPrice.trim() !== "";
+    const parsedLocal = parseFloat(localShippingPrice) || 0;
+
+    return Array.from(orderItemsMap.entries()).map(([orderId, items]) => {
+      const info = activeBatchOrders.find((o) => o.id === orderId);
+      let goods = 0, china = 0, importFee = 0;
+      const lines: PreviewProductLine[] = [];
+
+      for (const item of items) {
+        const unitPrice = numericPrices[item.product.id] ?? 0;
+        const goodsAmount = roundUp(unitPrice * item.quantity);
+        const chinaUnitTotal = parseFloat(chinaShippingPrices[item.product.id]) || 0;
+        const importUnitTotal = parseFloat(importFeePrices[item.product.id]) || 0;
+        const chinaQtyTotal = productTotalQuantity[item.product.id] || 1;
+        const chinaAmount = useNewChina ? roundUp((chinaUnitTotal / chinaQtyTotal) * item.quantity) : 0;
+        const importAmount = useNewImport ? roundUp((importUnitTotal / chinaQtyTotal) * item.quantity) : 0;
+
+        goods += goodsAmount;
+        china += chinaAmount;
+        importFee += importAmount;
+
+        lines.push({
+          productId: item.product.id,
+          productName: item.product.name,
+          qty: item.quantity,
+          unitPrice,
+          goodsAmount,
+          chinaUnitTotal,
+          chinaQtyTotal,
+          chinaAmount,
+          importUnitTotal,
+          importAmount,
+        });
+      }
+
+      const finalChina = useNewChina ? china : (info?.bill2?.china_shipping ?? 0);
+      const finalImport = useNewImport ? importFee : (info?.bill2?.import_fee ?? 0);
+      const finalLocal = useNewLocal ? parsedLocal : (info?.bill2?.local_shipping ?? 0);
+
+      return {
+        orderId,
+        orderNumber: info?.number ?? String(orderId),
+        items: lines,
+        goods,
+        china: finalChina,
+        importFee: finalImport,
+        localShipping: finalLocal,
+        baseTotal: roundUp(goods + finalChina + finalImport + finalLocal),
       };
     });
   }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, localShippingPrice]);
@@ -425,15 +500,35 @@ export default function Bill2UnitPrices() {
               const price = numericPrices[item.product.id] ?? 0;
               if (price > 0) orderPrices[item.product.id] = price;
             }
+
+            // orderTotals only carries the summed china/import total (and only when this
+            // round actually changed it — undefined otherwise, so patchBill2 knows to leave
+            // the existing value alone). The per-product split lives in previewOrders.
+            const preview = previewOrders.find((p) => p.orderId === info.orderId);
+            let chinaByProduct: Record<number, number> | undefined;
+            let importByProduct: Record<number, number> | undefined;
+            if (info.orderChinaShipping !== undefined) {
+              chinaByProduct = {};
+              for (const line of preview?.items ?? []) {
+                if (line.chinaAmount > 0) chinaByProduct[line.productId] = line.chinaAmount;
+              }
+            }
+            if (info.orderImportFee !== undefined) {
+              importByProduct = {};
+              for (const line of preview?.items ?? []) {
+                if (line.importAmount > 0) importByProduct[line.productId] = line.importAmount;
+              }
+            }
+
             await patchBill2(
-              info.orderId, 
-              info.total, 
-              "pending", 
-              undefined, 
-              orderPrices, 
+              info.orderId,
+              info.total,
+              "pending",
+              undefined,
+              orderPrices,
               batchId,
-              info.orderChinaShipping,
-              info.orderImportFee,
+              chinaByProduct,
+              importByProduct,
               info.orderLocalShipping
             );
             if (isNewBatch) {
@@ -699,17 +794,39 @@ export default function Bill2UnitPrices() {
         </div>
       </Modal>
 
-      {/* Confirm save */}
-      <AlertModal
-        isOpen={isConfirmOpen}
-        onClose={closeConfirm}
-        variant="info"
-        title={isNewBatch ? "ยืนยันการบันทึก" : "ยืนยันการอัปเดต"}
-        message={`${isNewBatch ? "บันทึก" : "อัปเดต"} Unit Prices สำหรับ ${activeBatchOrders.length} orders ใช่หรือไม่? รวม Bill 2: ฿${totalBill2.toLocaleString()}`}
-        onConfirm={handleSave}
-        confirmLabel="ยืนยัน"
-        cancelLabel="ยกเลิก"
-      />
+      {/* Confirm save — preview */}
+      <Modal isOpen={isConfirmOpen} onClose={closeConfirm} className="max-w-4xl m-4 p-6">
+        <div className="flex max-h-[85vh] flex-col">
+          <div className="shrink-0 mb-5 pr-8">
+            <h4 className="font-semibold text-gray-800 text-title-sm dark:text-white/90">
+              {isNewBatch ? "ยืนยันการบันทึก" : "ยืนยันการอัปเดต"} — Bill 2 แต่ละ Order
+            </h4>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              ตรวจสอบยอดก่อน{isNewBatch ? "บันทึก" : "อัปเดต"} ทั้งหมด {activeBatchOrders.length} orders
+            </p>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto -mx-6 px-6">
+            <BillPreviewTable orders={previewOrders} />
+          </div>
+
+          <div className="shrink-0 flex items-center justify-end gap-3 pt-5">
+            <button
+              onClick={closeConfirm}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] dark:hover:text-gray-300"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={spinning}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300"
+            >
+              ยืนยัน
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Confirm delete */}
       <AlertModal

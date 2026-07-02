@@ -77,8 +77,10 @@ export async function patchBill2(
     paidAt?: string,
     unitPrices?: Record<number, number>,
     unitPricesId?: string,
-    chinaShipping?: number,
-    importFee?: number,
+    // {product_id: amount} — same shape as unitPrices, so we can see which product
+    // contributed how much to this order's china shipping / import fee.
+    chinaShipping?: Record<number, number>,
+    importFee?: Record<number, number>,
     localShipping?: number
 ): Promise<PatchBillResponse> {
     return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/2`, {
@@ -89,8 +91,8 @@ export async function patchBill2(
             ...(paidAt && { paid_at: paidAt }),
             ...(unitPrices && { unit_prices: unitPrices }),
             ...(unitPricesId && { unit_prices_id: unitPricesId }),
-            ...(chinaShipping !== undefined && { china_shipping: chinaShipping }),
-            ...(importFee !== undefined && { import_fee: importFee }),
+            ...(chinaShipping && { china_shipping: chinaShipping }),
+            ...(importFee && { import_fee: importFee }),
             ...(localShipping !== undefined && { local_shipping: localShipping }),
         }),
     });

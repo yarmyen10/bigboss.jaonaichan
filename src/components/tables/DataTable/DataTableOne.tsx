@@ -220,6 +220,8 @@ export interface DataTableProps<T extends object> {
     customHeaderSearch?: ReactNode;
     /** Extra content rendered at the right end of the toolbar (after export button) */
     toolbarExtra?: ReactNode;
+    /** Extra content rendered at the left end of the toolbar (before search/tabs) */
+    toolbarLeftExtra?: ReactNode;
     pageSizeOptions?: number[];
     defaultPageSize?: number;
 
@@ -329,6 +331,7 @@ export default function DataTableOne<T extends object>({
     headerFilter,
     customHeaderSearch,
     toolbarExtra,
+    toolbarLeftExtra,
     pageSizeOptions = [10, 25, 50],
     defaultPageSize = 10,
     scrollable = false,
@@ -585,6 +588,7 @@ export default function DataTableOne<T extends object>({
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-100 px-0 sm:px-6 py-4 dark:border-white/[0.05] !mb-0">
                 {/* Left controls */}
                 <div className="flex flex-1 items-center gap-3 min-w-0">
+                    {toolbarLeftExtra}
                     {searchable === 'toolbar' && (
                         <div className="relative max-w-xs flex-1">
                             <span className="absolute z-50 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">

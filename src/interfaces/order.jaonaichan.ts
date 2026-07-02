@@ -44,6 +44,9 @@ export interface Bill {
     unit_prices_id?: string | null
     china_shipping?: number
     import_fee?: number
+    /** china_shipping / import_fee broken down by product: {product_id: amount} */
+    china_shipping_by_product?: Record<number, number>
+    import_fee_by_product?: Record<number, number>
     local_shipping?: number
 }
 
@@ -55,6 +58,8 @@ export interface BillSummary {
     unit_prices_id?: string | null
     china_shipping?: number
     import_fee?: number
+    china_shipping_by_product?: Record<number, number>
+    import_fee_by_product?: Record<number, number>
     local_shipping?: number
 }
 

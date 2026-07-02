@@ -33,6 +33,7 @@ import BottomSheet from "../../components/ui/bottom-sheet/BottomSheet";
 import { DateFilter, useOrderList } from "../../hooks/jaonaichan/useOrderList";
 import { useManageProducts } from "../../hooks/jaonaichan/useManageProducts";
 import { useOrderModals } from "../../hooks/jaonaichan/useOrderModals";
+import BillPreviewTable from "../../components/jaonaichan/BillPreviewTable";
 
 
 
@@ -698,6 +699,7 @@ export default function Order() {
 
   const { isOpen, openModal, closeModal } = useModal();
   const { isOpen: isAlertOpen, openModal: openAlert, closeModal: closeAlert } = useModal();
+  const [editingProduct, setEditingProduct] = useState<OrderItemProduct | null>(null);
 
   const {
     products,
@@ -719,7 +721,13 @@ export default function Order() {
     activeManageTab,
     setActiveManageTab,
     initialManageOrders,
-    handleSaveOrders
+    handleSaveOrders,
+    isPreviewOpen,
+    closePreviewModal,
+    previewOrders,
+    extraFees,
+    setExtraFees,
+    handleConfirmSaveOrders,
   } = useManageProducts({ withSpinner, openModal, closeModal, openAlert, onSaved: handleSaved });
 
   useEffect(() => {
@@ -802,7 +810,7 @@ export default function Order() {
           //   ],
           // }]}
           bulkActions={(selected, isAllSelected) => {
-            const targetOrders = isAllSelected ? orders : selected;
+            const targetOrders = isAllSelected ? displayOrders : selected;
             
             const manageableOrders = targetOrders.filter(o => 
               (STATUS_MANAGE_ACTIONS[o.status]?.length ?? 0) > 0 && !o.bill2?.unit_prices_id
@@ -861,40 +869,16 @@ export default function Order() {
         isOpen={isOpen}
         onClose={closeModal}
         isFullscreen={true}
-        className="max-w-[700px] m-4"
       >
-        <div className="fixed inset-0 bg-white dark:bg-gray-900">
-          <div className="flex h-full flex-col p-6 lg:p-10">
+          <div className="flex h-full w-full flex-col bg-white p-6 dark:bg-gray-900 lg:p-10">
             {/* Header */}
-            <div className="shrink-0 px-2 pr-14 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h4 className="mb-3 font-semibold text-gray-800 text-title-sm dark:text-white/90">
-                  Manage Orders
-                </h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Update your details to keep your profile up-to-date.
-                </p>
-              </div>
-              
-              {activeManageTab === "bill2" && (
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Local Shipping (per order)
-                  </label>
-                  <div className="relative w-32">
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                      ฿
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={localShippingPrice}
-                      onChange={(e) => setLocalShippingPrice(e.target.value.replace(/[^\d.]/g, ""))}
-                      className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-                    />
-                  </div>
-                </div>
-              )}
+            <div className="shrink-0 px-2 pr-14">
+              <h4 className="mb-3 font-semibold text-gray-800 text-title-sm dark:text-white/90">
+                Manage Orders
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                ตั้งราคาและค่าจัดส่งบิล 2 สำหรับออเดอร์ที่เลือก
+              </p>
             </div>
 
             {/* Content */}
@@ -904,14 +888,38 @@ export default function Order() {
               <ComponentTabCard
                 tabs={manageOrdersTabs}
                 onChange={setActiveManageTab}
-                className="md:h-full md:flex md:flex-col md:min-h-0"
-                classNameBody="md:flex-1 md:min-h-0 md:overflow-hidden"
+                className="h-full flex flex-col min-h-0"
+                classNameBody="flex-1 min-h-0 overflow-y-auto min-[1025px]:overflow-hidden"
               >
-                {/* min-h-0 on grid items overrides the default min-height:auto so explicit lg:h-full wins over intrinsic content height */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6 lg:gap-8 md:h-full md:min-h-0">
-                  <div className="md:col-span-3 min-[1025px]:col-span-2 flex flex-col md:h-full md:min-h-0 md:min-w-0">
+                {/* ≥1025px: same input lives in the desktop table's toolbar (toolbarExtra below) */}
+                {activeManageTab === "bill2" && (
+                  <div className="shrink-0 flex items-center gap-3 min-[1025px]:hidden">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Local Shipping (per order)
+                    </label>
+                    <div className="relative w-32">
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                        ฿
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={localShippingPrice}
+                        onChange={(e) => setLocalShippingPrice(e.target.value.replace(/[^\d.]/g, ""))}
+                        className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* below 1025px the Card Body itself scrolls (see classNameBody above), so
+                    nothing in here needs its own height/overflow — it just grows naturally.
+                    At ≥1025px the desktop table takes over with its own internal scroll,
+                    which is why flex-1/min-h-0 only kick in at that breakpoint. */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6 lg:gap-8 min-[1025px]:flex-1 min-[1025px]:min-h-0">
+                  <div className="md:col-span-3 min-[1025px]:col-span-2 flex flex-col min-[1025px]:h-full min-[1025px]:min-h-0 min-w-0 pb-4 min-[1025px]:pb-0">
                     {/* Unique products By Orders */}
-                    <div className="flex-1 min-h-0">
+                    <div className="flex-1 min-h-0 hidden min-[1025px]:block">
                       <DataTableOne<OrderItemProduct>
                         title="Products"
                         subtitle="Manage and track all customer orders."
@@ -925,10 +933,95 @@ export default function Order() {
                         onRowLongPress={(row) => setSheetProductId(row.id)}
                         scrollable
                         fillHeight
+                        toolbarLeftExtra={activeManageTab === "bill2" && (
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                              Local Shipping (per order)
+                            </label>
+                            <div className="relative w-32">
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                                ฿
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={localShippingPrice}
+                                onChange={(e) => setLocalShippingPrice(e.target.value.replace(/[^\d.]/g, ""))}
+                                className="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                              />
+                            </div>
+                          </div>
+                        )}
                       // rowHeight={75}
                       // scrollMaxHeight={350}
                       />
                     </div>
+
+                    {/* Mobile Product Card List — visible only on ≤1024px.
+                        No overflow/height here — Card Body (classNameBody above) is the scroll container. */}
+                    <div className="min-[1025px]:hidden flex flex-col gap-3 pr-1">
+                      {products.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <BoxIcon className="mb-2 size-10 text-gray-300 dark:text-gray-600" />
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No products found</p>
+                        </div>
+                      ) : (
+                        products.map((product) => {
+                          const hasUnit = !!unitPrices[product.id];
+                          const hasChina = !!chinaShippingPrices[product.id];
+                          const hasImport = !!importFeePrices[product.id];
+                          const hasPrices = hasUnit || hasChina || hasImport;
+
+                          return (
+                            <button
+                              key={product.id}
+                              type="button"
+                              onClick={() => setEditingProduct(product)}
+                              className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all active:scale-[0.98] ${
+                                hasPrices
+                                  ? "border-brand-200 bg-brand-50/50 dark:border-brand-800/40 dark:bg-brand-900/10"
+                                  : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.02] dark:hover:border-gray-600"
+                              }`}
+                            >
+                              <img
+                                src={product.image?.thumbnail ?? product.image?.medium ?? ""}
+                                alt={product.name}
+                                className="h-12 w-12 shrink-0 rounded-lg object-cover bg-gray-100 dark:bg-gray-800"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  {product.name}
+                                </p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">{product.sku}</p>
+                                {hasPrices && (
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {hasUnit && (
+                                      <span className="inline-flex items-center rounded-md bg-brand-100 px-1.5 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+                                        ฿{unitPrices[product.id]}
+                                      </span>
+                                    )}
+                                    {hasChina && (
+                                      <span className="inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                                        Ship ฿{chinaShippingPrices[product.id]}
+                                      </span>
+                                    )}
+                                    {hasImport && (
+                                      <span className="inline-flex items-center rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                                        Import ฿{importFeePrices[product.id]}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <svg className="size-4 shrink-0 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
                     
                     {activeManageTab === "bill2" && (
                       <div className="mt-3 shrink-0 rounded-lg border border-blue-100 bg-blue-50 p-3.5 text-sm text-blue-800 dark:border-blue-800/30 dark:bg-blue-900/20 dark:text-blue-300">
@@ -944,7 +1037,7 @@ export default function Order() {
                     )}
                   </div>
                   {/* flex flex-col h-full so ProductDetailsCard stretches to grid row height */}
-                  <div className="hidden min-[1025px]:flex flex-col md:h-full md:min-h-0 md:min-w-0">
+                  <div className="hidden min-[1025px]:flex flex-col min-[1025px]:h-full min-[1025px]:min-h-0 min-w-0">
                     <ProductDetailsCard product={selectedProduct} />
                   </div>
                 </div>
@@ -969,8 +1062,46 @@ export default function Order() {
               </button>
             </div>
           </div>
+      </Modal>
+
+      {/* Modal: Save Orders Preview */}
+      <Modal
+        isOpen={isPreviewOpen}
+        onClose={closePreviewModal}
+        className="max-w-4xl m-4 p-6"
+      >
+        <div className="flex max-h-[85vh] flex-col">
+          <div className="shrink-0 mb-5 pr-8">
+            <h4 className="font-semibold text-gray-800 text-title-sm dark:text-white/90">
+              ผลลัพธ์ — Bill 2 แต่ละ Order
+            </h4>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              ตรวจสอบยอดก่อนบันทึก เพิ่มค่าใช้จ่ายอื่นๆ ต่อ order ได้ในช่อง "เพิ่มเติม"
+            </p>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto -mx-6 px-6">
+            <BillPreviewTable orders={previewOrders} extraFees={extraFees} setExtraFees={setExtraFees} />
+          </div>
+
+          <div className="shrink-0 flex items-center justify-end gap-3 pt-5">
+            <button
+              onClick={closePreviewModal}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] dark:hover:text-gray-300"
+            >
+              ย้อนกลับ
+            </button>
+            <button
+              onClick={handleConfirmSaveOrders}
+              disabled={spinning}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300"
+            >
+              ยืนยันและบันทึก
+            </button>
+          </div>
         </div>
       </Modal>
+
       <BottomSheet
         isOpen={isOpen && sheetProductId !== null}
         onClose={() => setSheetProductId(null)}
@@ -983,6 +1114,137 @@ export default function Order() {
           <ProductDetailsCard product={sheetProduct} />
         </div>
       </BottomSheet>
+
+      {/* Mobile Edit Product Modal — for editing prices on small screens */}
+      <Modal
+        isOpen={editingProduct !== null}
+        onClose={() => setEditingProduct(null)}
+        className="max-w-[400px] p-5 sm:p-6"
+      >
+        {editingProduct && (
+          <div>
+            {/* Product Info */}
+            <div className="flex items-center gap-3 mb-5">
+              <img
+                src={editingProduct.image?.thumbnail ?? editingProduct.image?.medium ?? ""}
+                alt={editingProduct.name}
+                className="h-14 w-14 shrink-0 rounded-xl object-cover bg-gray-100 dark:bg-gray-800"
+              />
+              <div className="min-w-0 pr-8">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {editingProduct.name}
+                </h4>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{editingProduct.sku}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Price: ฿{Number(editingProduct.price).toLocaleString()}
+                  {editingProduct.stock !== null && ` · Stock: ${editingProduct.stock}`}
+                </p>
+              </div>
+            </div>
+
+            {/* Input Fields */}
+            <div className="space-y-4">
+              {/* Unit Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Unit Price
+                </label>
+                <div className="relative">
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                    ฿
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={unitPrices[editingProduct.id] ?? ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^\d.]/g, "");
+                      const parts = raw.split(".");
+                      const next = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}` : raw;
+                      setUnitPrices((prev) => {
+                        if (next === "") { const { [editingProduct.id]: _, ...rest } = prev; return rest; }
+                        return { ...prev, [editingProduct.id]: next };
+                      });
+                    }}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  />
+                </div>
+              </div>
+
+              {/* China Shipping */}
+              {activeManageTab === "bill2" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    China Shipping (Total)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                      ฿
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={chinaShippingPrices[editingProduct.id] ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^\d.]/g, "");
+                        const parts = raw.split(".");
+                        const next = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}` : raw;
+                        setChinaShippingPrices((prev) => {
+                          if (next === "") { const { [editingProduct.id]: _, ...rest } = prev; return rest; }
+                          return { ...prev, [editingProduct.id]: next };
+                        });
+                      }}
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Import Fee */}
+              {activeManageTab === "bill2" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Import Fee (Total)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 border-r border-gray-200 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                      ฿
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={importFeePrices[editingProduct.id] ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^\d.]/g, "");
+                        const parts = raw.split(".");
+                        const next = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}` : raw;
+                        setImportFeePrices((prev) => {
+                          if (next === "") { const { [editingProduct.id]: _, ...rest } = prev; return rest; }
+                          return { ...prev, [editingProduct.id]: next };
+                        });
+                      }}
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-transparent pl-10 pr-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Done Button */}
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
       <OrderDetails
         order={viewOrder}
         isOpen={isDetailsOpen}

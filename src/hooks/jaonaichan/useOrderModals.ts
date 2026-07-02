@@ -34,19 +34,28 @@ export function useOrderModals({ withSpinner, onSaved }: UseOrderModalsParams) {
   const handleConfirmUpdateStatus = () => {
     if (!newStatus) return;
     withSpinner(async () => {
-      await Promise.all(
-        updateStatusOrders.map(async (order) => {
-          await patchOrderStatus(order.id, `wc-${newStatus}`);
-          if (removeSlip) {
-            await Promise.allSettled([
-              deleteSlip(order.id, 1),
-              deleteSlip(order.id, 2),
-            ]);
-          }
-        })
-      );
-      closeUpdateStatus();
-      onSaved();
+      try {
+        const results = await Promise.allSettled(
+          updateStatusOrders.map(async (order) => {
+            await patchOrderStatus(order.id, `wc-${newStatus}`);
+            if (removeSlip) {
+              await Promise.allSettled([
+                deleteSlip(order.id, 1),
+                deleteSlip(order.id, 2),
+              ]);
+            }
+          })
+        );
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed > 0) {
+          alert(`Failed to update ${failed} order(s). Please try again.`);
+        }
+        closeUpdateStatus();
+        onSaved();
+      } catch (error: any) {
+        console.error("Update status failed", error);
+        alert("Failed to update order status: " + (error.message || "Unknown error"));
+      }
     });
   };
 

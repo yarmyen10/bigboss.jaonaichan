@@ -45,8 +45,9 @@ const ComponentTabCard: React.FC<ComponentTabCardProps> = ({
 
       {/* Card Body */}
       <div className={`p-4 border-t border-gray-100 dark:border-gray-800 sm:p-6 ${classNameBody}`}>
-        {/* h-full allows height to propagate to grid children when parent is flex */}
-        <div className="space-y-6 h-full">{children}</div>
+        {/* flex-col so a shrink-0 row (e.g. a toolbar) can sit above a flex-1 child
+            without the flex-1 child's height overflowing past it */}
+        <div className="flex flex-col gap-6 h-full min-h-0">{children}</div>
       </div>
     </div>
   );
