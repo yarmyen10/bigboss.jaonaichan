@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, ReactNode } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 import Button from '../../components/ui/button/Button';
 import Badge from '../../components/ui/badge/Badge';
 import Input from '../../components/form/input/InputField';
@@ -11,10 +12,14 @@ import {
     getBarcodeOrderItems,
     validateBarcode,
     confirmPack,
+    saveTracking,
     getOrders,
     getOrder,
+    getLots,
+    createLot,
 } from '../../services/jaonaichan';
-import type { BarcodeOrderItem } from '../../interfaces/barcode.jaonaichan';
+import type { BarcodeOrderItem, TrackingParcel } from '../../interfaces/barcode.jaonaichan';
+import type { Lot } from '../../interfaces/lot.jaonaichan';
 import type { Order } from '../../interfaces/order.jaonaichan';
 
 // Extended item to include data from getOrder
@@ -24,6 +29,13 @@ interface EnhancedBarcodeOrderItem extends BarcodeOrderItem {
 }
 
 const SCANNER_ELEMENT_ID = 'barcode-pack-reader';
+
+const CARRIERS: { value: TrackingParcel['carrier']; label: string }[] = [
+    { value: 'kerry',    label: 'Kerry Express' },
+    { value: 'flash',    label: 'Flash Express' },
+    { value: 'jt',       label: 'J&T Express' },
+    { value: 'thaipost', label: 'ไปรษณีย์ไทย (EMS)' },
+];
 
 const PAYMENT_LABEL: Record<string, string> = {
     promptpay_qr:  "PromptPay QR",
@@ -38,19 +50,6 @@ function parseAddressLines(raw: string): string[] {
         .filter(Boolean);
 }
 
-interface Html5QrcodeInstance {
-    start(
-        cameraConfig: { facingMode: string },
-        config: { fps: number; qrbox: { width: number; height: number } },
-        onScanSuccess: (decodedText: string) => void,
-        onScanError: (error: string) => void
-    ): Promise<void>;
-    stop(): Promise<void>;
-}
-
-type WindowWithScanner = Window & {
-    Html5Qrcode?: new (id: string) => Html5QrcodeInstance;
-};
 
 interface ScanResult {
     ok: boolean;
@@ -99,6 +98,10 @@ export default function BarcodePack() {
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
+    const [lots, setLots] = useState<Lot[]>([]);
+    const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
+    const [creatingLot, setCreatingLot] = useState(false);
+
     const [orderId, setOrderId] = useState('');
     const [items, setItems] = useState<EnhancedBarcodeOrderItem[]>([]);
     const [scanned, setScanned] = useState<Record<number, string[]>>({});
@@ -107,21 +110,23 @@ export default function BarcodePack() {
     const [cameraOpen, setCameraOpen] = useState(false);
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [confirming, setConfirming] = useState(false);
+    const [validating, setValidating] = useState(false);
     const [toast, setToast] = useState('');
+
+    const [lastPackedOrderId, setLastPackedOrderId] = useState<number | null>(null);
+    const [parcels, setParcels] = useState<TrackingParcel[]>([{ carrier: 'kerry', number: '' }]);
+    const [savingTracking, setSavingTracking] = useState(false);
     const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
 
-    const hasInitialized = useRef(false);
-    const scannerRef = useRef<Html5QrcodeInstance | null>(null);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const itemsRef = useRef<EnhancedBarcodeOrderItem[]>([]);
 
-    // Inject Html5Qrcode from CDN once on mount
+    // Keep ref in sync so camera closure can read current items
+    useEffect(() => { itemsRef.current = items; }, [items]);
+
+    // Load lots on mount
     useEffect(() => {
-        if (hasInitialized.current) return;
-        hasInitialized.current = true;
-        if (document.getElementById('html5qrcode-script')) return;
-        const script = document.createElement('script');
-        script.id = 'html5qrcode-script';
-        script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-        document.body.appendChild(script);
+        getLots().then(setLots).catch(() => {});
     }, []);
 
     // Toast auto-dismiss
@@ -138,13 +143,7 @@ export default function BarcodePack() {
         let stopped = false;
 
         const timer = setTimeout(async () => {
-            const Html5Qrcode = (window as WindowWithScanner).Html5Qrcode;
-            if (!Html5Qrcode) {
-                setCameraOpen(false);
-                return;
-            }
-
-            let scanner: Html5QrcodeInstance | undefined;
+            let scanner: Html5Qrcode | undefined;
             try {
                 const el = document.getElementById(SCANNER_ELEMENT_ID);
                 if (!el) {
@@ -164,7 +163,15 @@ export default function BarcodePack() {
                     setCameraOpen(false);
 
                     try {
+                        setValidating(true);
                         const res = await validateBarcode(barcode);
+                        // Check if scanned product is actually in this order
+                        const itemsSnapshot = itemsRef.current;
+                        const matchedItem = itemsSnapshot.find(i => i.product_id === res.product_id);
+                        if (!matchedItem) {
+                            setScanResult({ ok: false, name: `Product ID ${res.product_id} not in this order (order has: ${itemsSnapshot.map(i => i.product_id).join(', ')})` });
+                            return;
+                        }
                         setScanned((prev) => ({
                             ...prev,
                             [res.product_id]: [...(prev[res.product_id] ?? []), barcode],
@@ -172,6 +179,8 @@ export default function BarcodePack() {
                         setScanResult({ ok: true, name: res.product_name });
                     } catch {
                         setScanResult({ ok: false });
+                    } finally {
+                        setValidating(false);
                     }
                 };
 
@@ -214,13 +223,15 @@ export default function BarcodePack() {
         try {
             const [y, m, d] = selectedDate.split('-');
             const createDate = `${d}/${m}/${y}`;
-            const res = await getOrders({ createDate, status: 'processing', perPage: 100 });
+            const res = await getOrders({ createDate, status: 'paid-2', perPage: 100 });
             
-            const sorted = res.data.sort((a, b) => {
-                const timeA = a.bill2?.paid_at ? new Date(a.bill2.paid_at).getTime() : 0;
-                const timeB = b.bill2?.paid_at ? new Date(b.bill2.paid_at).getTime() : 0;
-                return timeA - timeB;
-            });
+            const sorted = res.data
+                .filter((o) => o.status === 'paid-2')
+                .sort((a, b) => {
+                    const timeA = a.bill2?.paid_at ? new Date(a.bill2.paid_at).getTime() : 0;
+                    const timeB = b.bill2?.paid_at ? new Date(b.bill2.paid_at).getTime() : 0;
+                    return timeA - timeB;
+                });
             setOrders(sorted);
         } catch (err: any) {
             setToast('Failed to load orders: ' + err.message);
@@ -280,24 +291,52 @@ export default function BarcodePack() {
         await loadItemsForOrderId(order.id);
     };
 
+    const handleCreateLot = async () => {
+        setCreatingLot(true);
+        try {
+            const lot = await createLot();
+            setLots((prev) => [lot, ...prev]);
+            setSelectedLotId(lot.id);
+        } catch {
+            setToast('Failed to create lot.');
+        } finally {
+            setCreatingLot(false);
+        }
+    };
+
     const handleConfirmPack = async () => {
         setConfirming(true);
         try {
-            await confirmPack(Number(orderId), scanned);
-            setToast('Pack confirmed successfully!');
+            const packedId = Number(orderId);
+            await confirmPack(packedId, scanned, selectedLotId ?? undefined);
+            setLastPackedOrderId(packedId);
+            setParcels([{ carrier: 'kerry', number: '' }]);
             setItems([]);
             setScanned({});
             setOrderId('');
             setScanResult(null);
             setSelectedOrder(null);
-            
-            if (orders.length > 0) {
-                void handleLoadOrders();
-            }
+            if (orders.length > 0) void handleLoadOrders();
         } catch {
             setToast('Failed to confirm pack. Please try again.');
         } finally {
             setConfirming(false);
+        }
+    };
+
+    const handleSaveTracking = async () => {
+        if (!lastPackedOrderId) return;
+        const valid = parcels.filter(p => p.number.trim());
+        if (!valid.length) return;
+        setSavingTracking(true);
+        try {
+            await saveTracking(lastPackedOrderId, valid);
+            setToast(`Order #${lastPackedOrderId} — tracking saved, status → shipped`);
+            setLastPackedOrderId(null);
+        } catch {
+            setToast('Failed to save tracking.');
+        } finally {
+            setSavingTracking(false);
         }
     };
 
@@ -361,6 +400,89 @@ export default function BarcodePack() {
             {toast && (
                 <div className="rounded-lg border border-success-300 bg-success-50 px-4 py-3 text-sm font-medium text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
                     {toast}
+                </div>
+            )}
+
+            {/* Lot Selector */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lot</p>
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <select
+                            value={selectedLotId ?? ''}
+                            onChange={(e) => setSelectedLotId(e.target.value ? Number(e.target.value) : null)}
+                            className={`h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-brand-800 ${selectedLotId ? 'text-gray-800 dark:text-white/90' : 'text-gray-400 dark:text-gray-400'}`}
+                        >
+                            <option value="" className="text-gray-700 dark:bg-gray-900 dark:text-gray-400">Select a lot…</option>
+                            {lots.map((lot) => (
+                                <option key={lot.id} value={lot.id} className="text-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                                    Lot #{lot.id} — {lot.status}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-700 dark:text-gray-400">
+                            <svg className="stroke-current" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => void handleCreateLot()} disabled={creatingLot}>
+                        {creatingLot ? '…' : '+ New Lot'}
+                    </Button>
+                </div>
+            </div>
+
+            {/* Tracking section — shown after pack confirmed */}
+            {lastPackedOrderId !== null && (
+                <div className="rounded-xl border border-success-200 bg-success-50 p-4 dark:border-success-500/30 dark:bg-success-500/10 space-y-3">
+                    <p className="text-sm font-semibold text-success-700 dark:text-success-400">
+                        📦 Order #{lastPackedOrderId} — Add Tracking
+                    </p>
+                    <div className="space-y-2">
+                        {parcels.map((parcel, i) => (
+                            <div key={i} className="flex gap-2 items-center">
+                                <select
+                                    value={parcel.carrier}
+                                    onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, carrier: e.target.value as TrackingParcel['carrier'] } : p))}
+                                    className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+                                >
+                                    {CARRIERS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </select>
+                                <input
+                                    type="text"
+                                    placeholder="Tracking number"
+                                    value={parcel.number}
+                                    onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, number: e.target.value } : p))}
+                                    className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+                                />
+                                {parcels.length > 1 && (
+                                    <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
+                                        <svg className="size-4" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setParcels(prev => [...prev, { carrier: 'kerry', number: '' }])}
+                        className="text-xs text-brand-500 hover:text-brand-600 font-medium"
+                    >
+                        + Add Box
+                    </button>
+                    <div className="flex gap-2 pt-1">
+                        <Button
+                            size="sm"
+                            variant="orange"
+                            disabled={savingTracking || !parcels.some(p => p.number.trim())}
+                            onClick={() => void handleSaveTracking()}
+                        >
+                            {savingTracking ? 'Saving…' : 'Save & Mark Shipped'}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setLastPackedOrderId(null)}>
+                            Skip
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -533,12 +655,17 @@ export default function BarcodePack() {
                     )}
 
                     {/* Scan Result Feedback */}
-                    {scanResult && (
+                    {(validating || scanResult) && (
                         <div className="flex items-center gap-2">
-                            {scanResult.ok ? (
+                            {validating ? (
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                                    Checking barcode…
+                                </div>
+                            ) : scanResult?.ok ? (
                                 <Badge color="success">✅ {scanResult.name ?? 'Matched'}</Badge>
                             ) : (
-                                <Badge color="error">❌ Barcode not recognised</Badge>
+                                <Badge color="error">❌ {scanResult?.name ?? 'Barcode not recognised'}</Badge>
                             )}
                         </div>
                     )}
@@ -548,10 +675,13 @@ export default function BarcodePack() {
                         <div className="space-y-4">
                             <BasicTableOne columns={ITEM_COLUMNS} rows={tableRows} />
                             
-                            <div className="flex justify-end pt-4">
+                            <div className="flex flex-col items-end gap-2 pt-4">
+                                {allScanned && !selectedLotId && (
+                                    <p className="text-xs text-warning-500">Please select a lot before confirming.</p>
+                                )}
                                 <Button
                                     variant="orange"
-                                    disabled={!allScanned || confirming}
+                                    disabled={!allScanned || confirming || !selectedLotId}
                                     onClick={() => void handleConfirmPack()}
                                     className="w-full sm:w-auto min-w-[200px]"
                                 >

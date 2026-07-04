@@ -27,7 +27,7 @@ export function useOrderList() {
 
   const [statusTab, setStatusTab] = useState<string>("all");
 
-  const [searchType, setSearchType] = useState<"general" | "batch">("general");
+  const [searchType, setSearchType] = useState<"general" | "batch" | "lot">("general");
   const [searchValue, setSearchValue] = useState<string>("");
   const [debouncedSearchValue, setDebouncedSearchValue] = useState<string>("");
 
@@ -56,7 +56,8 @@ export function useOrderList() {
   const loadOrders = async (
     filter: DateFilter,
     tab: string = statusTab,
-    bId: string = searchType === "batch" ? debouncedSearchValue : ""
+    bId: string = searchType === "batch" ? debouncedSearchValue : "",
+    lId: string = searchType === "lot" ? debouncedSearchValue : ""
   ) => {
     lastFetchedBatchId.current = bId;
     try {
@@ -70,6 +71,7 @@ export function useOrderList() {
           }),
         ...(TAB_STATUS[tab] ? { status: TAB_STATUS[tab] } : {}),
         ...(bId ? { unitPricesId: bId } : {}),
+        ...(lId ? { lotId: Number(lId) } : {}),
       });
       setOrders(Array.isArray(res?.data) ? res.data : []);
     } catch (error) {
@@ -99,8 +101,11 @@ export function useOrderList() {
     if (!hasInitialized.current) return;
 
     const targetBatchId = searchType === "batch" ? debouncedSearchValue : "";
+    const targetLotId   = searchType === "lot"   ? debouncedSearchValue : "";
     if (targetBatchId !== lastFetchedBatchId.current) {
-      loadOrders(dateFilter, statusTab, targetBatchId);
+      loadOrders(dateFilter, statusTab, targetBatchId, targetLotId);
+    } else if (searchType === "lot") {
+      loadOrders(dateFilter, statusTab, "", targetLotId);
     }
   }, [debouncedSearchValue, searchType]);
 

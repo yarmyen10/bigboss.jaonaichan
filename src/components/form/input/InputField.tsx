@@ -11,8 +11,12 @@ interface InputProps {
   className?: string;
   min?: string;
   max?: string;
+  minLength?: number;
+  maxLength?: number;
   step?: string | number;
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  onFocus?: React.FocusEventHandler<HTMLInputElement>;
   disabled?: boolean;
   success?: boolean;
   error?: boolean;
@@ -30,8 +34,12 @@ const Input: FC<InputProps> = ({
   className = "",
   min,
   max,
+  minLength,
+  maxLength,
   step,
   onKeyDown,
+  onBlur,
+  onFocus,
   disabled = false,
   success = false,
   error = false,
@@ -61,8 +69,12 @@ const Input: FC<InputProps> = ({
         onChange={onChange}
         min={min}
         max={max}
+        minLength={minLength}
+        maxLength={maxLength}
         step={step}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
+        onFocus={onFocus}
         disabled={disabled}
         required={required}
         className={inputClasses}

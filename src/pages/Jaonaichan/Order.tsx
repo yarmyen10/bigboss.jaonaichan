@@ -12,7 +12,7 @@ import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrder } from "../../services/jaonaichan";
 import { STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
-import { ORDER_STATUS_DETAILS, STATUS_PROGRESS_COLOR } from "../../config/orderStatus.jaonaichan";
+import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { CalenderIcon, CheckCircleIcon, MoreDotIcon, SearchOneIcon, BoxIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
@@ -38,6 +38,22 @@ import BillPreviewTable from "../../components/jaonaichan/BillPreviewTable";
 
 
 type PaymentMethod = "promptpay_qr" | "bank_transfer" | "cod";
+
+const STATUS_ORDER = [
+  "waiting-transfer",
+  "pending-payment-1", "wait-verify-1", "paid-1",
+  "pending-payment-2", "wait-verify-2", "paid-2",
+  "packed", "shipped", "completed",
+  "processing", "on-hold", "pending", "checkout-draft",
+  "cancelled", "refunded", "failed",
+];
+
+const STATUS_PROGRESS: Record<string, number> = {
+  "waiting-transfer": 5,
+  "pending-payment-1": 15, "wait-verify-1": 25, "paid-1": 40,
+  "pending-payment-2": 50, "wait-verify-2": 65, "paid-2": 80,
+  "packed": 90, "shipped": 95, "completed": 100,
+};
 // interface WCOrder {
 //   id: number;
 //   number: string;
@@ -347,12 +363,15 @@ const getOrderColumns = (
       label: "Progress",
       width: "130px",
       noExport: true,
+      sortable: true,
+      sortValue: (row) => STATUS_ORDER.indexOf(row.status),
       render: (_val, row) => {
-        const billPct = (b: { status: string } | undefined | null) =>
-          b?.status === "paid" ? 50 : b?.status === "submitted" ? 25 : 0;
-        const pct = billPct(row.bill1) + billPct(row.bill2);
-        const statusColor = ORDER_STATUS_DETAILS[row.status]?.color ?? "primary";
-        const barColor = pct === 0 ? "bg-gray-300 dark:bg-gray-600" : STATUS_PROGRESS_COLOR[statusColor];
+        const pct = STATUS_PROGRESS[row.status] ?? 0;
+        const barColor = pct === 0 ? "bg-gray-300 dark:bg-gray-600"
+          : pct <= 40 ? "bg-amber-400 dark:bg-amber-500"
+          : pct <= 65 ? "bg-blue-500 dark:bg-blue-400"
+          : pct < 100 ? "bg-teal-500 dark:bg-teal-400"
+          : "bg-emerald-500 dark:bg-emerald-400";
         return (
           <div className="flex flex-col gap-1.5 min-w-[100px]">
             <div className="flex justify-between items-center">
@@ -541,8 +560,8 @@ function SmartSearchInput({
   searchValue,
   setSearchValue
 }: {
-  searchType: "general" | "batch";
-  setSearchType: (type: "general" | "batch") => void;
+  searchType: "general" | "batch" | "lot";
+  setSearchType: (type: "general" | "batch" | "lot") => void;
   searchValue: string;
   setSearchValue: (val: string) => void;
 }) {
@@ -559,7 +578,7 @@ function SmartSearchInput({
     return () => document.removeEventListener("mousedown", fn);
   }, []);
 
-  const handleSelect = (type: "general" | "batch") => {
+  const handleSelect = (type: "general" | "batch" | "lot") => {
     setSearchType(type);
     setOpen(false);
   };
@@ -569,16 +588,18 @@ function SmartSearchInput({
     setSearchValue("");
   };
 
+  const badgeLabel: Record<string, string> = { batch: "Batch ID", lot: "Lot #" };
+
   return (
     <div ref={containerRef} className="relative w-full xl:w-[350px]">
       <div className="flex h-11 items-center rounded-lg border border-gray-300 bg-transparent shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 focus-within:ring-3 focus-within:ring-brand-500/10 focus-within:border-brand-300 dark:focus-within:border-brand-800 transition-shadow px-3 gap-2">
         <span className="text-gray-500 dark:text-gray-400 shrink-0 flex items-center justify-center">
           <SearchOneIcon />
         </span>
-        
+
         {searchType !== "general" && (
           <span className="flex items-center gap-1 bg-brand-500/10 text-brand-500 text-xs font-medium px-2 py-1 rounded">
-            {searchType === "batch" ? "Batch ID" : searchType}
+            {badgeLabel[searchType] ?? searchType}
             <button type="button" onClick={clearBadge} className="hover:text-brand-700 transition">
               <svg className="size-3" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
@@ -638,6 +659,26 @@ function SmartSearchInput({
                 </p>
                 <p className="text-xs text-brand-600/70 dark:text-brand-400/70">
                   Find orders matching exact batch
+                </p>
+              </div>
+            </button>
+
+            <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2" />
+
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-colors hover:bg-success-50 dark:hover:bg-success-500/10 group"
+              onClick={() => handleSelect("lot")}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400 group-hover:bg-white dark:group-hover:bg-success-500/30 shadow-theme-xs transition-colors">
+                <BoxIcon />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  Search Lot # <span className="text-success-600 dark:text-success-400">"{searchValue}"</span>
+                </p>
+                <p className="text-xs text-success-600/70 dark:text-success-400/70">
+                  Find orders in this lot
                 </p>
               </div>
             </button>

@@ -30,6 +30,8 @@ export interface ColumnDef<T> {
     /** ซ่อน column นี้ใน CSV */
     noExport?: boolean;
     classNameTableCell?: string;
+    /** custom sort key — ถ้าระบุจะใช้ค่านี้แทน row[key] ในการเรียงลำดับ */
+    sortValue?: (row: T) => string | number;
 }
 
 export interface FilterOption {
@@ -399,9 +401,10 @@ export default function DataTableOne<T extends object>({
         });
 
         if (sortKey) {
+            const sortCol = columns.find(c => c.key === sortKey);
             rows.sort((a, b) => {
-                const av = getNestedValue(a, sortKey);
-                const bv = getNestedValue(b, sortKey);
+                const av = sortCol?.sortValue ? sortCol.sortValue(a) : getNestedValue(a, sortKey);
+                const bv = sortCol?.sortValue ? sortCol.sortValue(b) : getNestedValue(b, sortKey);
                 const cmp = typeof av === "number" && typeof bv === "number"
                     ? av - bv
                     : String(av ?? "").localeCompare(String(bv ?? ""), "th");

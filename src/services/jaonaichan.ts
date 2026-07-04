@@ -13,13 +13,15 @@ export interface GetOrdersParams {
     createDateM?: number;
     createDateY?: number;
     unitPricesId?: string;
+    lotId?: number;
 }
 
 export async function getOrders(params: GetOrdersParams = {}): Promise<OrderListResponse> {
-    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY, unitPricesId } = params;
+    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY, unitPricesId, lotId } = params;
     const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     if (status) qs.set("status", status);
     if (unitPricesId) qs.set("unit_prices_id", unitPricesId);
+    if (lotId) qs.set("lot_id", String(lotId));
     if (createDate) {
         qs.set("create_date", createDate);
     } else {
@@ -160,6 +162,13 @@ export async function updateCustomer(id: number, payload: { email: string; first
     });
 }
 
+export async function resetCustomerPassword(id: number, payload: { mode: 'phone' | 'manual'; password?: string }): Promise<{ success: boolean; message?: string }> {
+    return apiRequest(`/jaonaichan/v1/customers/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
 // =========================================================================
 // Dashboard
 // =========================================================================
@@ -199,6 +208,7 @@ import type {
     ValidateBarcodeResponse,
     BarcodeListResponse,
     BarcodeDeleteResponse,
+    TrackingParcel,
 } from '../interfaces/barcode.jaonaichan';
 
 const BARCODE_PACK_ENDPOINT = '/jaonaichan/v1/barcode-pack';
@@ -219,11 +229,22 @@ export async function validateBarcode(barcode: string): Promise<ValidateBarcodeR
 
 export async function confirmPack(
     orderId: number,
-    scanned: Record<number, string[]>
+    scanned: Record<number, string[]>,
+    lotId?: number
 ): Promise<ConfirmPackResponse> {
     return apiRequest(BARCODE_PACK_ENDPOINT, {
         method: 'POST',
-        body: JSON.stringify({ action: 'confirm_pack', order_id: orderId, scanned }),
+        body: JSON.stringify({ action: 'confirm_pack', order_id: orderId, scanned, lot_id: lotId }),
+    });
+}
+
+export async function saveTracking(
+    orderId: number,
+    parcels: TrackingParcel[]
+): Promise<{ success: boolean }> {
+    return apiRequest(BARCODE_PACK_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'save_tracking', order_id: orderId, parcels }),
     });
 }
 
@@ -266,6 +287,20 @@ export async function deleteBarcode(id: number): Promise<BarcodeDeleteResponse> 
         method: 'POST',
         body: JSON.stringify({ action: 'delete_barcode', id }),
     });
+}
+
+// =========================================================================
+// Lots
+// =========================================================================
+
+import type { Lot } from '../interfaces/lot.jaonaichan';
+
+export async function getLots(): Promise<Lot[]> {
+    return apiRequest('/jaonaichan/v1/lots');
+}
+
+export async function createLot(): Promise<Lot> {
+    return apiRequest('/jaonaichan/v1/lots', { method: 'POST' });
 }
 
 // =========================================================================

@@ -244,7 +244,7 @@ export default function BarcodeImport() {
     return (
         <div className="mx-auto max-w-lg space-y-4">
             <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-                นำ Barcode เข้า
+                Barcode Import
             </h1>
 
             {/* HTTPS warning */}

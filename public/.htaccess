@@ -1,0 +1,23 @@
+# SPA routing — redirect all non-file requests to index.html
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# index.html ห้าม cache — browser ต้องดึงใหม่ทุก deploy
+<Files "index.html">
+    <IfModule mod_headers.c>
+        Header set Cache-Control "no-store, no-cache, must-revalidate"
+        Header set Pragma "no-cache"
+    </IfModule>
+</Files>
+
+# JS/CSS มี content hash → cache ได้ตลอดชีพ
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/css "access plus 1 year"
+</IfModule>

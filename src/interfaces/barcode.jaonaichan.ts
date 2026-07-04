@@ -18,6 +18,11 @@ export interface ConfirmPackResponse {
     success: boolean;
 }
 
+export interface TrackingParcel {
+    carrier: 'kerry' | 'flash' | 'jt' | 'thaipost';
+    number: string;
+}
+
 // =========================================================================
 // Barcode Import
 // =========================================================================

@@ -1,6 +1,6 @@
 /**
  * DataTable.tsx
- * Generic reusable DataTable — TailAdmin React/TSX
+ * Generic reusable DataTable — Jaonaichan React/TSX
  * Design matches E-commerce Products List style
  *
  * Features:

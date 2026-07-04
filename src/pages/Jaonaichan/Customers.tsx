@@ -10,7 +10,7 @@ import { Order as OrderIF } from "../../interfaces/order.jaonaichan";
 import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
-import { getCustomers, getCustomerOrders, createCustomer, updateCustomer } from "../../services/jaonaichan";
+import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword } from "../../services/jaonaichan";
 import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
@@ -18,6 +18,22 @@ import OrderDetails from "../../components/jaonaichan/OrderDetails";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { MoreDotIcon } from "../../icons";
+
+const PHONE_RE = /^0\d{8,9}$/;
+
+const formatPhone = (v: string) => {
+  const d = v.replace(/\D/g, "").slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+};
+
+const validateCustomerForm = (f: { first_name: string; last_name: string; email: string; phone: string }) => {
+  if (!f.first_name.trim() || f.first_name.length > 50) return "ชื่อต้องไม่เกิน 50 ตัวอักษร";
+  if (!f.last_name.trim() || f.last_name.length > 50) return "นามสกุลต้องไม่เกิน 50 ตัวอักษร";
+  if (!PHONE_RE.test(f.phone.replace(/[-\s]/g, ""))) return "เบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง: 0812345678)";
+  return null;
+};
 
 const getInitial = (name: string) => {
   if (!name) return "";
@@ -216,6 +232,39 @@ export default function Customers() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState("");
 
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetMode, setResetMode] = useState<'idle' | 'phone' | 'manual'>('idle');
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
+
+  const handleResetPassword = async (mode: 'phone' | 'manual') => {
+    if (!selectedCustomer) return;
+    if (mode === 'manual' && resetPassword.length < 6) {
+      setResetError("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+      return;
+    }
+    setResetError("");
+    setIsResetting(true);
+    try {
+      const res = await resetCustomerPassword(selectedCustomer.id, {
+        mode,
+        ...(mode === 'manual' && { password: resetPassword }),
+      });
+      if (res.success) {
+        setResetSuccess(res.message || "รีเซ็ตสำเร็จ");
+        setResetMode('idle');
+        setResetPassword("");
+      } else {
+        setResetError(res.message || "เกิดข้อผิดพลาด");
+      }
+    } catch (err: any) {
+      setResetError(err?.message || "เกิดข้อผิดพลาด");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const [viewOrder, setViewOrder] = useState<OrderIF | null>(null);
   const { isOpen: isDetailsOpen, openModal: openDetails, closeModal: closeDetails } = useModal();
 
@@ -231,6 +280,8 @@ export default function Customers() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationError = validateCustomerForm(createForm);
+    if (validationError) { setCreateError(validationError); return; }
     setCreateError("");
     setIsCreating(true);
     try {
@@ -252,6 +303,8 @@ export default function Customers() {
   const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomer) return;
+    const validationError = validateCustomerForm(editForm);
+    if (validationError) { setUpdateError(validationError); return; }
     setUpdateError("");
     setIsUpdating(true);
     try {
@@ -294,6 +347,10 @@ export default function Customers() {
     setCustomerOrders([]);
     setIsEditing(false);
     setUpdateError("");
+    setResetMode('idle');
+    setResetPassword("");
+    setResetError("");
+    setResetSuccess("");
     
     const nameParts = customer.name.split(" ");
     const firstName = nameParts[0] || "";
@@ -364,26 +421,61 @@ export default function Customers() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">ชื่อ</label>
-                        <Input required value={editForm.first_name} onChange={e => setEditForm(p => ({...p, first_name: e.target.value}))} />
+                        <Input required maxLength={50} disabled={isUpdating} value={editForm.first_name} onChange={e => setEditForm(p => ({...p, first_name: e.target.value}))} />
                       </div>
                       <div>
                         <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">นามสกุล</label>
-                        <Input required value={editForm.last_name} onChange={e => setEditForm(p => ({...p, last_name: e.target.value}))} />
+                        <Input required maxLength={50} disabled={isUpdating} value={editForm.last_name} onChange={e => setEditForm(p => ({...p, last_name: e.target.value}))} />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">เบอร์โทรศัพท์</label>
-                        <Input required value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))} />
+                        <Input required maxLength={12} disabled={isUpdating} value={editForm.phone}
+                          onChange={e => setEditForm(p => ({...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10)}))}
+                          onFocus={() => setEditForm(p => ({...p, phone: p.phone.replace(/\D/g, "")}))}
+                          onBlur={() => setEditForm(p => ({...p, phone: formatPhone(p.phone)}))}
+                        />
                       </div>
                       <div>
                         <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">อีเมล</label>
-                        <Input type="email" value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} />
+                        <Input type="email" disabled={isUpdating} value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} />
                       </div>
                     </div>
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" size="sm" onClick={(e) => { e.preventDefault(); setIsEditing(false); }}>ยกเลิก</Button>
+                      <Button variant="outline" size="sm" disabled={isUpdating} onClick={(e) => { e.preventDefault(); setIsEditing(false); }}>ยกเลิก</Button>
                       <Button size="sm" onClick={handleUpdateSubmit} disabled={isUpdating}>{isUpdating ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}</Button>
+                    </div>
+
+                    {/* Reset Password */}
+                    <div className="pt-4 border-t border-gray-100 dark:border-white/[0.05]">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">รีเซ็ตรหัสผ่าน</p>
+                      {resetSuccess && <p className="text-xs text-green-600 dark:text-green-400 mb-2">{resetSuccess}</p>}
+                      {resetError && <p className="text-xs text-red-500 mb-2">{resetError}</p>}
+                      {resetMode === 'idle' && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => { setResetMode('phone'); setResetError(""); setResetSuccess(""); }}>
+                            ใช้เบอร์โทร
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setResetMode('manual'); setResetError(""); setResetSuccess(""); }}>
+                            กรอกเอง
+                          </Button>
+                        </div>
+                      )}
+                      {resetMode === 'phone' && (
+                        <div className="flex gap-2 items-center">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">รหัสผ่านใหม่ = <span className="font-medium text-gray-700 dark:text-gray-200">{editForm.phone.replace(/\D/g, "")}</span></p>
+                          <Button size="sm" disabled={isResetting} onClick={() => handleResetPassword('phone')}>{isResetting ? "กำลังรีเซ็ต..." : "ยืนยัน"}</Button>
+                          <Button size="sm" variant="outline" onClick={() => { setResetMode('idle'); setResetError(""); }}>ยกเลิก</Button>
+                        </div>
+                      )}
+                      {resetMode === 'manual' && (
+                        <div className="flex gap-2 items-start">
+                          <Input placeholder="รหัสผ่านใหม่ (≥6 ตัว)" value={resetPassword} onChange={e => setResetPassword(e.target.value)} disabled={isResetting} />
+                          <Button size="sm" disabled={isResetting} onClick={() => handleResetPassword('manual')}>{isResetting ? "กำลังรีเซ็ต..." : "ยืนยัน"}</Button>
+                          <Button size="sm" variant="outline" onClick={() => { setResetMode('idle'); setResetPassword(""); setResetError(""); }}>ยกเลิก</Button>
+                        </div>
+                      )}
                     </div>
                   </form>
                 ) : (
@@ -478,27 +570,32 @@ export default function Customers() {
             
             <div>
               <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">เบอร์โทรศัพท์ (Phone) *</label>
-              <Input required placeholder="08x-xxx-xxxx" value={createForm.phone} onChange={(e) => setCreateForm(prev => ({...prev, phone: e.target.value}))} />
+              <Input required placeholder="081-234-5678" maxLength={12} value={createForm.phone}
+                disabled={isCreating}
+                onChange={(e) => setCreateForm(prev => ({...prev, phone: e.target.value.replace(/\D/g, "").slice(0, 10)}))}
+                onFocus={() => setCreateForm(prev => ({...prev, phone: prev.phone.replace(/\D/g, "")}))}
+                onBlur={() => setCreateForm(prev => ({...prev, phone: formatPhone(prev.phone)}))}
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">ชื่อ (First Name) *</label>
-                <Input required placeholder="ชื่อ" value={createForm.first_name} onChange={(e) => setCreateForm(prev => ({...prev, first_name: e.target.value}))} />
+                <Input required placeholder="ชื่อ" maxLength={50} disabled={isCreating} value={createForm.first_name} onChange={(e) => setCreateForm(prev => ({...prev, first_name: e.target.value}))} />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">นามสกุล (Last Name) *</label>
-                <Input required placeholder="นามสกุล" value={createForm.last_name} onChange={(e) => setCreateForm(prev => ({...prev, last_name: e.target.value}))} />
+                <Input required placeholder="นามสกุล" maxLength={50} disabled={isCreating} value={createForm.last_name} onChange={(e) => setCreateForm(prev => ({...prev, last_name: e.target.value}))} />
               </div>
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">อีเมล (Email)</label>
-              <Input type="email" placeholder="example@email.com" value={createForm.email} onChange={(e) => setCreateForm(prev => ({...prev, email: e.target.value}))} />
+              <Input type="email" placeholder="example@email.com" disabled={isCreating} value={createForm.email} onChange={(e) => setCreateForm(prev => ({...prev, email: e.target.value}))} />
             </div>
           </div>
           
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.05] flex justify-end gap-3 bg-gray-50/50 dark:bg-transparent rounded-b-2xl">
-            <Button variant="outline" onClick={(e) => { e.preventDefault(); setIsCreateOpen(false); }}>ยกเลิก</Button>
+            <Button variant="outline" disabled={isCreating} onClick={(e) => { e.preventDefault(); setIsCreateOpen(false); }}>ยกเลิก</Button>
             <Button onClick={handleCreateSubmit} disabled={isCreating}>
               {isCreating ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
             </Button>
