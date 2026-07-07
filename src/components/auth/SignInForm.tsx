@@ -145,10 +145,10 @@ export default function SignInForm() {
                   <Label>
                     Username or Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input 
-                    value={form.username} 
+                  <Input
+                    value={form.username}
                     onChange={e => setForm({ ...form, username: e.target.value })}
-                    placeholder="info@gmail.com" 
+                    placeholder="info@gmail.com"
                     success={form.username?.length > 0}
                     error={errorUsername}
                   />
@@ -162,7 +162,7 @@ export default function SignInForm() {
                       value={form.password}
                       onChange={e => setForm({ ...form, password: e.target.value })}
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password" 
+                      placeholder="Enter your password"
                       success={form.password?.length > 0}
                       error={errorPassword}
                     />

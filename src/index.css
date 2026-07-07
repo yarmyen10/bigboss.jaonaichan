@@ -298,6 +298,15 @@ layer(base);
   @apply border-brand-500 bg-brand-500;
 }
 
+/* iOS Safari auto-zoom fix — unlayered so it wins over Tailwind utility text-sm */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+}
+
 /* third-party libraries CSS */
 .apexcharts-legend-text {
   @apply !text-gray-700 dark:!text-gray-400;

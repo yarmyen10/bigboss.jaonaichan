@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, ReactNode } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import Button from '../../components/ui/button/Button';
 import Badge from '../../components/ui/badge/Badge';
@@ -30,11 +30,11 @@ interface EnhancedBarcodeOrderItem extends BarcodeOrderItem {
 
 const SCANNER_ELEMENT_ID = 'barcode-pack-reader';
 
-const CARRIERS: { value: TrackingParcel['carrier']; label: string }[] = [
-    { value: 'kerry',    label: 'Kerry Express' },
-    { value: 'flash',    label: 'Flash Express' },
-    { value: 'jt',       label: 'J&T Express' },
-    { value: 'thaipost', label: 'ไปรษณีย์ไทย (EMS)' },
+const CARRIERS: { value: TrackingParcel['carrier']; label: string; short: string; bg: string; text: string; ring: string }[] = [
+    { value: 'kerry',    label: 'Kerry Express',     short: 'KEX',      bg: 'bg-[#E30013]',  text: 'text-white', ring: 'ring-[#E30013]' },
+    { value: 'flash',    label: 'Flash Express',     short: 'FLASH',    bg: 'bg-[#FF6B00]',  text: 'text-white', ring: 'ring-[#FF6B00]' },
+    { value: 'jt',       label: 'J&T Express',       short: 'J&T',      bg: 'bg-[#E8000D]',  text: 'text-white', ring: 'ring-[#E8000D]' },
+    { value: 'thaipost', label: 'ไปรษณีย์ไทย',      short: 'POST',     bg: 'bg-[#6B2D8B]',  text: 'text-white', ring: 'ring-[#6B2D8B]' },
 ];
 
 const PAYMENT_LABEL: Record<string, string> = {
@@ -117,6 +117,8 @@ export default function BarcodePack() {
     const [parcels, setParcels] = useState<TrackingParcel[]>([{ carrier: 'kerry', number: '' }]);
     const [savingTracking, setSavingTracking] = useState(false);
     const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [manualBarcode, setManualBarcode] = useState('');
 
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const itemsRef = useRef<EnhancedBarcodeOrderItem[]>([]);
@@ -135,6 +137,26 @@ export default function BarcodePack() {
         const timer = setTimeout(() => setToast(''), 4000);
         return () => clearTimeout(timer);
     }, [toast]);
+
+    const handleBarcodeInput = useCallback(async (barcode: string) => {
+        setCameraOpen(false);
+        setManualBarcode('');
+        setValidating(true);
+        try {
+            const res = await validateBarcode(barcode);
+            const matchedItem = itemsRef.current.find(i => i.product_id === res.product_id);
+            if (!matchedItem) {
+                setScanResult({ ok: false, name: `Product ID ${res.product_id} not in this order (order has: ${itemsRef.current.map(i => i.product_id).join(', ')})` });
+                return;
+            }
+            setScanned(prev => ({ ...prev, [res.product_id]: [...(prev[res.product_id] ?? []), barcode] }));
+            setScanResult({ ok: true, name: res.product_name });
+        } catch {
+            setScanResult({ ok: false });
+        } finally {
+            setValidating(false);
+        }
+    }, []);
 
     // Camera lifecycle
     useEffect(() => {
@@ -160,28 +182,7 @@ export default function BarcodePack() {
                     stopped = true;
                     try { await capturedScanner.stop(); } catch { /* scanner already stopped */ }
                     scannerRef.current = null;
-                    setCameraOpen(false);
-
-                    try {
-                        setValidating(true);
-                        const res = await validateBarcode(barcode);
-                        // Check if scanned product is actually in this order
-                        const itemsSnapshot = itemsRef.current;
-                        const matchedItem = itemsSnapshot.find(i => i.product_id === res.product_id);
-                        if (!matchedItem) {
-                            setScanResult({ ok: false, name: `Product ID ${res.product_id} not in this order (order has: ${itemsSnapshot.map(i => i.product_id).join(', ')})` });
-                            return;
-                        }
-                        setScanned((prev) => ({
-                            ...prev,
-                            [res.product_id]: [...(prev[res.product_id] ?? []), barcode],
-                        }));
-                        setScanResult({ ok: true, name: res.product_name });
-                    } catch {
-                        setScanResult({ ok: false });
-                    } finally {
-                        setValidating(false);
-                    }
+                    handleBarcodeInput(barcode);
                 };
 
                 try {
@@ -385,9 +386,19 @@ export default function BarcodePack() {
 
     return (
         <div className="mx-auto max-w-6xl space-y-4">
-            <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-                Pack Order
-            </h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+                    Pack Order
+                </h1>
+                <button
+                    type="button"
+                    onClick={() => setIsHelpOpen(true)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-500 hover:border-brand-400 hover:text-brand-500 dark:border-gray-600 dark:text-gray-400 dark:hover:border-brand-500 dark:hover:text-brand-400 transition"
+                    title="คู่มือการใช้งาน"
+                >
+                    ?
+                </button>
+            </div>
 
             {/* HTTPS warning */}
             {!isHttps && (
@@ -438,28 +449,43 @@ export default function BarcodePack() {
                     <p className="text-sm font-semibold text-success-700 dark:text-success-400">
                         📦 Order #{lastPackedOrderId} — Add Tracking
                     </p>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {parcels.map((parcel, i) => (
-                            <div key={i} className="flex gap-2 items-center">
-                                <select
-                                    value={parcel.carrier}
-                                    onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, carrier: e.target.value as TrackingParcel['carrier'] } : p))}
-                                    className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
-                                >
-                                    {CARRIERS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                </select>
-                                <input
-                                    type="text"
-                                    placeholder="Tracking number"
-                                    value={parcel.number}
-                                    onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, number: e.target.value } : p))}
-                                    className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
-                                />
-                                {parcels.length > 1 && (
-                                    <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
-                                        <svg className="size-4" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                    </button>
-                                )}
+                            <div key={i} className="space-y-1.5">
+                                {/* Carrier pills */}
+                                <div className="flex flex-wrap gap-1.5">
+                                    {CARRIERS.map(c => {
+                                        const selected = parcel.carrier === c.value;
+                                        return (
+                                            <button
+                                                key={c.value}
+                                                type="button"
+                                                onClick={() => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, carrier: c.value } : p))}
+                                                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${selected ? `${c.bg} ${c.text} ring-2 ${c.ring} ring-offset-1` : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                            >
+                                                {c.short}
+                                            </button>
+                                        );
+                                    })}
+                                    <span className="self-center text-xs text-gray-400 dark:text-gray-500">
+                                        {CARRIERS.find(c => c.value === parcel.carrier)?.label}
+                                    </span>
+                                </div>
+                                {/* Tracking number + remove */}
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        placeholder="Tracking number"
+                                        value={parcel.number}
+                                        onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, number: e.target.value } : p))}
+                                        className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+                                    />
+                                    {parcels.length > 1 && (
+                                        <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
+                                            <svg className="size-4" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -707,6 +733,28 @@ export default function BarcodePack() {
                     <div className="overflow-hidden rounded-xl">
                         <div id={SCANNER_ELEMENT_ID} className="w-full" />
                     </div>
+                    <div className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-2">
+                        <p className="text-xs text-gray-400 text-center">หรือกรอก barcode</p>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={manualBarcode}
+                                onChange={e => setManualBarcode(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && manualBarcode.trim()) handleBarcodeInput(manualBarcode.trim()); }}
+                                placeholder="กรอก barcode..."
+                                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-brand-500"
+                                autoComplete="off"
+                            />
+                            <button
+                                type="button"
+                                disabled={!manualBarcode.trim()}
+                                onClick={() => handleBarcodeInput(manualBarcode.trim())}
+                                className="px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium disabled:opacity-40"
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    </div>
                     <button
                         type="button"
                         onClick={() => setCameraOpen(false)}
@@ -725,6 +773,86 @@ export default function BarcodePack() {
                     onClose={() => setIsOrderDetailsOpen(false)}
                 />
             )}
+
+            {/* Help Modal */}
+            <Modal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} className="max-w-lg">
+                <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+                    <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">คู่มือการใช้งาน Pack Order</h2>
+
+                    {/* ขั้นตอน */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">ขั้นตอนการแพ็ค</p>
+                        <ol className="space-y-2 text-sm text-gray-700 dark:text-gray-300 list-none">
+                            {[
+                                { n: '1', text: 'เลือก Lot จาก dropdown หรือกด "+ New Lot" เพื่อสร้างใหม่' },
+                                { n: '2', text: 'ค้นหา Order ด้วยวันที่ → กด Find → เลือก order จากรายการ หรือใส่ Order ID แล้วกด Load' },
+                                { n: '3', text: 'ตรวจสอบข้อมูลลูกค้า ชื่อ และที่อยู่จัดส่ง' },
+                                { n: '4', text: 'กดปุ่ม Scan ที่แถวสินค้า แล้วสแกน barcode ของสินค้านั้น' },
+                                { n: '5', text: 'สแกนซ้ำจนตัวเลข Qty ครบทุก item (badge เปลี่ยนเป็นสีน้ำเงิน)' },
+                                { n: '6', text: 'กด Confirm Pack (ปุ่มเปิดเมื่อสแกนครบ + เลือก Lot แล้วเท่านั้น)' },
+                                { n: '7', text: 'เลือกขนส่ง (KEX / FLASH / J&T / POST) ใส่เลข tracking ต่อกล่อง → Save & Mark Shipped หรือ Skip' },
+                            ].map(({ n, text }) => (
+                                <li key={n} className="flex gap-3">
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 text-xs font-bold">{n}</span>
+                                    <span>{text}</span>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+
+                    {/* Carrier reference */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">บริษัทขนส่ง</p>
+                        <div className="flex flex-wrap gap-2">
+                            {CARRIERS.map(c => (
+                                <span key={c.value} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${c.bg} ${c.text}`}>
+                                    <span>{c.short}</span>
+                                    <span className="font-normal opacity-80">{c.label}</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 dark:border-gray-700" />
+
+                    {/* กฎสำคัญ */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">กฎสำคัญ</p>
+                        <ul className="space-y-1.5 text-sm text-gray-700 dark:text-gray-300">
+                            {[
+                                'สแกนเฉพาะ barcode ของสินค้าที่อยู่ใน order นั้นเท่านั้น',
+                                'ต้องเลือก Lot ก่อนถึงจะกด Confirm Pack ได้',
+                                'Order ที่ค้นหาได้ต้องมีสถานะ "ชำระแล้ว (ครั้งที่ 2)" เท่านั้น',
+                                'ต้องเปิดเว็บด้วย HTTPS — กล้องไม่ทำงานบน http://',
+                            ].map((rule, i) => (
+                                <li key={i} className="flex gap-2">
+                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />
+                                    <span>{rule}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="border-t border-gray-100 dark:border-gray-700" />
+
+                    {/* Troubleshoot */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Scan ไม่ผ่าน</p>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
+                            {[
+                                { msg: '❌ Barcode not recognised', cause: 'barcode ไม่อยู่ในระบบ หรือถูกแพ็คไปแล้ว' },
+                                { msg: '❌ Product ID X not in this order', cause: 'barcode เป็นของสินค้าอื่น ไม่ใช่ order นี้' },
+                                { msg: 'กล้องไม่เปิด', cause: 'ต้องใช้ HTTPS และกดอนุญาตกล้องในเบราเซอร์' },
+                            ].map(({ msg, cause }, i) => (
+                                <div key={i} className={`flex gap-3 p-3 ${i > 0 ? 'border-t border-gray-100 dark:border-gray-700' : ''}`}>
+                                    <span className="font-medium text-error-600 dark:text-error-400 shrink-0 min-w-0">{msg}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">{cause}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Mobile Floating Scan Button */}
             {items.length > 0 && !loadingItems && !allScanned && (

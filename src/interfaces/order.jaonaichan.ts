@@ -33,6 +33,7 @@ export interface Shipping {
     name: string
     phone: string
     address: string
+    tracking?: { carrier: string; number: string }[]
 }
 
 /** bill1 / bill2 — full version (มี paid_at) */
@@ -136,6 +137,9 @@ export interface Order {
     bill2: Bill
     items?: OrderItem[] // มีเฉพาะ GET /orders/{id} (with_items = true)
     invoice_items?: InvoiceLineItem[]
+    is_rts?: boolean
+    linked_rts_order_id?: number | null
+    parent_order_id?: number | null
 }
 
 // =============================================================================

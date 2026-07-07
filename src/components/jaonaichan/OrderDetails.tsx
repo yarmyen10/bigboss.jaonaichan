@@ -86,10 +86,12 @@ function buildHistory(
     date: displayed.date,
   };
 
-  for (const [key, bill, slip, billNum] of [
+  const billEntries: [string, typeof displayed.bill1, string | null, 1 | 2][] = [
     ["bill1", displayed.bill1, slip1, 1],
-    ["bill2", displayed.bill2, slip2, 2],
-  ] as [string, typeof displayed.bill1, string | null, 1 | 2][]) {
+  ];
+  if (!displayed.is_rts) billEntries.push(["bill2", displayed.bill2, slip2, 2]);
+
+  for (const [key, bill, slip, billNum] of billEntries) {
     const hasStoredSlip = bill.status === "submitted" && slip !== null;
     const style = hasStoredSlip
       ? { Icon: ReceiptBill, iconBg: "bg-blue-50 dark:bg-blue-500/10", iconColor: "text-blue-500" }
@@ -385,8 +387,25 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                   {statusInfo.text}
                 </Badge>
               )}
+              {displayed?.is_rts && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                  ⚡ พร้อมส่ง
+                </span>
+              )}
             </div>
-            <p className="text-sm text-gray-400 dark:text-gray-500">{formattedDate}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-gray-400 dark:text-gray-500">{formattedDate}</p>
+              {displayed?.linked_rts_order_id && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                  RTS Order: #{displayed.linked_rts_order_id}
+                </span>
+              )}
+              {displayed?.parent_order_id && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  Order หลัก: #{displayed.parent_order_id}
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -470,6 +489,20 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                               <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line mt-1">
                                 {displayed.shipping.address}
                               </span>
+                            )}
+                            {displayed.shipping.tracking && displayed.shipping.tracking.length > 0 && (
+                              <div className="flex flex-col gap-1 mt-2">
+                                {displayed.shipping.tracking.map((p, i) => {
+                                  const colors: Record<string, string> = { kerry: 'bg-[#E30013] text-white', flash: 'bg-[#FF6B00] text-white', jt: 'bg-[#E8000D] text-white', thaipost: 'bg-[#6B2D8B] text-white' };
+                                  const labels: Record<string, string> = { kerry: 'KEX', flash: 'FLASH', jt: 'J&T', thaipost: 'POST' };
+                                  return (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-bold ${colors[p.carrier] ?? 'bg-gray-400 text-white'}`}>{labels[p.carrier] ?? p.carrier.toUpperCase()}</span>
+                                      <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{p.number}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
                           </>
                         ) : (

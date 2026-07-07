@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -7,17 +6,13 @@ import PageMeta from "../../components/common/PageMeta";
 import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataTableOne";
 import { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import { Order as OrderIF } from "../../interfaces/order.jaonaichan";
-import Badge, { BadgeColor } from "../../components/ui/badge/Badge";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
 import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword } from "../../services/jaonaichan";
-import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
 import OrderDetails from "../../components/jaonaichan/OrderDetails";
-import { Dropdown } from "../../components/ui/dropdown/Dropdown";
-import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
-import { MoreDotIcon } from "../../icons";
+import ListCard from "../../components/jaonaichan/ListCard";
 
 const PHONE_RE = /^0\d{8,9}$/;
 
@@ -108,115 +103,8 @@ const customerColumns: ColumnDef<CustomerListItem>[] = [
   },
 ];
 
-const getOrderHistoryColumns = (
-  buttonRefs: React.RefObject<Record<string, HTMLButtonElement | null>>,
-  openDropdownId: string | null,
-  setOpenDropdownId: (id: string | null) => void,
-  handleViewMore: (row: OrderIF) => void,
-  navigate: (to: string) => void
-): ColumnDef<OrderIF>[] => [
-  {
-    key: "id",
-    label: "Order #",
-    width: "80px",
-    render: (val) => (
-      <span className="text-theme-xs font-medium text-gray-700 dark:text-gray-400">#{val as string}</span>
-    ),
-  },
-  {
-    key: "date",
-    label: "Date",
-    width: "130px",
-    render: (val) => (
-      <span className="text-sm font-light text-gray-700 dark:text-gray-400">
-        {new Date(val as string).toLocaleDateString("th-TH", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })}
-      </span>
-    ),
-  },
-  {
-    key: "status",
-    label: "Status",
-    render: (val) => {
-      const s = val as string;
-      return (
-        <span className="whitespace-nowrap">
-          <Badge variant="gradient" color={(ORDER_STATUS_DETAILS[s]?.color ?? "light") as BadgeColor}>
-            {ORDER_STATUS_DETAILS[s]?.text ?? s}
-          </Badge>
-        </span>
-      );
-    },
-  },
-  {
-    key: "total",
-    label: "Total",
-    align: "left",
-    render: (val) => (
-      <span className="font-semibold text-black dark:text-white">
-        ฿{Number(val).toLocaleString()}
-      </span>
-    ),
-  },
-  {
-    key: "action",
-    label: "",
-    width: "80px",
-    render: (_val, row) => {
-      const isOpen = openDropdownId === String(row.id);
-      const btnRect = buttonRefs.current[row.id]?.getBoundingClientRect();
-      return (
-        <div className="relative flex justify-end">
-          <button
-            ref={(el) => { buttonRefs.current[row.id] = el; }}
-            className="dropdown-toggle"
-            onClick={() => setOpenDropdownId(isOpen ? null : String(row.id))}
-          >
-            <MoreDotIcon className="rotate-90 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 size-6" />
-          </button>
-          {isOpen && btnRect && createPortal(
-            <div
-              style={{
-                position: 'fixed',
-                top: btnRect.bottom,
-                left: btnRect.right,
-                zIndex: 999999,
-              }}
-            >
-              <Dropdown
-                isOpen={isOpen}
-                onClose={() => setOpenDropdownId(null)}
-                className="w-40 p-2"
-              >
-                <DropdownItem
-                  onItemClick={() => { setOpenDropdownId(null); handleViewMore(row); }}
-                  className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-                >
-                  View More
-                </DropdownItem>
-                <DropdownItem
-                  onItemClick={() => { setOpenDropdownId(null); navigate(`/jaonaichan/invoice/${row.id}`); }}
-                  className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-                >
-                  Invoice
-                </DropdownItem>
-              </Dropdown>
-            </div>,
-            document.body
-          )}
-        </div>
-      );
-    },
-  },
-];
-
 export default function Customers() {
   const navigate = useNavigate();
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const [isLoading, setIsLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
@@ -376,10 +264,6 @@ export default function Customers() {
   }, [openModal]);
 
   const columns = useMemo(() => customerColumns, []);
-  const orderCols = useMemo(
-    () => getOrderHistoryColumns(buttonRefs, openDropdownId, setOpenDropdownId, handleViewMore, navigate),
-    [openDropdownId, handleViewMore, navigate]
-  );
 
   return (
     <>
@@ -533,15 +417,26 @@ export default function Customers() {
                 )}
               </div>
 
-              <DataTableOne<OrderIF>
-                title="Order History"
-                columns={orderCols}
-                data={customerOrders}
-                rowKey="id"
-                scrollable
-                scrollMaxHeight={320}
-                loading={isOrdersLoading}
-              />
+              <div className="px-1">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Order History</p>
+                {isOrdersLoading ? (
+                  <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
+                ) : customerOrders.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-gray-400">No orders found</div>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+                    {customerOrders.map((order) => (
+                      <ListCard
+                        key={order.id}
+                        order={order}
+                        compact
+                        onView={handleViewMore}
+                        onInvoice={(id) => navigate(`/jaonaichan/invoice/${id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

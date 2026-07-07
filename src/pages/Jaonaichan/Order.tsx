@@ -12,9 +12,11 @@ import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../../components/ui/dropdown/DropdownItem";
 import { getOrder } from "../../services/jaonaichan";
 import { STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
-import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
+import { ORDER_STATUS_DETAILS, STATUS_PROGRESS } from "../../config/orderStatus.jaonaichan";
+import ListCard from "../../components/jaonaichan/ListCard";
+import SmartSearchInput from "../../components/jaonaichan/SmartSearchInput";
 import { TabOption } from "../../components/ui/tabs";
-import { CalenderIcon, CheckCircleIcon, MoreDotIcon, SearchOneIcon, BoxIcon, PencilIcon, TrashBinIcon } from "../../icons";
+import { CalenderIcon, CheckCircleIcon, MoreDotIcon, BoxIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
 import Select from "../../components/form/Select";
 import Label from "../../components/form/Label";
@@ -48,12 +50,6 @@ const STATUS_ORDER = [
   "cancelled", "refunded", "failed",
 ];
 
-const STATUS_PROGRESS: Record<string, number> = {
-  "waiting-transfer": 5,
-  "pending-payment-1": 15, "wait-verify-1": 25, "paid-1": 40,
-  "pending-payment-2": 50, "wait-verify-2": 65, "paid-2": 80,
-  "packed": 90, "shipped": 95, "completed": 100,
-};
 // interface WCOrder {
 //   id: number;
 //   number: string;
@@ -310,14 +306,19 @@ const getOrderColumns = (
       key: "status",
       label: "Status",
       sortable: true,
-      width: "180px",
-      render: (val) => {
+      // width: "180px",
+      render: (val, row) => {
         const s = val as string;
         return (
-          <span className="whitespace-nowrap">
+          <span className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
             <Badge variant="gradient" color={((ORDER_STATUS_DETAILS[s]?.color ?? 'light') as BadgeColor)}>
               {ORDER_STATUS_DETAILS[s]?.text ?? s}
             </Badge>
+            {row.is_rts && (
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                ⚡ RTS
+              </span>
+            )}
           </span>
         );
       },
@@ -377,7 +378,7 @@ const getOrderColumns = (
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500 dark:text-gray-400">{pct}%</span>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {(row.bill1?.status === "paid" ? 1 : 0) + (row.bill2?.status === "paid" ? 1 : 0)}/2
+                {(row.bill1?.status === "paid" ? 1 : 0) + (!row.is_rts && row.bill2?.status === "paid" ? 1 : 0)}/{row.is_rts ? 1 : 2}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700">
@@ -554,140 +555,6 @@ const getManageOrderColumns = (
     },
   ];
 
-function SmartSearchInput({
-  searchType,
-  setSearchType,
-  searchValue,
-  setSearchValue
-}: {
-  searchType: "general" | "batch" | "lot";
-  setSearchType: (type: "general" | "batch" | "lot") => void;
-  searchValue: string;
-  setSearchValue: (val: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const fn = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", fn);
-    return () => document.removeEventListener("mousedown", fn);
-  }, []);
-
-  const handleSelect = (type: "general" | "batch" | "lot") => {
-    setSearchType(type);
-    setOpen(false);
-  };
-
-  const clearBadge = () => {
-    setSearchType("general");
-    setSearchValue("");
-  };
-
-  const badgeLabel: Record<string, string> = { batch: "Batch ID", lot: "Lot #" };
-
-  return (
-    <div ref={containerRef} className="relative w-full xl:w-[350px]">
-      <div className="flex h-11 items-center rounded-lg border border-gray-300 bg-transparent shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 focus-within:ring-3 focus-within:ring-brand-500/10 focus-within:border-brand-300 dark:focus-within:border-brand-800 transition-shadow px-3 gap-2">
-        <span className="text-gray-500 dark:text-gray-400 shrink-0 flex items-center justify-center">
-          <SearchOneIcon />
-        </span>
-
-        {searchType !== "general" && (
-          <span className="flex items-center gap-1 bg-brand-500/10 text-brand-500 text-xs font-medium px-2 py-1 rounded">
-            {badgeLabel[searchType] ?? searchType}
-            <button type="button" onClick={clearBadge} className="hover:text-brand-700 transition">
-              <svg className="size-3" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-          </span>
-        )}
-
-        <input
-          type="text"
-          placeholder={searchType === "general" ? "Search orders..." : "Enter value..."}
-          value={searchValue}
-          onChange={(e) => {
-            setSearchValue(e.target.value);
-            if (searchType === "general" && e.target.value) setOpen(true);
-            else setOpen(false);
-          }}
-          onFocus={() => {
-            if (searchType === "general" && searchValue) setOpen(true);
-          }}
-          className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none dark:text-white/90 dark:placeholder:text-white/30 w-full min-w-0"
-        />
-      </div>
-
-      {open && searchValue && searchType === "general" && (
-        <div className="absolute left-0 top-full mt-2 w-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-theme-lg z-50 overflow-hidden">
-          <div className="p-1">
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 group"
-              onClick={() => handleSelect("general")}
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-white dark:group-hover:bg-gray-600 shadow-theme-xs transition-colors">
-                <SearchOneIcon />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  Search general for <span className="text-brand-500">"{searchValue}"</span>
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Search across all fields
-                </p>
-              </div>
-            </button>
-
-            <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2" />
-
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-colors hover:bg-brand-50 dark:hover:bg-brand-500/10 group"
-              onClick={() => handleSelect("batch")}
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 group-hover:bg-white dark:group-hover:bg-brand-500/30 shadow-theme-xs transition-colors">
-                <CheckCircleIcon />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  Search Batch ID <span className="text-brand-500">"{searchValue}"</span>
-                </p>
-                <p className="text-xs text-brand-600/70 dark:text-brand-400/70">
-                  Find orders matching exact batch
-                </p>
-              </div>
-            </button>
-
-            <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2" />
-
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-colors hover:bg-success-50 dark:hover:bg-success-500/10 group"
-              onClick={() => handleSelect("lot")}
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400 group-hover:bg-white dark:group-hover:bg-success-500/30 shadow-theme-xs transition-colors">
-                <BoxIcon />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  Search Lot # <span className="text-success-600 dark:text-success-400">"{searchValue}"</span>
-                </p>
-                <p className="text-xs text-success-600/70 dark:text-success-400/70">
-                  Find orders in this lot
-                </p>
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function Order() {
   const navigate = useNavigate();
@@ -708,8 +575,18 @@ export default function Order() {
     setSearchType,
     searchValue,
     setSearchValue,
+    selectedStatuses,
+    setSelectedStatuses,
+    rtsFilter,
+    setRtsFilter,
     loadOrders
   } = useOrderList();
+
+  const CARD_PAGE_SIZE = 10;
+  const [cardPage, setCardPage] = useState(1);
+  useEffect(() => { setCardPage(1); }, [displayOrders]);
+  const cardTotalPages = Math.max(1, Math.ceil(displayOrders.length / CARD_PAGE_SIZE));
+  const pagedOrders = displayOrders.slice((cardPage - 1) * CARD_PAGE_SIZE, cardPage * CARD_PAGE_SIZE);
 
   const handleSaved = useCallback(() => {
     loadOrders(dateFilter);
@@ -814,6 +691,9 @@ export default function Order() {
         description="This is Order Dashboard page for Tailwind CSS Admin Dashboard Template"
       />
       <PageBreadcrumb pageTitle="Order Jaonaichan" />
+
+      {/* Desktop table */}
+      <div className="hidden min-[1025px]:block">
       <CardFrame isLoading={isLoading}>
         <DataTableOne<OrderIF>
           title="Orders"
@@ -830,6 +710,11 @@ export default function Order() {
               setSearchType={setSearchType}
               searchValue={searchValue}
               setSearchValue={setSearchValue}
+              selectedStatuses={selectedStatuses}
+              setSelectedStatuses={setSelectedStatuses}
+              statusOptions={Object.entries(ORDER_STATUS_DETAILS).map(([k, v]) => ({ value: k, label: v.text }))}
+              rtsFilter={rtsFilter}
+              setRtsFilter={setRtsFilter}
             />
           }
           headerFilter={<DateFilterDropdown value={dateFilter} onChange={handleFilterChange} />}
@@ -905,6 +790,88 @@ export default function Order() {
           }}
         />
       </CardFrame>
+      </div>
+
+      {/* Mobile/tablet card list */}
+      <div className="min-[1025px]:hidden">
+        {/* Tabs */}
+        <div className="flex gap-1 mb-3 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
+          {(["all", "unpaid", "paid"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                statusTab === tab
+                  ? "bg-brand-500 text-white"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              {tab === "all" ? "All Order" : tab === "unpaid" ? "Unpaid" : "Paid"}
+            </button>
+          ))}
+        </div>
+        {/* Search + date filter */}
+        <div className="flex gap-2 mb-3">
+          <div className="flex-1">
+            <SmartSearchInput
+              searchType={searchType}
+              setSearchType={setSearchType}
+              searchValue={searchValue}
+              setSearchValue={setSearchValue}
+              selectedStatuses={selectedStatuses}
+              setSelectedStatuses={setSelectedStatuses}
+              statusOptions={Object.entries(ORDER_STATUS_DETAILS).map(([k, v]) => ({ value: k, label: v.text }))}
+              rtsFilter={rtsFilter}
+              setRtsFilter={setRtsFilter}
+            />
+          </div>
+          <DateFilterDropdown value={dateFilter} onChange={handleFilterChange} />
+        </div>
+        {/* Cards */}
+        {isLoading ? (
+          <div className="flex justify-center py-12 text-sm text-gray-400">Loading…</div>
+        ) : displayOrders.length === 0 ? (
+          <div className="flex justify-center py-12 text-sm text-gray-400">No orders found</div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              {pagedOrders.map((order) => (
+                <ListCard
+                  key={order.id}
+                  order={order}
+                  onView={handleViewMore}
+                  onInvoice={(id) => navigate(`/jaonaichan/invoice/${id}`)}
+                  onUpdateStatus={(o) => handleOpenUpdateStatus([o])}
+                />
+              ))}
+            </div>
+            {cardTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 px-1">
+                <span className="text-xs text-gray-400">
+                  {(cardPage - 1) * CARD_PAGE_SIZE + 1}–{Math.min(cardPage * CARD_PAGE_SIZE, displayOrders.length)} of {displayOrders.length}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    disabled={cardPage === 1}
+                    onClick={() => setCardPage((p) => p - 1)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    disabled={cardPage === cardTotalPages}
+                    onClick={() => setCardPage((p) => p + 1)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Modal Manage Orders */}
       <Modal
         isOpen={isOpen}
@@ -1314,10 +1281,13 @@ export default function Order() {
             <Label>New Status</Label>
             <Select
               key={isUpdateStatusOpen ? "open" : "closed"}
-              options={Object.entries(ORDER_STATUS_DETAILS).map(([key, detail]) => ({
-                value: key,
-                label: detail.text,
-              }))}
+              options={Object.entries(ORDER_STATUS_DETAILS)
+                .filter(([key]) =>
+                  updateStatusOrders.every(o => o.is_rts)
+                    ? !["pending-payment-2", "wait-verify-2", "paid-2"].includes(key)
+                    : true
+                )
+                .map(([key, detail]) => ({ value: key, label: detail.text }))}
               placeholder="Select new status"
               defaultValue={newStatus}
               onChange={setNewStatus}

@@ -24,6 +24,13 @@ export const STATUS_PROGRESS_COLOR: Record<BadgeColor, string> = {
   emerald: "bg-emerald-500",
 };
 
+export const STATUS_PROGRESS: Record<string, number> = {
+  "waiting-transfer": 5,
+  "pending-payment-1": 15, "wait-verify-1": 25, "paid-1": 40,
+  "pending-payment-2": 50, "wait-verify-2": 65, "paid-2": 80,
+  "packed": 90, "shipped": 95, "completed": 100,
+};
+
 export const ORDER_STATUS_DETAILS: Record<string, OrderStatusDetail> = {
   "pending":             { color: "primary", text: "Pending payment" },
   "processing":          { color: "warning", text: "Processing" },

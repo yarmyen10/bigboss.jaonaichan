@@ -27,9 +27,11 @@ export function useOrderList() {
 
   const [statusTab, setStatusTab] = useState<string>("all");
 
-  const [searchType, setSearchType] = useState<"general" | "batch" | "lot">("general");
+  const [searchType, setSearchType] = useState<"general" | "batch" | "lot" | "status">("general");
   const [searchValue, setSearchValue] = useState<string>("");
   const [debouncedSearchValue, setDebouncedSearchValue] = useState<string>("");
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [rtsFilter, setRtsFilter] = useState(false);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -39,17 +41,24 @@ export function useOrderList() {
   }, [searchValue]);
 
   const displayOrders = useMemo(() => {
+    let result = orders;
     if (searchType === "general" && debouncedSearchValue) {
       const q = debouncedSearchValue.toLowerCase();
-      return orders.filter(row =>
+      result = result.filter(row =>
         String(row.id).toLowerCase().includes(q) ||
         row.customer.name.toLowerCase().includes(q) ||
         row.customer.email.toLowerCase().includes(q) ||
         (row.number && row.number.toLowerCase().includes(q))
       );
     }
-    return orders;
-  }, [orders, searchType, debouncedSearchValue]);
+    if (selectedStatuses.length > 0) {
+      result = result.filter(row => selectedStatuses.includes(row.status));
+    }
+    if (rtsFilter) {
+      result = result.filter(row => row.is_rts);
+    }
+    return result;
+  }, [orders, searchType, debouncedSearchValue, selectedStatuses, rtsFilter]);
 
   const lastFetchedBatchId = useRef("");
 
@@ -60,20 +69,38 @@ export function useOrderList() {
     lId: string = searchType === "lot" ? debouncedSearchValue : ""
   ) => {
     lastFetchedBatchId.current = bId;
+    const PER_PAGE = 50;
+    const baseParams = {
+      perPage: PER_PAGE,
+      ...(filter.date
+        ? { createDate: filter.date }
+        : {
+          ...(filter.month ? { createDateM: Number(filter.month) } : {}),
+          ...(filter.year ? { createDateY: Number(filter.year) } : {}),
+        }),
+      ...(TAB_STATUS[tab] ? { status: TAB_STATUS[tab] } : {}),
+      ...(bId ? { unitPricesId: bId } : {}),
+      ...(lId ? { lotId: Number(lId) } : {}),
+    };
+
     try {
       setIsLoading(true);
-      const res: OrderListResponse = await getOrders({
-        ...(filter.date
-          ? { createDate: filter.date }
-          : {
-            ...(filter.month ? { createDateM: Number(filter.month) } : {}),
-            ...(filter.year ? { createDateY: Number(filter.year) } : {}),
-          }),
-        ...(TAB_STATUS[tab] ? { status: TAB_STATUS[tab] } : {}),
-        ...(bId ? { unitPricesId: bId } : {}),
-        ...(lId ? { lotId: Number(lId) } : {}),
-      });
-      setOrders(Array.isArray(res?.data) ? res.data : []);
+      const first = await getOrders({ ...baseParams, page: 1 });
+      const allOrders = Array.isArray(first?.data) ? [...first.data] : [];
+      const totalPages = first?.pagination?.total_pages ?? 1;
+
+      if (totalPages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, i) =>
+            getOrders({ ...baseParams, page: i + 2 })
+          )
+        );
+        for (const r of rest) {
+          if (Array.isArray(r?.data)) allOrders.push(...r.data);
+        }
+      }
+
+      setOrders(allOrders);
     } catch (error) {
       if (import.meta.env.DEV) console.error(error);
     } finally {
@@ -122,6 +149,10 @@ export function useOrderList() {
     searchValue,
     setSearchValue,
     debouncedSearchValue,
+    selectedStatuses,
+    setSelectedStatuses,
+    rtsFilter,
+    setRtsFilter,
     loadOrders
   };
 }
