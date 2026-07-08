@@ -431,3 +431,25 @@ export async function updateSocialLoginSettings(payload: Partial<SocialLoginSett
         body: JSON.stringify(payload),
     });
 }
+
+// =========================================================================
+// RTS Shipping Settings
+// =========================================================================
+
+export interface RtsShippingSettings {
+    zone_name: string;
+    method_title: string;
+    cost: number;
+    instance_id: number | null;
+}
+
+export async function getRtsShippingSettings(): Promise<RtsShippingSettings> {
+    return apiRequest('/jaonaichan/v1/settings/rts-shipping');
+}
+
+export async function updateRtsShippingSettings(cost: number): Promise<{ success: boolean; cost: number }> {
+    return apiRequest('/jaonaichan/v1/settings/rts-shipping', {
+        method: 'POST',
+        body: JSON.stringify({ cost }),
+    });
+}

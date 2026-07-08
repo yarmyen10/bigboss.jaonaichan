@@ -8,6 +8,9 @@ import { getBillSlipObjectUrl, getOrder, patchOrderShipping, reVerifySlip } from
 import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import { BoxIcon, PencilIcon, ReceiptApproved, ReceiptBill, ReceiptDeclined } from "../../icons";
 
+const stripHtml = (html: string) =>
+  new DOMParser().parseFromString(html, 'text/html').body.textContent ?? html;
+
 interface OrderDetailsProps {
   order: Order | null;
   isOpen: boolean;
@@ -231,7 +234,7 @@ function ItemsTable({ items }: { items: OrderItem[] }) {
           </p>
           {item.variation.length > 0 && (
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              {item.variation.map((v) => `${v.key}: ${v.value}`).join(", ")}
+              {item.variation.map((v) => `${v.key}: ${stripHtml(v.value)}`).join(", ")}
             </p>
           )}
           <p className="text-xs text-gray-400 dark:text-gray-500">{item.product.sku}</p>
@@ -465,14 +468,16 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
 
                     {/* Right: Shipping */}
                     <div className="flex flex-col gap-3 min-w-0 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-gray-800 pt-4 sm:pt-0 sm:pl-4 relative">
-                      <button
-                        type="button"
-                        onClick={handleEditShipping}
-                        className="absolute top-0 sm:top-[-4px] right-0 p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-md transition"
-                        title="Edit Shipping"
-                      >
-                        <PencilIcon className="w-3.5 h-3.5" />
-                      </button>
+                      {displayed.status !== 'completed' && (
+                        <button
+                          type="button"
+                          onClick={handleEditShipping}
+                          className="absolute top-0 sm:top-[-4px] right-0 p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-md transition"
+                          title="Edit Shipping"
+                        >
+                          <PencilIcon className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <div className="flex flex-col gap-0.5 min-w-0">
                         <span className="text-xs text-gray-400 dark:text-gray-500 pr-6">Shipping Info</span>
                         {displayed.shipping && (displayed.shipping.name || displayed.shipping.address) ? (

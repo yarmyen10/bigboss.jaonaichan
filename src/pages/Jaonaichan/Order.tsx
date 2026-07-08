@@ -564,7 +564,6 @@ export default function Order() {
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const {
-    orders,
     displayOrders,
     isLoading,
     dateFilter,

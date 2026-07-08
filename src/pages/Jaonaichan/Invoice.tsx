@@ -9,6 +9,9 @@ import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import Badge from "../../components/ui/badge/Badge";
 import Button from "../../components/ui/button/Button";
 
+const stripHtml = (html: string) =>
+  new DOMParser().parseFromString(html, 'text/html').body.textContent ?? html;
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -231,7 +234,7 @@ export default function InvoicePage() {
                     <p className="font-medium text-gray-800 dark:text-white/90">{item.name}</p>
                     {item.variation.length > 0 && (
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {item.variation.map((v) => `${v.key}: ${v.value}`).join(", ")}
+                        {item.variation.map((v) => `${v.key}: ${stripHtml(v.value)}`).join(", ")}
                       </p>
                     )}
                   </td>
