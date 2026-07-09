@@ -504,6 +504,7 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                                     <div key={i} className="flex items-center gap-2">
                                       <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-bold ${colors[p.carrier] ?? 'bg-gray-400 text-white'}`}>{labels[p.carrier] ?? p.carrier.toUpperCase()}</span>
                                       <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{p.number}</span>
+                                      {p.number && (() => { const urls: Record<string,string> = { kerry: `https://th.kerryexpress.com/th/track/?track=${encodeURIComponent(p.number)}`, flash: `https://flashexpress.com/tracking/?se=${encodeURIComponent(p.number)}`, jt: `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${encodeURIComponent(p.number)}`, thaipost: `https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(p.number)}` }; const url = urls[p.carrier]; return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-500 hover:text-brand-600 transition" title="Track"><svg className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg></a> : null; })()}
                                     </div>
                                   );
                                 })}

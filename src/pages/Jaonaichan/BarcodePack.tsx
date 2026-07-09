@@ -37,6 +37,17 @@ const CARRIERS: { value: TrackingParcel['carrier']; label: string; short: string
     { value: 'thaipost', label: 'ไปรษณีย์ไทย',      short: 'POST',     bg: 'bg-[#6B2D8B]',  text: 'text-white', ring: 'ring-[#6B2D8B]' },
 ];
 
+const trackingUrl = (carrier: string, number: string): string | null => {
+    const n = encodeURIComponent(number.trim());
+    const map: Record<string, string> = {
+        kerry:    `https://th.kerryexpress.com/th/track/?track=${n}`,
+        flash:    `https://flashexpress.com/tracking/?se=${n}`,
+        jt:       `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${n}`,
+        thaipost: `https://track.thailandpost.co.th/?trackNumber=${n}`,
+    };
+    return map[carrier] ?? null;
+};
+
 const PAYMENT_LABEL: Record<string, string> = {
     promptpay_qr:  "PromptPay QR",
     bank_transfer: "Bank Transfer",
@@ -119,6 +130,8 @@ export default function BarcodePack() {
     const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const [manualBarcode, setManualBarcode] = useState('');
+    const [cameraFailed, setCameraFailed] = useState(false);
+    const manualInputRef = useRef<HTMLInputElement>(null);
 
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const itemsRef = useRef<EnhancedBarcodeOrderItem[]>([]);
@@ -158,9 +171,15 @@ export default function BarcodePack() {
         }
     }, []);
 
+    // Auto-focus manual input when camera fails
+    useEffect(() => {
+        if (cameraFailed) manualInputRef.current?.focus();
+    }, [cameraFailed]);
+
     // Camera lifecycle
     useEffect(() => {
         if (!cameraOpen) return;
+        setCameraFailed(false);
 
         let stopped = false;
 
@@ -174,7 +193,6 @@ export default function BarcodePack() {
                     return;
                 }
                 scanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
-                scannerRef.current = scanner;
                 const capturedScanner = scanner;
 
                 const onScanSuccess = async (barcode: string) => {
@@ -201,10 +219,11 @@ export default function BarcodePack() {
                         () => { /* ignore per-frame decode errors */ }
                     );
                 }
+                scannerRef.current = scanner; // only set after a successful start
             } catch (err: any) {
                 console.error("Camera start error:", err);
-                setToast(err?.message || "Failed to open camera. Please check permissions or use HTTPS.");
-                setCameraOpen(false);
+                scannerRef.current = null; // ensure cleanup won't stop() an unstarted scanner
+                setCameraFailed(true);
             }
         }, 150);
 
@@ -212,7 +231,7 @@ export default function BarcodePack() {
             clearTimeout(timer);
             if (scannerRef.current && !stopped) {
                 stopped = true;
-                scannerRef.current.stop().catch(() => {});
+                try { scannerRef.current.stop().catch(() => {}); } catch { /* not started */ }
                 scannerRef.current = null;
             }
         };
@@ -247,18 +266,19 @@ export default function BarcodePack() {
         setItems([]);
         setScanned({});
         setScanResult(null);
+        setLastPackedOrderId(null);
         try {
             const [res, orderDetail] = await Promise.all([
                 getBarcodeOrderItems(id),
                 getOrder(id).catch(() => null)
             ]);
-            
+
             if (orderDetail) {
                 setSelectedOrder(orderDetail);
             } else {
                 setSelectedOrder(null);
             }
-            
+
             if (res.items.length === 0) {
                 setItemsError('No items found for this order.');
             } else {
@@ -271,6 +291,14 @@ export default function BarcodePack() {
                     };
                 });
                 setItems(enhancedItems);
+            }
+
+            if (orderDetail?.status === 'packed') {
+                const hasTracking = (orderDetail.shipping?.tracking?.length ?? 0) > 0;
+                if (!hasTracking) {
+                    setLastPackedOrderId(orderDetail.id);
+                    setParcels([{ carrier: 'kerry', number: '' }]);
+                }
             }
         } catch {
             setItemsError('Failed to load order items.');
@@ -349,7 +377,9 @@ export default function BarcodePack() {
 
     const tableRows = items.map((item, index) => {
         const scannedCount = scanned[item.product_id]?.length ?? 0;
-        const done = scannedCount >= item.qty;
+        const isPacked = selectedOrder?.status === 'packed';
+        const done = isPacked || scannedCount >= item.qty;
+        const displayCount = isPacked ? item.qty : scannedCount;
 
         return {
             no: <div className="text-center w-full">{index + 1}</div>,
@@ -363,22 +393,26 @@ export default function BarcodePack() {
             qty: (
                 <div className="text-center w-full">
                     <Badge color={done ? 'primary' : 'light'} size="sm">
-                        {scannedCount}/{item.qty}
+                        {displayCount}/{item.qty}
                     </Badge>
                 </div>
             ),
             action: (
                 <div className="text-center w-full">
-                    <Button 
-                        size="sm" 
-                        disabled={done || cameraOpen} 
-                        onClick={() => {
-                            setScanResult(null);
-                            setCameraOpen(true);
-                        }}
-                    >
-                        Scan
-                    </Button>
+                    {isPacked ? (
+                        <Badge color="primary" size="sm">✓</Badge>
+                    ) : (
+                        <Button
+                            size="sm"
+                            disabled={done || cameraOpen}
+                            onClick={() => {
+                                setScanResult(null);
+                                setCameraOpen(true);
+                            }}
+                        >
+                            Scan
+                        </Button>
+                    )}
                 </div>
             )
         };
@@ -480,6 +514,11 @@ export default function BarcodePack() {
                                         onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, number: e.target.value } : p))}
                                         className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
                                     />
+                                    {parcel.number.trim() && (() => { const url = trackingUrl(parcel.carrier, parcel.number); return url ? (
+                                        <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-500 hover:text-brand-600 transition" title="เปิด tracking link">
+                                            <svg className="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg>
+                                        </a>
+                                    ) : null; })()}
                                     {parcels.length > 1 && (
                                         <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
                                             <svg className="size-4" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -702,17 +741,32 @@ export default function BarcodePack() {
                             <BasicTableOne columns={ITEM_COLUMNS} rows={tableRows} />
                             
                             <div className="flex flex-col items-end gap-2 pt-4">
-                                {allScanned && !selectedLotId && (
-                                    <p className="text-xs text-warning-500">Please select a lot before confirming.</p>
+                                {selectedOrder?.status === 'packed' ? (
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-medium text-success-600 dark:text-success-400">✓ Packed แล้ว</span>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => { setLastPackedOrderId(selectedOrder.id); setParcels([{ carrier: 'kerry', number: '' }]); }}
+                                        >
+                                            + Add Tracking
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {allScanned && !selectedLotId && (
+                                            <p className="text-xs text-warning-500">Please select a lot before confirming.</p>
+                                        )}
+                                        <Button
+                                            variant="orange"
+                                            disabled={!allScanned || confirming || !selectedLotId}
+                                            onClick={() => void handleConfirmPack()}
+                                            className="w-full sm:w-auto min-w-[200px]"
+                                        >
+                                            {confirming ? 'Confirming…' : 'Confirm Pack'}
+                                        </Button>
+                                    </>
                                 )}
-                                <Button
-                                    variant="orange"
-                                    disabled={!allScanned || confirming || !selectedLotId}
-                                    onClick={() => void handleConfirmPack()}
-                                    className="w-full sm:w-auto min-w-[200px]"
-                                >
-                                    {confirming ? 'Confirming…' : 'Confirm Pack'}
-                                </Button>
                             </div>
                         </div>
                     )}
@@ -728,15 +782,19 @@ export default function BarcodePack() {
             >
                 <div className="p-4 space-y-3">
                     <p className="text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        สแกน Barcode
+                        {cameraFailed ? 'กรอก Barcode' : 'สแกน Barcode'}
                     </p>
-                    <div className="overflow-hidden rounded-xl">
+                    <div className={`overflow-hidden rounded-xl ${cameraFailed ? 'hidden' : ''}`}>
                         <div id={SCANNER_ELEMENT_ID} className="w-full" />
                     </div>
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-2">
-                        <p className="text-xs text-gray-400 text-center">หรือกรอก barcode</p>
+                    {cameraFailed && (
+                        <p className="text-xs text-center text-amber-500">เปิดกล้องไม่ได้ — กรอก barcode แทน</p>
+                    )}
+                    <div className={`space-y-2 ${cameraFailed ? '' : 'border-t border-gray-100 dark:border-gray-700 pt-3'}`}>
+                        {!cameraFailed && <p className="text-xs text-gray-400 text-center">หรือกรอก barcode</p>}
                         <div className="flex gap-2">
                             <input
+                                ref={manualInputRef}
                                 type="text"
                                 value={manualBarcode}
                                 onChange={e => setManualBarcode(e.target.value)}

@@ -418,7 +418,7 @@ export default function Bill2UnitPrices() {
         perPage: 100,
         createDateY: new Date().getFullYear(),
       });
-      const orders = res?.data ?? [];
+      const orders = (res?.data ?? []).filter((o) => !o.is_rts);
       setAllOrders(orders);
 
       if (orders.length > 0) {
