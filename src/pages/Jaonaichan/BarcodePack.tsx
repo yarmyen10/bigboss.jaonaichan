@@ -30,6 +30,9 @@ interface EnhancedBarcodeOrderItem extends BarcodeOrderItem {
 
 const SCANNER_ELEMENT_ID = 'barcode-pack-reader';
 
+// statuses ที่ถือว่า "pack แล้ว" ในหน้านี้
+const PACKED_STATUSES = new Set(['packed', 'wait-tracking', 'tracked']);
+
 const CARRIERS: { value: TrackingParcel['carrier']; label: string; short: string; bg: string; text: string; ring: string }[] = [
     { value: 'kerry',    label: 'Kerry Express',     short: 'KEX',      bg: 'bg-[#E30013]',  text: 'text-white', ring: 'ring-[#E30013]' },
     { value: 'flash',    label: 'Flash Express',     short: 'FLASH',    bg: 'bg-[#FF6B00]',  text: 'text-white', ring: 'ring-[#FF6B00]' },
@@ -40,7 +43,7 @@ const CARRIERS: { value: TrackingParcel['carrier']; label: string; short: string
 const trackingUrl = (carrier: string, number: string): string | null => {
     const n = encodeURIComponent(number.trim());
     const map: Record<string, string> = {
-        kerry:    `https://th.kerryexpress.com/th/track/?track=${n}`,
+        kerry:    `https://th.kex-express.com/en/track/?track=${n}`,
         flash:    `https://flashexpress.com/tracking/?se=${n}`,
         jt:       `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${n}`,
         thaipost: `https://track.thailandpost.co.th/?trackNumber=${n}`,
@@ -293,7 +296,7 @@ export default function BarcodePack() {
                 setItems(enhancedItems);
             }
 
-            if (orderDetail?.status === 'packed') {
+            if (orderDetail && PACKED_STATUSES.has(orderDetail.status) && orderDetail.status !== 'tracked') {
                 const hasTracking = (orderDetail.shipping?.tracking?.length ?? 0) > 0;
                 if (!hasTracking) {
                     setLastPackedOrderId(orderDetail.id);
@@ -377,7 +380,7 @@ export default function BarcodePack() {
 
     const tableRows = items.map((item, index) => {
         const scannedCount = scanned[item.product_id]?.length ?? 0;
-        const isPacked = selectedOrder?.status === 'packed';
+        const isPacked = !!selectedOrder && PACKED_STATUSES.has(selectedOrder.status);
         const done = isPacked || scannedCount >= item.qty;
         const displayCount = isPacked ? item.qty : scannedCount;
 
@@ -515,9 +518,9 @@ export default function BarcodePack() {
                                         className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
                                     />
                                     {parcel.number.trim() && (() => { const url = trackingUrl(parcel.carrier, parcel.number); return url ? (
-                                        <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-500 hover:text-brand-600 transition" title="เปิด tracking link">
+                                        <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
                                             <svg className="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg>
-                                        </a>
+                                        </Button>
                                     ) : null; })()}
                                     {parcels.length > 1 && (
                                         <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
@@ -741,7 +744,7 @@ export default function BarcodePack() {
                             <BasicTableOne columns={ITEM_COLUMNS} rows={tableRows} />
                             
                             <div className="flex flex-col items-end gap-2 pt-4">
-                                {selectedOrder?.status === 'packed' ? (
+                                {selectedOrder && PACKED_STATUSES.has(selectedOrder.status) ? (
                                     <div className="flex items-center gap-3">
                                         <span className="text-sm font-medium text-success-600 dark:text-success-400">✓ Packed แล้ว</span>
                                         <Button

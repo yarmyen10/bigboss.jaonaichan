@@ -45,7 +45,7 @@ const STATUS_ORDER = [
   "waiting-transfer",
   "pending-payment-1", "wait-verify-1", "paid-1",
   "pending-payment-2", "wait-verify-2", "paid-2",
-  "packed", "shipped", "completed",
+  "packed", "wait-tracking", "tracked", "wait-shipping", "shipped", "completed",
   "processing", "on-hold", "pending", "checkout-draft",
   "cancelled", "refunded", "failed",
 ];

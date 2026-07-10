@@ -28,7 +28,7 @@ export const STATUS_PROGRESS: Record<string, number> = {
   "waiting-transfer": 5,
   "pending-payment-1": 15, "wait-verify-1": 25, "paid-1": 40,
   "pending-payment-2": 50, "wait-verify-2": 65, "paid-2": 80,
-  "packed": 90, "shipped": 95, "completed": 100,
+  "packed": 85, "wait-tracking": 88, "tracked": 91, "wait-shipping": 94, "shipped": 97, "completed": 100,
 };
 
 export const ORDER_STATUS_DETAILS: Record<string, OrderStatusDetail> = {
@@ -47,4 +47,9 @@ export const ORDER_STATUS_DETAILS: Record<string, OrderStatusDetail> = {
   "wait-verify-2":       { color: "warning", text: "Waiting for Verification 2" },
   "paid-1":              { color: "primary", text: "Paid 1" },
   "paid-2":              { color: "emerald", text: "Paid 2" },
+  "packed":              { color: "success", text: "Packed" },
+  "wait-tracking":       { color: "amber",   text: "Waiting for Tracking" },
+  "tracked":             { color: "primary", text: "Tracked" },
+  "wait-shipping":       { color: "info",    text: "Waiting for Shipping" },
+  "shipped":             { color: "success", text: "Shipped" },
 };

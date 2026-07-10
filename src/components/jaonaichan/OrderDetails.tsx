@@ -207,6 +207,49 @@ function OrderHistoryTimeline({
   );
 }
 
+const CARRIER_META: Record<string, { bg: string; label: string; url: (n: string) => string }> = {
+  kerry:    { bg: 'bg-[#E30013] text-white', label: 'KEX',   url: n => `https://th.kex-express.com/en/track/?track=${encodeURIComponent(n)}` },
+  flash:    { bg: 'bg-[#FF6B00] text-white', label: 'FLASH', url: n => `https://flashexpress.com/tracking/?se=${encodeURIComponent(n)}` },
+  jt:       { bg: 'bg-[#E8000D] text-white', label: 'J&T',   url: n => `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${encodeURIComponent(n)}` },
+  thaipost: { bg: 'bg-[#6B2D8B] text-white', label: 'POST',  url: n => `https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(n)}` },
+};
+
+function TrackingCard({ tracking }: { tracking: Array<{ carrier: string; number: string }> }) {
+  return (
+    <SectionCard title="Tracking">
+      <div className="flex flex-col gap-2">
+        {tracking.map((p, i) => {
+          const meta = CARRIER_META[p.carrier] ?? { bg: 'bg-gray-400 text-white', label: p.carrier.toUpperCase(), url: () => '' };
+          const url  = meta.url(p.number);
+          return (
+            <div key={i} className="flex items-center gap-3 rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2.5">
+              <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold ${meta.bg}`}>
+                {meta.label}
+              </span>
+              <span className="flex-1 font-mono text-sm text-gray-800 dark:text-gray-200 select-all">
+                {p.number}
+              </span>
+              {url && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 flex items-center gap-1.5 text-xs text-brand-500 hover:text-brand-600 transition"
+                >
+                  <svg className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/>
+                  </svg>
+                  Track
+                </a>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
 const ITEM_COLUMNS: BasicTableColumn[] = [
   { key: "product", label: "Product" },
   { key: "qty", label: "Quantity", className: "text-center" },
@@ -495,21 +538,6 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                                 {displayed.shipping.address}
                               </span>
                             )}
-                            {displayed.shipping.tracking && displayed.shipping.tracking.length > 0 && (
-                              <div className="flex flex-col gap-1 mt-2">
-                                {displayed.shipping.tracking.map((p, i) => {
-                                  const colors: Record<string, string> = { kerry: 'bg-[#E30013] text-white', flash: 'bg-[#FF6B00] text-white', jt: 'bg-[#E8000D] text-white', thaipost: 'bg-[#6B2D8B] text-white' };
-                                  const labels: Record<string, string> = { kerry: 'KEX', flash: 'FLASH', jt: 'J&T', thaipost: 'POST' };
-                                  return (
-                                    <div key={i} className="flex items-center gap-2">
-                                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-bold ${colors[p.carrier] ?? 'bg-gray-400 text-white'}`}>{labels[p.carrier] ?? p.carrier.toUpperCase()}</span>
-                                      <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{p.number}</span>
-                                      {p.number && (() => { const urls: Record<string,string> = { kerry: `https://th.kerryexpress.com/th/track/?track=${encodeURIComponent(p.number)}`, flash: `https://flashexpress.com/tracking/?se=${encodeURIComponent(p.number)}`, jt: `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${encodeURIComponent(p.number)}`, thaipost: `https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(p.number)}` }; const url = urls[p.carrier]; return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-500 hover:text-brand-600 transition" title="Track"><svg className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg></a> : null; })()}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
                           </>
                         ) : (
                           <span className="text-sm text-amber-500 mt-1 italic">รอข้อมูลจัดส่ง</span>
@@ -534,13 +562,18 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
                   )}
                 </div>
 
-                <OrderHistoryTimeline
-                  events={buildHistory(displayed, slip1, slip2)}
-                  onPreviewSlip={setPreviewUrl}
-                  onReVerify={handleReVerify}
-                  reVerifying={reVerifying}
-                  reVerifyError={reVerifyError}
-                />
+                <div className="flex flex-col gap-6">
+                  <OrderHistoryTimeline
+                    events={buildHistory(displayed, slip1, slip2)}
+                    onPreviewSlip={setPreviewUrl}
+                    onReVerify={handleReVerify}
+                    reVerifying={reVerifying}
+                    reVerifyError={reVerifyError}
+                  />
+                  {displayed.shipping?.tracking && displayed.shipping.tracking.length > 0 && (
+                    <TrackingCard tracking={displayed.shipping.tracking} />
+                  )}
+                </div>
               </div>
             </div>
           )}
