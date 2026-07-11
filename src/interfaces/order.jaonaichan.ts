@@ -4,7 +4,7 @@
 
 import type { InvoiceLineItem } from './invoice.jaonaichan'
 
-export type BillStatus = 'pending' | 'submitted' | 'paid' | 'cancelled'
+export type BillStatus = 'pending' | 'submitted' | 'paid' | 'cancelled' | 'draft'
 export type OrderStatus = string // wc statuses e.g. 'processing' | 'completed' | 'on-hold' | ...
 
 export interface Pagination {

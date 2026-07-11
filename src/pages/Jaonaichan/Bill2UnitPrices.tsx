@@ -35,6 +35,13 @@ function generateBatchId(): string {
   return `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
 }
 
+function recordChanged(current: Record<number, string>, saved: Record<number, string>): boolean {
+  const currentKeys = Object.keys(current).sort();
+  const savedKeys = Object.keys(saved).sort();
+  if (currentKeys.length !== savedKeys.length) return true;
+  return currentKeys.some((k) => current[Number(k)] !== saved[Number(k)]);
+}
+
 function formatBatchDate(batchId: string): string {
   if (batchId.length < 12) return batchId;
   return `${batchId.slice(0, 4)}-${batchId.slice(4, 6)}-${batchId.slice(6, 8)} ${batchId.slice(8, 10)}:${batchId.slice(10, 12)}`;
@@ -179,7 +186,9 @@ export default function Bill2UnitPrices() {
   const [unitPrices, setUnitPrices] = useState<Record<number, string>>({});
   const savedUnitPrices = useRef<Record<number, string>>({});
   const [chinaShippingPrices, setChinaShippingPrices] = useState<Record<number, string>>({});
+  const savedChinaShippingPrices = useRef<Record<number, string>>({});
   const [importFeePrices, setImportFeePrices] = useState<Record<number, string>>({});
+  const savedImportFeePrices = useRef<Record<number, string>>({});
   const [localShippingPrice, setLocalShippingPrice] = useState<string>("");
   const [modalProduct, setModalProduct] = useState<OrderItemProduct | null>(null);
 
@@ -358,17 +367,16 @@ export default function Bill2UnitPrices() {
   const pricedCount = Object.keys(unitPrices).length;
 
   const hasChanges = useMemo(() => {
-    if (Object.keys(chinaShippingPrices).length > 0) return true;
-    if (Object.keys(importFeePrices).length > 0) return true;
     if (localShippingPrice.trim() !== "") return true;
-    const saved = savedUnitPrices.current;
-    const currentKeys = Object.keys(unitPrices).sort();
-    const savedKeys = Object.keys(saved).sort();
-    if (currentKeys.length !== savedKeys.length) return true;
-    return currentKeys.some((k) => unitPrices[Number(k)] !== saved[Number(k)]);
+    if (recordChanged(unitPrices, savedUnitPrices.current)) return true;
+    if (recordChanged(chinaShippingPrices, savedChinaShippingPrices.current)) return true;
+    if (recordChanged(importFeePrices, savedImportFeePrices.current)) return true;
+    return false;
   }, [unitPrices, chinaShippingPrices, importFeePrices, localShippingPrice]);
   const totalBill2 = orderTotals.reduce((s, o) => s + o.total, 0);
   const isNewBatch = activeBatchId === null;
+  const activeBatchHasLiveOrder = !isNewBatch && activeBatchOrders.some((o) => o.bill2.status !== "draft");
+  const showDraftOption = isNewBatch || !activeBatchHasLiveOrder;
 
   const handleViewDetails = useCallback((product: OrderItemProduct) => {
     setModalProduct(product);
@@ -397,8 +405,25 @@ export default function Bill2UnitPrices() {
     }
     savedUnitPrices.current = merged;
     setUnitPrices(merged);
-    setChinaShippingPrices({});
-    setImportFeePrices({});
+
+    // china_shipping_by_product / import_fee_by_product store each order's already-split
+    // share — sum them back across the batch to reconstruct the "Total" the admin typed in.
+    const sumByProduct = (pick: (o: OrderIF) => Record<number, number> | undefined) => {
+      const totals: Record<number, number> = {};
+      for (const order of batchOrders) {
+        for (const [pid, amount] of Object.entries(pick(order) ?? {})) {
+          if (!/^\d+$/.test(pid)) continue; // skips legacy '_legacy' flat-number entries
+          totals[Number(pid)] = (totals[Number(pid)] ?? 0) + Number(amount);
+        }
+      }
+      return Object.fromEntries(Object.entries(totals).map(([pid, total]) => [pid, String(total)]));
+    };
+    const china = sumByProduct((o) => o.bill2.china_shipping_by_product);
+    const importFee = sumByProduct((o) => o.bill2.import_fee_by_product);
+    savedChinaShippingPrices.current = china;
+    savedImportFeePrices.current = importFee;
+    setChinaShippingPrices(china);
+    setImportFeePrices(importFee);
     setLocalShippingPrice("");
   }, []);
 
@@ -474,7 +499,7 @@ export default function Bill2UnitPrices() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = (publish: boolean) => {
     withSpinner(async () => {
       try {
         const numericPrices: Record<number, number> = {};
@@ -520,10 +545,16 @@ export default function Bill2UnitPrices() {
               }
             }
 
+            const orderInfo = activeBatchOrders.find((o) => o.id === info.orderId)!;
+            // Only touch bill2.status while it's still ours to move (draft/pending) — once the
+            // customer has submitted/paid, an unrelated admin price tweak must not revert it.
+            const hasProgressed = !["draft", "pending"].includes(orderInfo.bill2.status);
+            const targetStatus = hasProgressed ? undefined : publish ? "pending" : "draft";
+
             await patchBill2(
               info.orderId,
               info.total,
-              "pending",
+              targetStatus,
               undefined,
               orderPrices,
               batchId,
@@ -531,7 +562,7 @@ export default function Bill2UnitPrices() {
               importByProduct,
               info.orderLocalShipping
             );
-            if (isNewBatch) {
+            if (orderInfo.status === "paid-1") {
               await patchOrderStatus(info.orderId, "wc-pending-payment-2");
             }
           })
@@ -540,7 +571,7 @@ export default function Bill2UnitPrices() {
         closeConfirm();
         setResultVariant("success");
         setResultMessage(
-          `${isNewBatch ? "บันทึก" : "อัปเดต"}สำเร็จ! ${orderItemsMap.size} orders (Batch: ${batchId})`
+          `${publish ? "เผยแพร่" : "บันทึกร่าง"}สำเร็จ! ${orderItemsMap.size} orders (Batch: ${batchId})`
         );
         openResult();
         await loadData();
@@ -741,7 +772,12 @@ export default function Bill2UnitPrices() {
             {/* Batch ID */}
             {activeBatchId && (
               <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/50">
-                <p className="text-xs text-gray-400 dark:text-gray-500">Batch ID</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Batch ID</p>
+                  <Badge size="sm" variant="light" color={activeBatchHasLiveOrder ? "success" : "warning"}>
+                    {activeBatchHasLiveOrder ? "เผยแพร่แล้ว" : "ร่าง"}
+                  </Badge>
+                </div>
                 <p className="font-mono text-xs text-gray-600 dark:text-gray-300">{activeBatchId}</p>
               </div>
             )}
@@ -755,8 +791,8 @@ export default function Bill2UnitPrices() {
                 disabled={pricedCount === 0 || activeBatchOrders.length === 0 || (!isNewBatch && !hasChanges)}
                 className="w-full justify-center"
               >
-                {isNewBatch
-                  ? `บันทึก ${activeBatchOrders.length} Orders`
+                {showDraftOption
+                  ? `บันทึก/เผยแพร่ ${activeBatchOrders.length} Orders`
                   : `อัปเดตราคา ${activeBatchOrders.length} Orders`}
               </Button>
               <div className="flex gap-2">
@@ -799,10 +835,11 @@ export default function Bill2UnitPrices() {
         <div className="flex max-h-[85vh] flex-col">
           <div className="shrink-0 mb-5 pr-8">
             <h4 className="font-semibold text-gray-800 text-title-sm dark:text-white/90">
-              {isNewBatch ? "ยืนยันการบันทึก" : "ยืนยันการอัปเดต"} — Bill 2 แต่ละ Order
+              {showDraftOption ? "บันทึกร่างหรือเผยแพร่" : "ยืนยันการอัปเดต"} — Bill 2 แต่ละ Order
             </h4>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              ตรวจสอบยอดก่อน{isNewBatch ? "บันทึก" : "อัปเดต"} ทั้งหมด {activeBatchOrders.length} orders
+              ตรวจสอบยอดก่อน{showDraftOption ? "บันทึก" : "อัปเดต"} ทั้งหมด {activeBatchOrders.length} orders
+              {showDraftOption && " — บันทึกร่างจะยังไม่แสดงให้ลูกค้าเห็น"}
             </p>
           </div>
 
@@ -817,12 +854,21 @@ export default function Bill2UnitPrices() {
             >
               ยกเลิก
             </button>
+            {showDraftOption && (
+              <button
+                onClick={() => handleSave(false)}
+                disabled={spinning}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] dark:hover:text-gray-300"
+              >
+                บันทึกร่าง
+              </button>
+            )}
             <button
-              onClick={handleSave}
+              onClick={() => handleSave(true)}
               disabled={spinning}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm text-white shadow-theme-xs transition hover:bg-brand-600 disabled:bg-brand-300"
             >
-              ยืนยัน
+              {showDraftOption ? "เผยแพร่ให้ลูกค้าเห็น" : "อัปเดต"}
             </button>
           </div>
         </div>

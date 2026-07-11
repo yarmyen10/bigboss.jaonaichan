@@ -314,6 +314,11 @@ const getOrderColumns = (
             <Badge variant="gradient" color={((ORDER_STATUS_DETAILS[s]?.color ?? 'light') as BadgeColor)}>
               {ORDER_STATUS_DETAILS[s]?.text ?? s}
             </Badge>
+            {row.bill2?.unit_prices_id && ["pending-payment-2", "wait-verify-2"].includes(row.status) && (
+              <Badge variant="light" size="sm" color={row.bill2.status === "draft" ? "warning" : "success"}>
+                {row.bill2.status === "draft" ? "Draft" : "Published"}
+              </Badge>
+            )}
             {row.is_rts && (
               <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
                 ⚡ RTS

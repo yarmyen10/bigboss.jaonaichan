@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Order as OrderIF, OrderItemProduct, OrderProductsBulkItem, OrderProductsBulkResponse } from "../../interfaces/order.jaonaichan";
-import { getProductsBulkByOrders, patchBill2, patchOrderStatus } from "../../services/jaonaichan";
+import { getProductsBulkByOrders, patchBill2 } from "../../services/jaonaichan";
 import { resolveManageTabs, STATUS_MANAGE_ACTIONS } from "../../config/manageOrders.jaonaichan";
 import { TabOption } from "../../components/ui/tabs";
 import { useModal } from "../useModal";
@@ -214,8 +214,7 @@ export function useManageProducts({
             if (line.chinaAmount > 0) chinaByProduct[line.productId] = line.chinaAmount;
             if (line.importAmount > 0) importByProduct[line.productId] = line.importAmount;
           }
-          await patchBill2(order.orderId, finalTotal, 'pending', undefined, orderPrices, previewBatchId, chinaByProduct, importByProduct, order.localShipping);
-          await patchOrderStatus(order.orderId, 'wc-pending-payment-2');
+          await patchBill2(order.orderId, finalTotal, 'draft', undefined, orderPrices, previewBatchId, chinaByProduct, importByProduct, order.localShipping);
         })
       );
       closePreviewModal();
