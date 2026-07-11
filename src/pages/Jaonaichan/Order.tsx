@@ -1287,7 +1287,7 @@ export default function Order() {
               key={isUpdateStatusOpen ? "open" : "closed"}
               options={Object.entries(ORDER_STATUS_DETAILS)
                 .filter(([key]) =>
-                  updateStatusOrders.every(o => o.is_rts)
+                  updateStatusOrders.some(o => o.is_rts)
                     ? !["pending-payment-2", "wait-verify-2", "paid-2"].includes(key)
                     : true
                 )
