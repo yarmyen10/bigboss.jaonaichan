@@ -14,14 +14,18 @@ export interface GetOrdersParams {
     createDateY?: number;
     unitPricesId?: string;
     lotId?: number;
+    memberNo?: number;
+    username?: string;
 }
 
 export async function getOrders(params: GetOrdersParams = {}): Promise<OrderListResponse> {
-    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY, unitPricesId, lotId } = params;
+    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY, unitPricesId, lotId, memberNo, username } = params;
     const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     if (status) qs.set("status", status);
     if (unitPricesId) qs.set("unit_prices_id", unitPricesId);
     if (lotId) qs.set("lot_id", String(lotId));
+    if (memberNo) qs.set("member_no", String(memberNo));
+    if (username) qs.set("username", username);
     if (createDate) {
         qs.set("create_date", createDate);
     } else {
@@ -148,17 +152,24 @@ export async function getProductsBulkByOrders({
     });
 }
 
-export async function createCustomer(payload: { email: string; first_name: string; last_name: string; phone?: string }): Promise<{ success: boolean; data: any; message?: string }> {
+export async function createCustomer(payload: { username: string; customer_name: string; phone: string; email?: string; status?: 'active' | 'inactive' }): Promise<{ success: boolean; data: any; message?: string }> {
     return apiRequest('/jaonaichan/v1/customers', {
         method: 'POST',
         body: JSON.stringify(payload),
     });
 }
 
-export async function updateCustomer(id: number, payload: { email: string; first_name: string; last_name: string; phone?: string }): Promise<{ success: boolean; data?: any; message?: string }> {
+export async function updateCustomer(id: number, payload: { username: string; customer_name: string; phone: string; email?: string }): Promise<{ success: boolean; data?: any; message?: string }> {
     return apiRequest(`/jaonaichan/v1/customers/${id}`, {
         method: 'POST',
         body: JSON.stringify(payload),
+    });
+}
+
+export async function setCustomerStatus(id: number, status: 'active' | 'inactive'): Promise<{ success: boolean; message?: string }> {
+    return apiRequest(`/jaonaichan/v1/customers/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
     });
 }
 

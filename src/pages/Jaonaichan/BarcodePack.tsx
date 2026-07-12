@@ -79,12 +79,15 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+function SectionCard({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3 min-w-0 overflow-hidden bg-white dark:bg-gray-800">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-        {title}
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          {title}
+        </p>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -127,6 +130,7 @@ export default function BarcodePack() {
     const [validating, setValidating] = useState(false);
     const [toast, setToast] = useState('');
 
+    const [memberSearch, setMemberSearch] = useState('');
     const [lastPackedOrderId, setLastPackedOrderId] = useState<number | null>(null);
     const [parcels, setParcels] = useState<TrackingParcel[]>([{ carrier: 'kerry', number: '' }]);
     const [savingTracking, setSavingTracking] = useState(false);
@@ -242,6 +246,13 @@ export default function BarcodePack() {
 
     const handleLoadOrders = async () => {
         if (!selectedDate) return;
+        setOrderId('');
+        setMemberSearch('');
+        setSelectedOrder(null);
+        setItems([]);
+        setScanned({});
+        setScanResult(null);
+        setItemsError('');
         setLoadingOrders(true);
         try {
             const [y, m, d] = selectedDate.split('-');
@@ -310,9 +321,44 @@ export default function BarcodePack() {
         }
     };
 
+    const handleSearchMember = async () => {
+        const val = memberSearch.trim();
+        if (!val) return;
+        setOrders([]);
+        setOrderId('');
+        setSelectedOrder(null);
+        setItems([]);
+        setScanned({});
+        setScanResult(null);
+        setItemsError('');
+        setLoadingOrders(true);
+        try {
+            const isNum = /^\d+$/.test(val);
+            const res = await getOrders({
+                status: 'paid-2',
+                perPage: 100,
+                ...(isNum ? { memberNo: Number(val) } : { username: val }),
+            });
+            const sorted = res.data
+                .filter((o) => o.status === 'paid-2')
+                .sort((a, b) => {
+                    const timeA = a.bill2?.paid_at ? new Date(a.bill2.paid_at).getTime() : 0;
+                    const timeB = b.bill2?.paid_at ? new Date(b.bill2.paid_at).getTime() : 0;
+                    return timeA - timeB;
+                });
+            setOrders(sorted);
+        } catch (err) {
+            setToast('Failed to search: ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+            setLoadingOrders(false);
+        }
+    };
+
     const handleLoadItemsManual = async () => {
         const id = Number(orderId.trim());
         if (!id) return;
+        setOrders([]);
+        setMemberSearch('');
         setSelectedOrder(null);
         await loadItemsForOrderId(id);
     };
@@ -554,80 +600,105 @@ export default function BarcodePack() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr] gap-6 items-start">
-                {/* LEFT COLUMN: Search and Order List */}
-                <div className="space-y-4">
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-4">
-                        <div className="space-y-3">
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Find by Date</p>
-                            <div className="flex gap-2">
-                                <div className="flex-1">
-                                    <DatePicker
-                                        id="barcode-pack-date-picker"
-                                        defaultDate={selectedDate}
-                                        onChange={(_dates, dateStr) => setSelectedDate(dateStr)}
-                                    />
-                                </div>
-                                <Button size="sm" onClick={() => void handleLoadOrders()} disabled={loadingOrders || !selectedDate}>
-                                    {loadingOrders ? 'Loading…' : 'Find'}
-                                </Button>
+            {/* Filters — 3-column row */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Search</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setOrders([]);
+                            setSelectedOrder(null);
+                            setOrderId('');
+                            setMemberSearch('');
+                            setItems([]);
+                            setScanned({});
+                            setScanResult(null);
+                            setItemsError('');
+                        }}
+                        className="text-xs font-medium text-error-500 hover:text-error-600 dark:text-error-400 dark:hover:text-error-300 transition"
+                    >
+                        Clear
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Find by Date</p>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <DatePicker
+                                    id="barcode-pack-date-picker"
+                                    defaultDate={selectedDate}
+                                    onChange={(_dates, dateStr) => setSelectedDate(dateStr)}
+                                />
                             </div>
-                            
-                            {orders.length > 0 && (
-                                <div className="max-h-96 overflow-y-auto space-y-1 mt-2 custom-scrollbar">
-                                    {orders.map((o) => (
-                                        <button
-                                            key={o.id}
-                                            onClick={() => void handleSelectOrder(o)}
-                                            className={`w-full flex justify-between items-center p-2 rounded-lg border text-sm transition-colors
-                                                ${selectedOrder?.id === o.id 
-                                                    ? 'border-brand-500 bg-brand-50 dark:border-brand-500 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300' 
-                                                    : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                                }`}
-                                        >
-                                            <span className="font-medium">#{o.id} - {o.customer.name}</span>
-                                            <span className="text-xs text-gray-500">{o.bill2?.paid_at ? new Date(o.bill2.paid_at).toLocaleString('th-TH') : 'Unpaid'}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                            <Button size="sm" onClick={() => void handleLoadOrders()} disabled={loadingOrders || !selectedDate}>
+                                {loadingOrders ? '…' : 'Find'}
+                            </Button>
                         </div>
+                    </div>
 
-                        <div className="flex items-center gap-4">
-                            <hr className="flex-1 border-gray-200 dark:border-gray-700" />
-                            <span className="text-xs font-medium text-gray-400 uppercase">OR</span>
-                            <hr className="flex-1 border-gray-200 dark:border-gray-700" />
-                        </div>
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Manual Order ID</p>
+                        <form onSubmit={(e) => { e.preventDefault(); void handleLoadItemsManual(); }} className="flex gap-2">
+                            <div className="flex-1">
+                                <Input
+                                    type="number"
+                                    placeholder="Order ID"
+                                    value={orderId}
+                                    onChange={(e) => setOrderId(e.target.value)}
+                                    disabled={loadingItems}
+                                    className="!text-base"
+                                />
+                            </div>
+                            <Button size="sm" onClick={() => void handleLoadItemsManual()} disabled={loadingItems || !orderId.trim()}>
+                                {loadingItems ? '…' : 'Load'}
+                            </Button>
+                        </form>
+                    </div>
 
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Manual Order ID</p>
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    void handleLoadItemsManual();
-                                }}
-                                className="flex gap-2"
-                            >
-                                <div className="flex-1">
-                                    <Input
-                                        type="number"
-                                        placeholder="Order ID"
-                                        value={orderId}
-                                        onChange={(e) => setOrderId(e.target.value)}
-                                        disabled={loadingItems}
-                                        className="!text-base"
-                                    />
-                                </div>
-                                <Button size="sm" onClick={() => void handleLoadItemsManual()} disabled={loadingItems || !orderId.trim()}>
-                                    {loadingItems ? 'Loading…' : 'Load'}
-                                </Button>
-                            </form>
-                        </div>
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Member No. / Username</p>
+                        <form onSubmit={(e) => { e.preventDefault(); void handleSearchMember(); }} className="flex gap-2">
+                            <div className="flex-1">
+                                <Input
+                                    type="text"
+                                    placeholder="No. / Username"
+                                    value={memberSearch}
+                                    onChange={(e) => setMemberSearch(e.target.value)}
+                                    disabled={loadingOrders}
+                                    className="!text-base"
+                                />
+                            </div>
+                            <Button size="sm" onClick={() => void handleSearchMember()} disabled={loadingOrders || !memberSearch.trim()}>
+                                {loadingOrders ? '…' : 'Search'}
+                            </Button>
+                        </form>
                     </div>
                 </div>
 
-                {/* RIGHT COLUMN: Details and Items Table */}
-                <div className="space-y-6">
+                {orders.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto space-y-1 border-t border-gray-100 pt-3 dark:border-gray-700 custom-scrollbar">
+                        {orders.map((o) => (
+                            <button
+                                key={o.id}
+                                onClick={() => void handleSelectOrder(o)}
+                                className={`w-full flex justify-between items-center p-2 rounded-lg border text-sm transition-colors
+                                    ${selectedOrder?.id === o.id
+                                        ? 'border-brand-500 bg-brand-50 dark:border-brand-500 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300'
+                                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    }`}
+                            >
+                                <span className="font-medium">#{o.id} - {o.customer.name}</span>
+                                <span className="text-xs text-gray-500">{o.bill2?.paid_at ? new Date(o.bill2.paid_at).toLocaleString('th-TH') : 'Unpaid'}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Order details + items */}
+            <div className="space-y-6">
                     {!selectedOrder && !items.length && !loadingItems && !itemsError && (
                         <div className="flex flex-col min-h-[400px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50/50 p-8 text-center dark:border-gray-700 dark:bg-gray-800/50">
                             <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-theme-sm dark:bg-gray-800">
@@ -663,60 +734,57 @@ export default function BarcodePack() {
                             </div>
                             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                                 <SectionCard title="Customer">
-                                    <InfoRow label="Name">{selectedOrder.customer.name}</InfoRow>
-                                    <InfoRow label="Email">{selectedOrder.customer.email}</InfoRow>
+                                    <div className="flex gap-6">
+                                        <InfoRow label="Member No.">{selectedOrder.customer.id || '—'}</InfoRow>
+                                        {selectedOrder.customer.username && (
+                                            <InfoRow label="Username">{selectedOrder.customer.username}</InfoRow>
+                                        )}
+                                    </div>
                                     {selectedOrder.customer.phone && (
                                         <InfoRow label="Phone">{selectedOrder.customer.phone}</InfoRow>
                                     )}
                                 </SectionCard>
 
-                                <SectionCard title="Billing & Shipping">
-                                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4">
-                                        <div className="flex flex-col gap-3 min-w-0">
-                                            <div className="flex flex-col gap-0.5 min-w-0">
-                                                <span className="text-xs text-gray-400 dark:text-gray-500">Billing Address</span>
-                                                {selectedOrder.billing?.address ? (
-                                                    parseAddressLines(selectedOrder.billing.address).map((line, i) => (
-                                                        <span key={i} className="text-sm font-medium text-gray-800 dark:text-white/90 break-words">
-                                                            {line}
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
-                                                )}
-                                            </div>
-                                            <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-auto">
-                                                <InfoRow label="Payment method">
-                                                    {PAYMENT_LABEL[selectedOrder.payment_method] ?? selectedOrder.payment_method}
-                                                </InfoRow>
-                                            </div>
+                                <SectionCard
+                                    title="Shipping"
+                                    action={selectedOrder.shipping && (selectedOrder.shipping.name || selectedOrder.shipping.address) ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const s = selectedOrder.shipping;
+                                                const parts = [s.name, s.phone, s.address].filter(Boolean);
+                                                void navigator.clipboard.writeText(parts.join('\n'));
+                                                setToast('Copied shipping info');
+                                            }}
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 transition"
+                                        >
+                                            <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+                                                <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/>
+                                            </svg>
+                                            Copy
+                                        </button>
+                                    ) : undefined}
+                                >
+                                    {selectedOrder.shipping && (selectedOrder.shipping.name || selectedOrder.shipping.address) ? (
+                                        <div className="flex flex-col gap-1 min-w-0">
+                                            <span className="text-sm font-medium text-gray-800 dark:text-white/90 break-words">
+                                                {selectedOrder.shipping.name}
+                                            </span>
+                                            {selectedOrder.shipping.phone && (
+                                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                    {selectedOrder.shipping.phone}
+                                                </span>
+                                            )}
+                                            {selectedOrder.shipping.address && (
+                                                <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                                                    {selectedOrder.shipping.address}
+                                                </span>
+                                            )}
                                         </div>
-
-                                        <div className="flex flex-col gap-3 min-w-0 border-t lg:border-t-0 xl:border-t 2xl:border-t-0 lg:border-l xl:border-l-0 2xl:border-l border-gray-100 dark:border-gray-800 pt-4 lg:pt-0 xl:pt-4 2xl:pt-0 lg:pl-4 xl:pl-0 2xl:pl-4 relative">
-                                            <div className="flex flex-col gap-0.5 min-w-0">
-                                                <span className="text-xs text-gray-400 dark:text-gray-500 pr-6">Shipping Info</span>
-                                                {selectedOrder.shipping && (selectedOrder.shipping.name || selectedOrder.shipping.address) ? (
-                                                    <>
-                                                        <span className="text-sm font-medium text-gray-800 dark:text-white/90 break-words mt-1">
-                                                            {selectedOrder.shipping.name}
-                                                        </span>
-                                                        {selectedOrder.shipping.phone && (
-                                                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                                {selectedOrder.shipping.phone}
-                                                            </span>
-                                                        )}
-                                                        {selectedOrder.shipping.address && (
-                                                            <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line mt-1">
-                                                                {selectedOrder.shipping.address}
-                                                            </span>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-sm text-amber-500 mt-1 italic">รอข้อมูลจัดส่ง</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    ) : (
+                                        <span className="text-sm text-amber-500 italic">รอข้อมูลจัดส่ง</span>
+                                    )}
                                 </SectionCard>
                             </div>
                         </div>
@@ -773,7 +841,6 @@ export default function BarcodePack() {
                             </div>
                         </div>
                     )}
-                </div>
             </div>
 
             {/* Camera modal */}

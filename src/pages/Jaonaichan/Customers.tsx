@@ -8,7 +8,7 @@ import { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import { Order as OrderIF } from "../../interfaces/order.jaonaichan";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
-import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword } from "../../services/jaonaichan";
+import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword, setCustomerStatus } from "../../services/jaonaichan";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
 import OrderDetails from "../../components/jaonaichan/OrderDetails";
@@ -23,9 +23,12 @@ const formatPhone = (v: string) => {
   return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
 };
 
-const validateCustomerForm = (f: { first_name: string; last_name: string; email: string; phone: string }) => {
-  if (!f.first_name.trim() || f.first_name.length > 50) return "ชื่อต้องไม่เกิน 50 ตัวอักษร";
-  if (!f.last_name.trim() || f.last_name.length > 50) return "นามสกุลต้องไม่เกิน 50 ตัวอักษร";
+const formatDate = (val: string | null) =>
+  val ? new Date(val).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" }) : null;
+
+const validateCustomerForm = (f: { username: string; customer_name: string; phone: string }) => {
+  if (!f.username.trim() || f.username.length > 50) return "Username ต้องไม่เกิน 50 ตัวอักษร";
+  if (!f.customer_name.trim() || f.customer_name.length > 100) return "ชื่อลูกค้าต้องไม่เกิน 100 ตัวอักษร";
   if (!PHONE_RE.test(f.phone.replace(/[-\s]/g, ""))) return "เบอร์โทรศัพท์ไม่ถูกต้อง (ตัวอย่าง: 0812345678)";
   return null;
 };
@@ -37,10 +40,30 @@ const getInitial = (name: string) => {
   return match ? match[1] : trimmed.charAt(0);
 };
 
+const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) =>
+  status === 'active' ? (
+    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+      Active
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+      <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+      Inactive
+    </span>
+  );
+
 const customerColumns: ColumnDef<CustomerListItem>[] = [
   {
+    key: "username",
+    label: "Username",
+    render: (val) => (
+      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{val as string || "—"}</span>
+    ),
+  },
+  {
     key: "name",
-    label: "Customer",
+    label: "Customer Name",
     render: (_val, row) => (
       <div>
         <p className="text-sm font-medium text-black dark:text-white">{row.name}</p>
@@ -84,22 +107,37 @@ const customerColumns: ColumnDef<CustomerListItem>[] = [
     ),
   },
   {
+    key: "status",
+    label: "Status",
+    render: (val) => <StatusBadge status={val as 'active' | 'inactive'} />,
+  },
+  {
+    key: "member_date",
+    label: "Member Date",
+    sortable: true,
+    width: "130px",
+    render: (val) => {
+      const d = formatDate(val as string | null);
+      return d ? (
+        <span className="text-sm font-light text-gray-700 dark:text-gray-400">{d}</span>
+      ) : (
+        <span className="text-sm text-gray-400">—</span>
+      );
+    },
+  },
+  {
     key: "last_order_date",
     label: "Last Order",
     sortable: true,
     width: "130px",
-    render: (val) =>
-      val ? (
-        <span className="text-sm font-light text-gray-700 dark:text-gray-400">
-          {new Date(val as string).toLocaleDateString("th-TH", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })}
-        </span>
+    render: (val) => {
+      const d = formatDate(val as string | null);
+      return d ? (
+        <span className="text-sm font-light text-gray-700 dark:text-gray-400">{d}</span>
       ) : (
         <span className="text-sm text-gray-400">—</span>
-      ),
+      );
+    },
   },
 ];
 
@@ -116,7 +154,7 @@ export default function Customers() {
   const { isOpen, openModal, closeModal } = useModal();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", email: "", phone: "" });
+  const [editForm, setEditForm] = useState({ username: "", customer_name: "", email: "", phone: "" });
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState("");
 
@@ -125,6 +163,25 @@ export default function Customers() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetSuccess, setResetSuccess] = useState("");
+
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+
+  const handleToggleStatus = async () => {
+    if (!selectedCustomer || isTogglingStatus) return;
+    const newStatus = selectedCustomer.status === 'active' ? 'inactive' : 'active';
+    setIsTogglingStatus(true);
+    try {
+      const res = await setCustomerStatus(selectedCustomer.id, newStatus);
+      if (res.success) {
+        setSelectedCustomer(prev => prev ? { ...prev, status: newStatus } : null);
+        setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, status: newStatus } : c));
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) console.error(err);
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
 
   const handleResetPassword = async (mode: 'phone' | 'manual') => {
     if (!selectedCustomer) return;
@@ -162,7 +219,7 @@ export default function Customers() {
   }, [openDetails]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ email: "", first_name: "", last_name: "", phone: "" });
+  const [createForm, setCreateForm] = useState({ username: "", customer_name: "", email: "", phone: "", status: 'active' as 'active' | 'inactive' });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -176,7 +233,7 @@ export default function Customers() {
       const res = await createCustomer(createForm);
       if (res.success) {
         setIsCreateOpen(false);
-        setCreateForm({ email: "", first_name: "", last_name: "", phone: "" });
+        setCreateForm({ username: "", customer_name: "", email: "", phone: "", status: 'active' });
         loadCustomers();
       } else {
         setCreateError(res.message || "เกิดข้อผิดพลาด");
@@ -199,8 +256,7 @@ export default function Customers() {
       const res = await updateCustomer(selectedCustomer.id, editForm);
       if (res.success) {
         setIsEditing(false);
-        const newName = `${editForm.first_name} ${editForm.last_name}`.trim();
-        setSelectedCustomer(prev => prev ? { ...prev, name: newName, email: editForm.email, phone: editForm.phone } : null);
+        setSelectedCustomer(prev => prev ? { ...prev, name: editForm.customer_name, username: editForm.username, email: editForm.email, phone: editForm.phone } : null);
         loadCustomers();
       } else {
         setUpdateError(res.message || "เกิดข้อผิดพลาด");
@@ -239,14 +295,10 @@ export default function Customers() {
     setResetPassword("");
     setResetError("");
     setResetSuccess("");
-    
-    const nameParts = customer.name.split(" ");
-    const firstName = nameParts[0] || "";
-    const lastName = nameParts.slice(1).join(" ") || "";
-    
+
     setEditForm({
-      first_name: firstName,
-      last_name: lastName,
+      username: customer.username || "",
+      customer_name: customer.name,
       email: customer.email,
       phone: customer.phone || "",
     });
@@ -304,12 +356,12 @@ export default function Customers() {
                     {updateError && <div className="text-sm text-red-500">{updateError}</div>}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">ชื่อ</label>
-                        <Input required maxLength={50} disabled={isUpdating} value={editForm.first_name} onChange={e => setEditForm(p => ({...p, first_name: e.target.value}))} />
+                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">Username</label>
+                        <Input required maxLength={50} disabled={isUpdating} value={editForm.username} onChange={e => setEditForm(p => ({...p, username: e.target.value}))} />
                       </div>
                       <div>
-                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">นามสกุล</label>
-                        <Input required maxLength={50} disabled={isUpdating} value={editForm.last_name} onChange={e => setEditForm(p => ({...p, last_name: e.target.value}))} />
+                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">Customer Name</label>
+                        <Input required maxLength={100} disabled={isUpdating} value={editForm.customer_name} onChange={e => setEditForm(p => ({...p, customer_name: e.target.value}))} />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -369,20 +421,33 @@ export default function Customers() {
                       <div className="w-16 h-16 shrink-0 rounded-full bg-brand-500/10 text-brand-600 flex items-center justify-center text-2xl font-bold uppercase ring-1 ring-brand-500/20">
                         {getInitial(selectedCustomer.name)}
                       </div>
-                      
+
                       {/* Info */}
                       <div>
-                        <div className="flex items-center gap-3 mb-1.5">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h4 className="text-xl font-bold text-gray-900 dark:text-white">
                             {selectedCustomer.name}
                           </h4>
-                          <button 
+                          <StatusBadge status={selectedCustomer.status} />
+                          <button
                             onClick={() => setIsEditing(true)}
                             className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 transition-colors"
                           >
                             แก้ไข
                           </button>
+                          <button
+                            onClick={handleToggleStatus}
+                            disabled={isTogglingStatus}
+                            className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors disabled:opacity-50 ${
+                              selectedCustomer.status === 'active'
+                                ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20'
+                                : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20'
+                            }`}
+                          >
+                            {isTogglingStatus ? "..." : selectedCustomer.status === 'active' ? 'ระงับ' : 'เปิดใช้งาน'}
+                          </button>
                         </div>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">@{selectedCustomer.username}</p>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500 dark:text-gray-400">
                           <span className="flex items-center gap-1.5">
                             <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
@@ -441,28 +506,35 @@ export default function Customers() {
           )}
         </div>
       </Modal>
+
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         className="max-w-lg m-4 w-full"
       >
         <form onSubmit={handleCreateSubmit} className="flex flex-col">
-          {/* Header */}
           <div className="px-6 py-5 border-b border-gray-100 dark:border-white/[0.05]">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              เพิ่มลูกค้าใหม่
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">เพิ่มลูกค้าใหม่</h3>
             <p className="text-sm text-gray-500 mt-1">กรอกข้อมูลพื้นฐานเพื่อสร้างบัญชีลูกค้า (รหัสผ่านคือเบอร์โทรศัพท์)</p>
           </div>
-          
-          {/* Body */}
+
           <div className="p-6 space-y-5">
             {createError && (
               <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">
                 {createError}
               </div>
             )}
-            
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">Username *</label>
+                <Input required placeholder="username" maxLength={50} disabled={isCreating} value={createForm.username} onChange={(e) => setCreateForm(prev => ({...prev, username: e.target.value}))} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">Customer Name *</label>
+                <Input required placeholder="ชื่อลูกค้า" maxLength={100} disabled={isCreating} value={createForm.customer_name} onChange={(e) => setCreateForm(prev => ({...prev, customer_name: e.target.value}))} />
+              </div>
+            </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">เบอร์โทรศัพท์ (Phone) *</label>
               <Input required placeholder="081-234-5678" maxLength={12} value={createForm.phone}
@@ -472,23 +544,29 @@ export default function Customers() {
                 onBlur={() => setCreateForm(prev => ({...prev, phone: formatPhone(prev.phone)}))}
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">ชื่อ (First Name) *</label>
-                <Input required placeholder="ชื่อ" maxLength={50} disabled={isCreating} value={createForm.first_name} onChange={(e) => setCreateForm(prev => ({...prev, first_name: e.target.value}))} />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">นามสกุล (Last Name) *</label>
-                <Input required placeholder="นามสกุล" maxLength={50} disabled={isCreating} value={createForm.last_name} onChange={(e) => setCreateForm(prev => ({...prev, last_name: e.target.value}))} />
-              </div>
-            </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">อีเมล (Email)</label>
               <Input type="email" placeholder="example@email.com" disabled={isCreating} value={createForm.email} onChange={(e) => setCreateForm(prev => ({...prev, email: e.target.value}))} />
             </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">สถานะ</label>
+              <div className="flex gap-2">
+                <button type="button"
+                  onClick={() => setCreateForm(prev => ({...prev, status: 'active'}))}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${createForm.status === 'active' ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-400' : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
+                >
+                  Active
+                </button>
+                <button type="button"
+                  onClick={() => setCreateForm(prev => ({...prev, status: 'inactive'}))}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${createForm.status === 'inactive' ? 'bg-gray-100 border-gray-400 text-gray-700 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-300' : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
+                >
+                  Inactive
+                </button>
+              </div>
+            </div>
           </div>
-          
-          {/* Footer */}
+
           <div className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.05] flex justify-end gap-3 bg-gray-50/50 dark:bg-transparent rounded-b-2xl">
             <Button variant="outline" disabled={isCreating} onClick={(e) => { e.preventDefault(); setIsCreateOpen(false); }}>ยกเลิก</Button>
             <Button onClick={handleCreateSubmit} disabled={isCreating}>

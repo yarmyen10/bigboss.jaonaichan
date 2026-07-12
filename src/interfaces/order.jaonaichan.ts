@@ -20,6 +20,7 @@ export interface Pagination {
 
 export interface Customer {
     id: number
+    username?: string | null
     name: string
     email: string
     phone: string
