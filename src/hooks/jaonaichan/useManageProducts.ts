@@ -10,6 +10,7 @@ export const roundUp = (n: number) => Math.ceil(n * 2) / 2;
 
 export interface PreviewProductLine {
   productId: number;
+  itemId: number;
   productName: string;
   qty: number;
   unitPrice: number;
@@ -19,6 +20,8 @@ export interface PreviewProductLine {
   chinaAmount: number;
   importUnitTotal: number;
   importAmount: number;
+  extraShippingUnitTotal: number;
+  extraShippingAmount: number;
 }
 
 export interface PreviewOrder {
@@ -29,7 +32,8 @@ export interface PreviewOrder {
   china: number;
   importFee: number;
   localShipping: number;
-  baseTotal: number; // goods + china + importFee + localShipping, before extra fee
+  extraShipping: number;
+  baseTotal: number; // goods + china + importFee + localShipping + extraShipping, before extra fee
 }
 
 interface UseManageProductsParams {
@@ -161,7 +165,8 @@ export function useManageProducts({
 
         lines.push({
           productId: item.product.id,
-          productName: item.product.name,
+          itemId: item.item_id,
+          productName: item.name,
           qty: item.quantity,
           unitPrice,
           goodsAmount,
@@ -170,6 +175,8 @@ export function useManageProducts({
           chinaAmount,
           importUnitTotal,
           importAmount,
+          extraShippingUnitTotal: 0,
+          extraShippingAmount: 0,
         });
       }
 
@@ -183,6 +190,7 @@ export function useManageProducts({
           china,
           importFee,
           localShipping: orderLocalShipping,
+          extraShipping: 0,
           baseTotal,
         });
       }

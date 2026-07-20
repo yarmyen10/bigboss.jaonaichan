@@ -31,13 +31,14 @@ interface EnhancedBarcodeOrderItem extends BarcodeOrderItem {
 const SCANNER_ELEMENT_ID = 'barcode-pack-reader';
 
 // statuses ที่ถือว่า "pack แล้ว" ในหน้านี้
-const PACKED_STATUSES = new Set(['packed', 'wait-tracking', 'tracked']);
+const PACKED_STATUSES = new Set(['packed', 'wait-tracking', 'tracked', 'wait-shipping', 'shipped']);
 
 const CARRIERS: { value: TrackingParcel['carrier']; label: string; short: string; bg: string; text: string; ring: string }[] = [
     { value: 'kerry',    label: 'Kerry Express',     short: 'KEX',      bg: 'bg-[#E30013]',  text: 'text-white', ring: 'ring-[#E30013]' },
     { value: 'flash',    label: 'Flash Express',     short: 'FLASH',    bg: 'bg-[#FF6B00]',  text: 'text-white', ring: 'ring-[#FF6B00]' },
     { value: 'jt',       label: 'J&T Express',       short: 'J&T',      bg: 'bg-[#E8000D]',  text: 'text-white', ring: 'ring-[#E8000D]' },
     { value: 'thaipost', label: 'ไปรษณีย์ไทย',      short: 'POST',     bg: 'bg-[#6B2D8B]',  text: 'text-white', ring: 'ring-[#6B2D8B]' },
+    { value: 'spx',      label: 'Shopee Express',    short: 'SPX',      bg: 'bg-[#EE4D2D]',  text: 'text-white', ring: 'ring-[#EE4D2D]' },
 ];
 
 const trackingUrl = (carrier: string, number: string): string | null => {
@@ -47,6 +48,7 @@ const trackingUrl = (carrier: string, number: string): string | null => {
         flash:    `https://flashexpress.com/tracking/?se=${n}`,
         jt:       `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${n}`,
         thaipost: `https://track.thailandpost.co.th/?trackNumber=${n}`,
+        spx:      `https://spx.co.th/track?${n}`,
     };
     return map[carrier] ?? null;
 };
@@ -253,6 +255,7 @@ export default function BarcodePack() {
         setScanned({});
         setScanResult(null);
         setItemsError('');
+        setLastPackedOrderId(null);
         setLoadingOrders(true);
         try {
             const [y, m, d] = selectedDate.split('-');
@@ -307,12 +310,10 @@ export default function BarcodePack() {
                 setItems(enhancedItems);
             }
 
-            if (orderDetail && PACKED_STATUSES.has(orderDetail.status) && orderDetail.status !== 'tracked') {
-                const hasTracking = (orderDetail.shipping?.tracking?.length ?? 0) > 0;
-                if (!hasTracking) {
-                    setLastPackedOrderId(orderDetail.id);
-                    setParcels([{ carrier: 'kerry', number: '' }]);
-                }
+            if (orderDetail && PACKED_STATUSES.has(orderDetail.status)) {
+                setLastPackedOrderId(orderDetail.id);
+                setParcels([{ carrier: 'kerry', number: '' }]);
+                if (orderDetail.lot_id) setSelectedLotId(orderDetail.lot_id);
             }
         } catch {
             setItemsError('Failed to load order items.');
@@ -331,6 +332,7 @@ export default function BarcodePack() {
         setScanned({});
         setScanResult(null);
         setItemsError('');
+        setLastPackedOrderId(null);
         setLoadingOrders(true);
         try {
             const isNum = /^\d+$/.test(val);
@@ -530,73 +532,95 @@ export default function BarcodePack() {
             {lastPackedOrderId !== null && (
                 <div className="rounded-xl border border-success-200 bg-success-50 p-4 dark:border-success-500/30 dark:bg-success-500/10 space-y-3">
                     <p className="text-sm font-semibold text-success-700 dark:text-success-400">
-                        📦 Order #{lastPackedOrderId} — Add Tracking
+                        📦 Order #{lastPackedOrderId} — {['wait-shipping', 'shipped'].includes(selectedOrder?.status ?? '') ? 'Tracking' : 'Add Tracking'}
                     </p>
-                    <div className="space-y-3">
-                        {parcels.map((parcel, i) => (
-                            <div key={i} className="space-y-1.5">
-                                {/* Carrier pills */}
-                                <div className="flex flex-wrap gap-1.5">
-                                    {CARRIERS.map(c => {
-                                        const selected = parcel.carrier === c.value;
-                                        return (
-                                            <button
-                                                key={c.value}
-                                                type="button"
-                                                onClick={() => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, carrier: c.value } : p))}
-                                                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${selected ? `${c.bg} ${c.text} ring-2 ${c.ring} ring-offset-1` : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                                            >
-                                                {c.short}
+                    {(selectedOrder?.shipping?.tracking?.length ?? 0) > 0 && (
+                        <div className="flex flex-col gap-2">
+                            {selectedOrder!.shipping.tracking!.map((t, i) => {
+                                const c = CARRIERS.find(x => x.value === t.carrier);
+                                const url = trackingUrl(t.carrier, t.number);
+                                return (
+                                    <div key={i} className="flex items-center gap-3 rounded-lg border border-success-200 bg-white dark:border-success-500/20 dark:bg-gray-800/50 px-3 py-2.5">
+                                        <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold ${c ? `${c.bg} ${c.text}` : 'bg-gray-400 text-white'}`}>
+                                            {c?.short ?? t.carrier.toUpperCase()}
+                                        </span>
+                                        <span className="flex-1 font-mono text-sm text-gray-800 dark:text-gray-200 select-all">{t.number}</span>
+                                        {url && (
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 flex items-center gap-1.5 text-xs text-brand-500 hover:text-brand-600 transition">
+                                                <svg className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg>
+                                                Track
+                                            </a>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    {!['wait-shipping', 'shipped'].includes(selectedOrder?.status ?? '') && (<>
+                        <div className="space-y-3">
+                            {parcels.map((parcel, i) => (
+                                <div key={i} className="space-y-1.5">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {CARRIERS.map(c => {
+                                            const selected = parcel.carrier === c.value;
+                                            return (
+                                                <button
+                                                    key={c.value}
+                                                    type="button"
+                                                    onClick={() => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, carrier: c.value } : p))}
+                                                    className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${selected ? `${c.bg} ${c.text} ring-2 ${c.ring} ring-offset-1` : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                                >
+                                                    {c.short}
+                                                </button>
+                                            );
+                                        })}
+                                        <span className="self-center text-xs text-gray-400 dark:text-gray-500">
+                                            {CARRIERS.find(c => c.value === parcel.carrier)?.label}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            placeholder="Tracking number"
+                                            value={parcel.number}
+                                            onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, number: e.target.value } : p))}
+                                            className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+                                        />
+                                        {parcel.number.trim() && (() => { const url = trackingUrl(parcel.carrier, parcel.number); return url ? (
+                                            <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
+                                                <svg className="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg>
+                                            </Button>
+                                        ) : null; })()}
+                                        {parcels.length > 1 && (
+                                            <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
+                                                <svg className="size-4" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                             </button>
-                                        );
-                                    })}
-                                    <span className="self-center text-xs text-gray-400 dark:text-gray-500">
-                                        {CARRIERS.find(c => c.value === parcel.carrier)?.label}
-                                    </span>
+                                        )}
+                                    </div>
                                 </div>
-                                {/* Tracking number + remove */}
-                                <div className="flex gap-2 items-center">
-                                    <input
-                                        type="text"
-                                        placeholder="Tracking number"
-                                        value={parcel.number}
-                                        onChange={(e) => setParcels(prev => prev.map((p, idx) => idx === i ? { ...p, number: e.target.value } : p))}
-                                        className="h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
-                                    />
-                                    {parcel.number.trim() && (() => { const url = trackingUrl(parcel.carrier, parcel.number); return url ? (
-                                        <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
-                                            <svg className="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg>
-                                        </Button>
-                                    ) : null; })()}
-                                    {parcels.length > 1 && (
-                                        <button type="button" onClick={() => setParcels(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-error-500 transition">
-                                            <svg className="size-4" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => setParcels(prev => [...prev, { carrier: 'kerry', number: '' }])}
-                        className="text-xs text-brand-500 hover:text-brand-600 font-medium"
-                    >
-                        + Add Box
-                    </button>
-                    <div className="flex gap-2 pt-1">
-                        <Button
-                            size="sm"
-                            variant="orange"
-                            disabled={savingTracking || !parcels.some(p => p.number.trim())}
-                            onClick={() => void handleSaveTracking()}
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setParcels(prev => [...prev, { carrier: 'kerry', number: '' }])}
+                            className="text-xs text-brand-500 hover:text-brand-600 font-medium"
                         >
-                            {savingTracking ? 'Saving…' : 'Save & Mark Shipped'}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setLastPackedOrderId(null)}>
-                            Skip
-                        </Button>
-                    </div>
+                            + Add Box
+                        </button>
+                        <div className="flex gap-2 pt-1">
+                            <Button
+                                size="sm"
+                                variant="orange"
+                                disabled={savingTracking || !parcels.some(p => p.number.trim())}
+                                onClick={() => void handleSaveTracking()}
+                            >
+                                {savingTracking ? 'Saving…' : 'Save & Mark Shipped'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setLastPackedOrderId(null)}>
+                                Skip
+                            </Button>
+                        </div>
+                    </>)}
                 </div>
             )}
 
@@ -734,12 +758,7 @@ export default function BarcodePack() {
                             </div>
                             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                                 <SectionCard title="Customer">
-                                    <div className="flex gap-6">
-                                        <InfoRow label="Member No.">{selectedOrder.customer.id || '—'}</InfoRow>
-                                        {selectedOrder.customer.username && (
-                                            <InfoRow label="Username">{selectedOrder.customer.username}</InfoRow>
-                                        )}
-                                    </div>
+                                    <InfoRow label="Member No.">{selectedOrder.customer.username || '—'}</InfoRow>
                                     {selectedOrder.customer.phone && (
                                         <InfoRow label="Phone">{selectedOrder.customer.phone}</InfoRow>
                                     )}
@@ -810,21 +829,47 @@ export default function BarcodePack() {
                     {items.length > 0 && !loadingItems && (
                         <div className="space-y-4">
                             <BasicTableOne columns={ITEM_COLUMNS} rows={tableRows} />
-                            
-                            <div className="flex flex-col items-end gap-2 pt-4">
+
+                            <div className="flex flex-col gap-3 pt-4">
                                 {selectedOrder && PACKED_STATUSES.has(selectedOrder.status) ? (
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-sm font-medium text-success-600 dark:text-success-400">✓ Packed แล้ว</span>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => { setLastPackedOrderId(selectedOrder.id); setParcels([{ carrier: 'kerry', number: '' }]); }}
-                                        >
-                                            + Add Tracking
-                                        </Button>
-                                    </div>
-                                ) : (
                                     <>
+                                        {lastPackedOrderId === null && (selectedOrder.shipping?.tracking?.length ?? 0) > 0 && (
+                                            <div className="flex flex-col gap-2">
+                                                {selectedOrder.shipping.tracking!.map((t, i) => {
+                                                    const c = CARRIERS.find(x => x.value === t.carrier);
+                                                    const url = trackingUrl(t.carrier, t.number);
+                                                    return (
+                                                        <div key={i} className="flex items-center gap-3 rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2.5">
+                                                            <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold ${c ? `${c.bg} ${c.text}` : 'bg-gray-400 text-white'}`}>
+                                                                {c?.short ?? t.carrier.toUpperCase()}
+                                                            </span>
+                                                            <span className="flex-1 font-mono text-sm text-gray-800 dark:text-gray-200 select-all">{t.number}</span>
+                                                            {url && (
+                                                                <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 flex items-center gap-1.5 text-xs text-brand-500 hover:text-brand-600 transition">
+                                                                    <svg className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 3H17M17 3V9M17 3L9 11M8 5H5C3.895 5 3 5.895 3 7V15C3 16.105 3.895 17 5 17H13C14.105 17 15 16.105 15 15V12"/></svg>
+                                                                    Track
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        <div className="flex items-center justify-end gap-3">
+                                            <span className="text-sm font-medium text-success-600 dark:text-success-400">✓ Packed แล้ว</span>
+                                            {!['wait-shipping', 'shipped'].includes(selectedOrder.status) && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => { setLastPackedOrderId(selectedOrder.id); setParcels([{ carrier: 'kerry', number: '' }]); }}
+                                                >
+                                                    + Add Tracking
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-end gap-2">
                                         {allScanned && !selectedLotId && (
                                             <p className="text-xs text-warning-500">Please select a lot before confirming.</p>
                                         )}
@@ -836,7 +881,7 @@ export default function BarcodePack() {
                                         >
                                             {confirming ? 'Confirming…' : 'Confirm Pack'}
                                         </Button>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         </div>

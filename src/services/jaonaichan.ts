@@ -1,5 +1,5 @@
 import { apiFetch, apiRequest } from "../api/client";
-import { OrderDetailResponse, OrderListResponse, OrderProductsBulkResponse, PatchBillResponse } from "../interfaces/order.jaonaichan";
+import { OrderDetailResponse, OrderItemEdit, OrderListResponse, OrderProductsBulkResponse, PatchBillResponse } from "../interfaces/order.jaonaichan";
 import type { DashboardStats } from '../interfaces/dashboard.jaonaichan';
 import { PatchProfilePayload, PatchProfileResponse, UserProfile } from "../interfaces/profile.jaonaichan";
 import type { InvoiceLineItem } from "../interfaces/invoice.jaonaichan";
@@ -87,7 +87,8 @@ export async function patchBill2(
     // contributed how much to this order's china shipping / import fee.
     chinaShipping?: Record<number, number>,
     importFee?: Record<number, number>,
-    localShipping?: number
+    localShipping?: number,
+    extraShipping?: Record<number, number>
 ): Promise<PatchBillResponse> {
     return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/2`, {
         method: "PATCH",
@@ -100,7 +101,34 @@ export async function patchBill2(
             ...(chinaShipping && { china_shipping: chinaShipping }),
             ...(importFee && { import_fee: importFee }),
             ...(localShipping !== undefined && { local_shipping: localShipping }),
+            ...(extraShipping && { extra_shipping: extraShipping }),
         }),
+    });
+}
+
+export async function patchBill1(
+    orderId: number,
+    amount?: number,
+    status?: string,
+    paidAt?: string,
+): Promise<PatchBillResponse> {
+    return apiRequest(`/jaonaichan/v1/orders/${orderId}/bill/1`, {
+        method: "PATCH",
+        body: JSON.stringify({
+            ...(amount !== undefined && { amount }),
+            ...(status && { status }),
+            ...(paidAt && { paid_at: paidAt }),
+        }),
+    });
+}
+
+export async function patchOrderItems(
+    orderId: number,
+    items: OrderItemEdit[],
+): Promise<{ success: true; data: OrderDetailResponse }> {
+    return apiRequest(`/jaonaichan/v1/orders/${orderId}/items`, {
+        method: "PATCH",
+        body: JSON.stringify({ items }),
     });
 }
 

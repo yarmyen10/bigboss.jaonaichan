@@ -19,7 +19,7 @@ export interface ConfirmPackResponse {
 }
 
 export interface TrackingParcel {
-    carrier: 'kerry' | 'flash' | 'jt' | 'thaipost';
+    carrier: 'kerry' | 'flash' | 'jt' | 'thaipost' | 'spx';
     number: string;
 }
 

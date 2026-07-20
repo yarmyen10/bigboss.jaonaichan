@@ -13,6 +13,7 @@ interface BillPreviewTableProps {
  * and the Bill2UnitPrices confirm-preview — same calculation, same columns. */
 export default function BillPreviewTable({ orders, extraFees, setExtraFees }: BillPreviewTableProps) {
   const editable = !!setExtraFees;
+  const hasExtraShipping = orders.some((o) => o.extraShipping > 0);
   const finalTotalOf = (order: PreviewOrder) =>
     roundUp(order.baseTotal + (parseFloat(extraFees?.[order.orderId] ?? "") || 0));
 
@@ -26,6 +27,9 @@ export default function BillPreviewTable({ orders, extraFees, setExtraFees }: Bi
           <th className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-2 py-2 text-right font-medium">ค่าส่งจีน</th>
           <th className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-2 py-2 text-right font-medium">ค่า Import</th>
           <th className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-2 py-2 text-right font-medium">ค่าส่งไทย</th>
+          {hasExtraShipping && (
+            <th className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-2 py-2 text-right font-medium">ค่าส่งเพิ่ม</th>
+          )}
           {editable && (
             <th className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-2 py-2 text-right font-medium w-28">เพิ่มเติม</th>
           )}
@@ -52,6 +56,11 @@ export default function BillPreviewTable({ orders, extraFees, setExtraFees }: Bi
               <td className="px-2 py-2.5 text-right tabular-nums text-purple-600 dark:text-purple-400">
                 {order.localShipping.toFixed(2)}
               </td>
+              {hasExtraShipping && (
+                <td className="px-2 py-2.5 text-right tabular-nums text-teal-600 dark:text-teal-400">
+                  {order.extraShipping.toFixed(2)}
+                </td>
+              )}
               {editable && (
                 <td className="px-2 py-1.5">
                   <input
@@ -75,12 +84,12 @@ export default function BillPreviewTable({ orders, extraFees, setExtraFees }: Bi
               </td>
             </tr>
             {order.items.map((line) => (
-              <tr key={line.productId} className="text-xs text-gray-400 dark:text-gray-500 italic">
+              <tr key={line.itemId} className="text-xs text-gray-400 dark:text-gray-500 italic">
                 <td className="px-2 pb-1.5 pl-4">{line.productName}: {line.qty} ชิ้น</td>
                 <td className="px-2 pb-1.5 text-right">{line.unitPrice.toFixed(2)} × {line.qty} = {line.goodsAmount.toFixed(2)}</td>
                 <td className="px-2 pb-1.5 text-right">{line.chinaUnitTotal.toFixed(2)} ÷ {line.chinaQtyTotal} × {line.qty} = {line.chinaAmount.toFixed(2)}</td>
                 <td className="px-2 pb-1.5 text-right">{line.importUnitTotal.toFixed(2)} ÷ {line.chinaQtyTotal} × {line.qty} = {line.importAmount.toFixed(2)}</td>
-                <td colSpan={editable ? 4 : 3}></td>
+                <td colSpan={3 + (hasExtraShipping ? 1 : 0) + (editable ? 1 : 0)}></td>
               </tr>
             ))}
           </Fragment>
@@ -88,7 +97,7 @@ export default function BillPreviewTable({ orders, extraFees, setExtraFees }: Bi
       </tbody>
       <tfoot>
         <tr className="border-t-2 border-gray-200 dark:border-gray-700 font-semibold">
-          <td className="px-2 py-3 text-gray-700 dark:text-gray-300" colSpan={editable ? 6 : 5}>
+          <td className="px-2 py-3 text-gray-700 dark:text-gray-300" colSpan={5 + (hasExtraShipping ? 1 : 0) + (editable ? 1 : 0)}>
             รวม batch ทั้งหมด
           </td>
           <td className="px-2 py-3 text-right tabular-nums text-brand-600 dark:text-brand-400">

@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { Modal } from "../ui/modal";
 import Badge, { BadgeColor } from "../ui/badge/Badge";
 import BasicTableOne, { BasicTableColumn } from "../tables/BasicTables/BasicTableOne";
-import { Order, OrderDetailResponse, OrderItem } from "../../interfaces/order.jaonaichan";
-import { getBillSlipObjectUrl, getOrder, patchOrderShipping, reVerifySlip } from "../../services/jaonaichan";
+import { Order, OrderDetailResponse, OrderItem, OrderItemEdit } from "../../interfaces/order.jaonaichan";
+import { getBillSlipObjectUrl, getOrder, patchBill1, patchBill2, patchOrderItems, patchOrderShipping, reVerifySlip } from "../../services/jaonaichan";
 import { ORDER_STATUS_DETAILS } from "../../config/orderStatus.jaonaichan";
 import { BoxIcon, PencilIcon, ReceiptApproved, ReceiptBill, ReceiptDeclined } from "../../icons";
 
@@ -212,6 +212,7 @@ const CARRIER_META: Record<string, { bg: string; label: string; url: (n: string)
   flash:    { bg: 'bg-[#FF6B00] text-white', label: 'FLASH', url: n => `https://flashexpress.com/tracking/?se=${encodeURIComponent(n)}` },
   jt:       { bg: 'bg-[#E8000D] text-white', label: 'J&T',   url: n => `https://www.jtexpress.co.th/index/query/gzquery.html?bills=${encodeURIComponent(n)}` },
   thaipost: { bg: 'bg-[#6B2D8B] text-white', label: 'POST',  url: n => `https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(n)}` },
+  spx:      { bg: 'bg-[#EE4D2D] text-white', label: 'SPX',   url: n => `https://spx.co.th/track?${encodeURIComponent(n)}` },
 };
 
 function TrackingCard({ tracking }: { tracking: Array<{ carrier: string; number: string }> }) {
@@ -301,6 +302,99 @@ function ItemsTable({ items }: { items: OrderItem[] }) {
   return <BasicTableOne columns={ITEM_COLUMNS} rows={rows} />;
 }
 
+function Bill2ItemsTable({ items, bill2 }: { items: OrderItem[]; bill2: Order["bill2"] }) {
+  const upMap: Record<number, number> = bill2.unit_prices ?? {};
+  const csMap: Record<number, number> = bill2.china_shipping_by_product ?? {};
+  const ifMap: Record<number, number> = bill2.import_fee_by_product ?? {};
+
+  const hasData = items.some(i => {
+    const pid = i.product.id;
+    return (upMap[pid] ?? 0) + (csMap[pid] ?? 0) + (ifMap[pid] ?? 0) > 0;
+  }) || (bill2.local_shipping ?? 0) > 0;
+
+  if (!hasData) {
+    return <p className="text-sm text-gray-400 dark:text-gray-500">No Bill 2 data yet.</p>;
+  }
+
+  const dash = <span className="text-gray-300 dark:text-gray-700">—</span>;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+      <div className="max-w-full overflow-x-auto">
+        <table className="w-full">
+          <thead className="border-b border-gray-100 dark:border-white/[0.05]">
+            <tr>
+              <th className="px-5 py-3 text-left text-theme-xs font-medium text-gray-500 dark:text-gray-400">Product</th>
+              <th className="px-5 py-3 text-center text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-16">Qty</th>
+              <th className="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Unit Price</th>
+              <th className="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">China</th>
+              <th className="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Local</th>
+              <th className="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Import Fee</th>
+              <th className="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Total</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+            {items.map(item => {
+              const pid = item.product.id;
+              const up = upMap[pid] ?? 0;
+              const cs = csMap[pid] ?? 0;
+              const fee = ifMap[pid] ?? 0;
+              const rowTotal = up + cs + fee;
+              return (
+                <tr key={item.item_id}>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2.5">
+                      {item.product.image?.thumbnail ? (
+                        <img src={item.product.image.thumbnail} alt={item.name} className="h-10 w-10 shrink-0 rounded object-cover bg-gray-100 dark:bg-gray-800" />
+                      ) : (
+                        <div className="h-10 w-10 shrink-0 rounded bg-gray-100 dark:bg-gray-800" />
+                      )}
+                      <p className="max-w-[200px] truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">{item.name}</p>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-center text-theme-sm text-gray-500 dark:text-gray-400">{item.quantity}</td>
+                  <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                    {up > 0 ? `฿${up.toLocaleString()}` : dash}
+                  </td>
+                  <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                    {cs > 0 ? `฿${cs.toLocaleString()}` : dash}
+                  </td>
+                  <td className="px-5 py-3 text-right text-theme-sm text-gray-300 dark:text-gray-700">—</td>
+                  <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                    {fee > 0 ? `฿${fee.toLocaleString()}` : dash}
+                  </td>
+                  <td className="px-5 py-3 text-right text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                    {rowTotal > 0 ? `฿${rowTotal.toLocaleString()}` : dash}
+                  </td>
+                </tr>
+              );
+            })}
+            <tr className="border-t border-gray-100 dark:border-white/[0.05] bg-gray-50 dark:bg-white/[0.02]">
+              <td colSpan={2} className="px-5 py-3 text-theme-xs font-medium text-gray-500 dark:text-gray-400">Total</td>
+              <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                {Object.values(upMap).reduce((s, v) => s + v, 0) > 0
+                  ? `฿${Object.values(upMap).reduce((s, v) => s + v, 0).toLocaleString()}` : dash}
+              </td>
+              <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                {(bill2.china_shipping ?? 0) > 0 ? `฿${Number(bill2.china_shipping).toLocaleString()}` : dash}
+              </td>
+              <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                {(bill2.local_shipping ?? 0) > 0 ? `฿${Number(bill2.local_shipping).toLocaleString()}` : dash}
+              </td>
+              <td className="px-5 py-3 text-right text-theme-sm text-gray-500 dark:text-gray-400">
+                {(bill2.import_fee ?? 0) > 0 ? `฿${Number(bill2.import_fee).toLocaleString()}` : dash}
+              </td>
+              <td className="px-5 py-3 text-right text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+                ฿{Number(bill2.amount).toLocaleString()}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsProps) {
   const [detail, setDetail] = useState<OrderDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -309,6 +403,21 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reVerifying, setReVerifying] = useState(false);
   const [reVerifyError, setReVerifyError] = useState<string | null>(null);
+
+  const [activeBill, setActiveBill] = useState<1 | 2>(1);
+
+  const [editItemsMode, setEditItemsMode] = useState(false);
+  const [editItems, setEditItems] = useState<OrderItemEdit[]>([]);
+  const [newItemRow, setNewItemRow] = useState({ name: "", quantity: 1, unit_price: 0 });
+  const [savingItems, setSavingItems] = useState(false);
+  const [saveItemsError, setSaveItemsError] = useState<string | null>(null);
+
+  type Bill2EditRow = { productId: number; itemId: number; name: string; quantity: number; unitPrice: number; cs: number; fee: number };
+  const [editBill2Mode, setEditBill2Mode] = useState(false);
+  const [editBill2Items, setEditBill2Items] = useState<Bill2EditRow[]>([]);
+  const [editBill2LocalShipping, setEditBill2LocalShipping] = useState(0);
+  const [savingBill2, setSavingBill2] = useState(false);
+  const [saveBill2Error, setSaveBill2Error] = useState<string | null>(null);
 
   const [editShippingOpen, setEditShippingOpen] = useState(false);
   const [shippingInput, setShippingInput] = useState({ name: "", phone: "", address: "" });
@@ -319,6 +428,9 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
     setLoading(true);
     setDetail(null);
     setReVerifyError(null);
+    setActiveBill(1);
+    setEditItemsMode(false);
+    setEditBill2Mode(false);
     getOrder(order.id)
       .then(setDetail)
       .catch(console.error)
@@ -360,6 +472,96 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
       for (const u of created) URL.revokeObjectURL(u);
     };
   }, [isOpen, displayed?.id]);
+
+  const startEditItems = () => {
+    setEditItems(items.map(i => ({ item_id: i.item_id, name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price) })));
+    setNewItemRow({ name: "", quantity: 1, unit_price: 0 });
+    setSaveItemsError(null);
+    setEditItemsMode(true);
+  };
+
+  const editItemsTotal = () => {
+    const base = editItems.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+    const extra = newItemRow.name.trim() ? newItemRow.quantity * newItemRow.unit_price : 0;
+    return base + extra;
+  };
+
+  const syncBillToTotal = async (before: Order | OrderDetailResponse, newTotal: number) => {
+    if (Number(before.total) === newTotal) return;
+    const bill1Paid = before.bill1.status === "paid";
+    if (before.is_rts || !bill1Paid) {
+      await patchBill1(before.id, newTotal);
+    } else {
+      await patchBill2(before.id, newTotal - Number(before.bill1.amount));
+    }
+  };
+
+  const handleSaveItems = async () => {
+    if (!displayed) return;
+    setSavingItems(true);
+    setSaveItemsError(null);
+    try {
+      const all: OrderItemEdit[] = newItemRow.name.trim()
+        ? [...editItems, { name: newItemRow.name, quantity: newItemRow.quantity, unit_price: newItemRow.unit_price }]
+        : editItems;
+      const res = await patchOrderItems(displayed.id, all);
+      await syncBillToTotal(displayed, Number(res.data.total));
+      const fresh = await getOrder(displayed.id);
+      setDetail(fresh);
+      setEditItemsMode(false);
+    } catch (err: unknown) {
+      setSaveItemsError((err as { message?: string })?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } finally {
+      setSavingItems(false);
+    }
+  };
+
+  const startEditBill2 = () => {
+    if (!displayed) return;
+    const upMap = displayed.bill2.unit_prices ?? {};
+    const csMap = displayed.bill2.china_shipping_by_product ?? {};
+    const ifMap = displayed.bill2.import_fee_by_product ?? {};
+    setEditBill2Items(items.map(i => ({
+      productId: i.product.id,
+      itemId: i.item_id,
+      name: i.name,
+      quantity: i.quantity,
+      unitPrice: upMap[i.product.id] ?? 0,
+      cs: csMap[i.product.id] ?? 0,
+      fee: ifMap[i.product.id] ?? 0,
+    })));
+    setEditBill2LocalShipping(Number(displayed.bill2.local_shipping ?? 0));
+    setSaveBill2Error(null);
+    setEditBill2Mode(true);
+  };
+
+  const editBill2Total = () =>
+    editBill2Items.reduce((s, r) => s + r.unitPrice + r.cs + r.fee, 0) + editBill2LocalShipping;
+
+  const handleSaveBill2 = async () => {
+    if (!displayed) return;
+    setSavingBill2(true);
+    setSaveBill2Error(null);
+    try {
+      const upMap: Record<number, number> = {};
+      const csMap: Record<number, number> = {};
+      const ifMap: Record<number, number> = {};
+      for (const row of editBill2Items) {
+        upMap[row.productId] = row.unitPrice;
+        csMap[row.productId] = row.cs;
+        ifMap[row.productId] = row.fee;
+      }
+      const newAmount = editBill2Total();
+      await patchBill2(displayed.id, newAmount, undefined, undefined, upMap, undefined, csMap, ifMap, editBill2LocalShipping);
+      const fresh = await getOrder(displayed.id);
+      setDetail(fresh);
+      setEditBill2Mode(false);
+    } catch (err: unknown) {
+      setSaveBill2Error((err as { message?: string })?.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } finally {
+      setSavingBill2(false);
+    }
+  };
 
   const handleReVerify = async (bill: 1 | 2) => {
     if (!displayed) return;
@@ -551,7 +753,275 @@ export default function OrderDetails({ order, isOpen, onClose }: OrderDetailsPro
               {/* Items + Order History side by side */}
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
                 <div>
-                  {loading ? (
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    {/* Bill toggle */}
+                    {!displayed.is_rts ? (
+                      <div className="flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                        {([1, 2] as const).map(b => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => { setActiveBill(b); setEditItemsMode(false); setEditBill2Mode(false); }}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+                              activeBill === b
+                                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                                : "text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            }`}
+                          >
+                            Bill {b}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        Order Items
+                      </span>
+                    )}
+                    {detail && displayed.status !== "completed" && !editItemsMode && !editBill2Mode && (
+                      <button
+                        type="button"
+                        onClick={activeBill === 1 ? startEditItems : startEditBill2}
+                        className="p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-md transition"
+                        title={activeBill === 1 ? "Edit Items" : "Edit Bill 2"}
+                      >
+                        <PencilIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {activeBill === 2 ? (
+                    editBill2Mode ? (
+                      <div className="space-y-3">
+                        {saveBill2Error && (
+                          <div className="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+                            {saveBill2Error}
+                          </div>
+                        )}
+                        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+                          <div className="max-w-full overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="border-b border-gray-100 dark:border-white/[0.05]">
+                                <tr>
+                                  <th className="px-5 py-3 text-left text-theme-xs font-medium text-gray-500 dark:text-gray-400">Product</th>
+                                  <th className="px-5 py-3 text-center text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-16">Qty</th>
+                                  <th className="px-3 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Unit Price</th>
+                                  <th className="px-3 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">China</th>
+                                  <th className="px-3 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Local</th>
+                                  <th className="px-3 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Import Fee</th>
+                                  <th className="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400 w-28">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                                {editBill2Items.map((row, i) => (
+                                  <tr key={row.itemId}>
+                                    <td className="px-5 py-3 text-theme-sm text-gray-800 dark:text-white/90">{row.name}</td>
+                                    <td className="px-5 py-3 text-center text-theme-sm text-gray-500 dark:text-gray-400">{row.quantity}</td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={row.unitPrice}
+                                        onChange={e => setEditBill2Items(prev => prev.map((x, j) => j === i ? { ...x, unitPrice: Number(e.target.value) } : x))}
+                                        className="w-full text-right h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={row.cs}
+                                        onChange={e => setEditBill2Items(prev => prev.map((x, j) => j === i ? { ...x, cs: Number(e.target.value) } : x))}
+                                        className="w-full text-right h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                      />
+                                    </td>
+                                    <td className="px-5 py-2 text-right text-xs text-gray-300 dark:text-gray-700">—</td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={row.fee}
+                                        onChange={e => setEditBill2Items(prev => prev.map((x, j) => j === i ? { ...x, fee: Number(e.target.value) } : x))}
+                                        className="w-full text-right h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                      />
+                                    </td>
+                                    <td className="px-5 py-2 text-right text-xs font-medium text-gray-800 dark:text-white/90">
+                                      ฿{(row.unitPrice + row.cs + row.fee).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                                <tr className="border-t border-gray-100 dark:border-white/[0.05] bg-gray-50 dark:bg-white/[0.02]">
+                                  <td colSpan={2} className="px-5 py-2 text-theme-xs font-medium text-gray-500 dark:text-gray-400">Total</td>
+                                  <td className="px-3 py-2 text-right text-xs text-gray-300 dark:text-gray-700">—</td>
+                                  <td className="px-3 py-2 text-right text-xs text-gray-300 dark:text-gray-700">—</td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={0.01}
+                                      value={editBill2LocalShipping}
+                                      onChange={e => setEditBill2LocalShipping(Number(e.target.value))}
+                                      className="w-full text-right h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-xs text-gray-300 dark:text-gray-700">—</td>
+                                  <td className="px-5 py-2 text-right text-xs font-medium text-gray-800 dark:text-white/90">
+                                    ฿{editBill2Total().toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        <div className="text-right text-sm font-semibold text-gray-800 dark:text-white">
+                          New total: ฿{editBill2Total().toLocaleString()}
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditBill2Mode(false)}
+                            disabled={savingBill2}
+                            className="px-4 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                          >
+                            ยกเลิก
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveBill2}
+                            disabled={savingBill2}
+                            className="px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {savingBill2 ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : "บันทึก"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Bill2ItemsTable items={items} bill2={displayed.bill2} />
+                    )
+                  ) : editItemsMode ? (
+                    <div className="space-y-3">
+                      {saveItemsError && (
+                        <div className="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+                          {saveItemsError}
+                        </div>
+                      )}
+                      <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">สินค้า</th>
+                              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 w-20">จำนวน</th>
+                              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 w-28">ราคา/ชิ้น</th>
+                              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 w-28">รวม</th>
+                              <th className="w-8" />
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            {editItems.map((item, i) => (
+                              <tr key={i} className="bg-white dark:bg-gray-900">
+                                <td className="px-3 py-2 text-gray-800 dark:text-white/90 text-xs">{item.name}</td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={item.quantity}
+                                    onChange={e => setEditItems(prev => prev.map((x, j) => j === i ? { ...x, quantity: Math.max(1, Number(e.target.value)) } : x))}
+                                    className="w-full text-center h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none"
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={0.01}
+                                    value={item.unit_price}
+                                    onChange={e => setEditItems(prev => prev.map((x, j) => j === i ? { ...x, unit_price: Number(e.target.value) } : x))}
+                                    className="w-full text-right h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-right text-xs font-medium text-gray-800 dark:text-white/90">
+                                  ฿{(item.quantity * item.unit_price).toLocaleString()}
+                                </td>
+                                <td className="px-2 py-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditItems(prev => prev.filter((_, j) => j !== i))}
+                                    className="text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400 transition text-base leading-none"
+                                    title="ลบรายการ"
+                                  >
+                                    ×
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {/* Add row */}
+                            <tr className="bg-gray-50 dark:bg-gray-800/50">
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  placeholder="ชื่อสินค้าใหม่"
+                                  value={newItemRow.name}
+                                  onChange={e => setNewItemRow(r => ({ ...r, name: e.target.value }))}
+                                  className="w-full h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={newItemRow.quantity}
+                                  onChange={e => setNewItemRow(r => ({ ...r, quantity: Math.max(1, Number(e.target.value)) }))}
+                                  className="w-full text-center h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={0.01}
+                                  value={newItemRow.unit_price}
+                                  onChange={e => setNewItemRow(r => ({ ...r, unit_price: Number(e.target.value) }))}
+                                  className="w-full text-right h-7 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-brand-500 outline-none px-2"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs text-gray-400">
+                                {newItemRow.name.trim() ? `฿${(newItemRow.quantity * newItemRow.unit_price).toLocaleString()}` : "—"}
+                              </td>
+                              <td />
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* New total preview */}
+                      <div className="text-right text-sm font-semibold text-gray-800 dark:text-white">
+                        ยอดรวมใหม่: ฿{editItemsTotal().toLocaleString()}
+                      </div>
+                      {/* Actions */}
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setEditItemsMode(false)}
+                          disabled={savingItems}
+                          className="px-4 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                        >
+                          ยกเลิก
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveItems}
+                          disabled={savingItems}
+                          className="px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {savingItems ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          ) : "บันทึก"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : loading ? (
                     <div className="flex h-32 items-center justify-center">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
                     </div>

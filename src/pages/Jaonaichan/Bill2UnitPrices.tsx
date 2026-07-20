@@ -67,8 +67,9 @@ const renderFeeInput = (
     <input
       type="text"
       inputMode="decimal"
-      placeholder="0.00"
+      placeholder="0"
       value={value}
+      onFocus={(e) => e.target.select()}
       onChange={(e) => {
         const raw = e.target.value.replace(/[^\d.]/g, "");
         const parts = raw.split(".");
@@ -95,6 +96,8 @@ const getProductColumns = (
   setChinaShippingPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
   importFeePrices: Record<number, string>,
   setImportFeePrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+  extraShippingPrices: Record<number, string>,
+  setExtraShippingPrices: React.Dispatch<React.SetStateAction<Record<number, string>>>,
   onViewDetails: (product: OrderItemProduct) => void
 ): ColumnDef<OrderItemProduct>[] => [
   {
@@ -110,7 +113,11 @@ const getProductColumns = (
         />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-black dark:text-white">{val as string}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">{row.sku}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {row.variation?.length
+              ? `${row.sku} · ${row.variation.map((v) => v.value.replace(/<[^>]+>/g, "").trim()).join(" / ")}`
+              : row.sku}
+          </p>
         </div>
       </div>
     ),
@@ -140,24 +147,31 @@ const getProductColumns = (
   },
   {
     key: "unit_price",
-    label: "Unit Price (Bill 2)",
+    label: "Extra Items",
     width: "150px",
     noExport: true,
-    render: (_val, row) => renderFeeInput(unitPrices[row.id] ?? "", setUnitPrices, row.id),
+    render: (_val, row) => renderFeeInput(unitPrices[row.id] ?? "0", setUnitPrices, row.id),
+  },
+  {
+    key: "extra_shipping",
+    label: "Extra Shipping Fee",
+    width: "150px",
+    noExport: true,
+    render: (_val, row) => renderFeeInput(extraShippingPrices[row.id] ?? "0", setExtraShippingPrices, row.id),
   },
   {
     key: "china_shipping",
     label: "China Shipping (Total)",
     width: "150px",
     noExport: true,
-    render: (_val, row) => renderFeeInput(chinaShippingPrices[row.id] ?? "", setChinaShippingPrices, row.id),
+    render: (_val, row) => renderFeeInput(chinaShippingPrices[row.id] ?? "0", setChinaShippingPrices, row.id),
   },
   {
     key: "import_fee",
     label: "Import Fee (Total)",
     width: "150px",
     noExport: true,
-    render: (_val, row) => renderFeeInput(importFeePrices[row.id] ?? "", setImportFeePrices, row.id),
+    render: (_val, row) => renderFeeInput(importFeePrices[row.id] ?? "0", setImportFeePrices, row.id),
   },
   {
     key: "action",
@@ -189,6 +203,8 @@ export default function Bill2UnitPrices() {
   const savedChinaShippingPrices = useRef<Record<number, string>>({});
   const [importFeePrices, setImportFeePrices] = useState<Record<number, string>>({});
   const savedImportFeePrices = useRef<Record<number, string>>({});
+  const [extraShippingPrices, setExtraShippingPrices] = useState<Record<number, string>>({});
+  const savedExtraShippingPrices = useRef<Record<number, string>>({});
   const [localShippingPrice, setLocalShippingPrice] = useState<string>("");
   const [modalProduct, setModalProduct] = useState<OrderItemProduct | null>(null);
 
@@ -222,13 +238,17 @@ export default function Bill2UnitPrices() {
 
   const uniqueProducts = useMemo(() => {
     const activeIds = new Set(activeBatchOrders.map((o) => o.id));
-    const map = new Map<number, OrderItemProduct>();
+    const seen = new Set<number>();
+    const result: OrderItemProduct[] = [];
     for (const item of bulkItems) {
-      if (activeIds.has(item.id) && !map.has(item.product.id)) {
-        map.set(item.product.id, item.product);
+      if (activeIds.has(item.id) && !seen.has(item.item_id)) {
+        seen.add(item.item_id);
+        // Use item_id as the product id so same-variation items with different
+        // flavors/names are shown as separate rows in the pricing table.
+        result.push({ ...item.product, id: item.item_id, name: item.name, variation: item.variation });
       }
     }
-    return Array.from(map.values());
+    return result;
   }, [bulkItems, activeBatchOrders]);
 
   const orderTotals = useMemo(() => {
@@ -239,16 +259,15 @@ export default function Bill2UnitPrices() {
     }
     const activeIds = new Set(activeBatchOrders.map((o) => o.id));
     const orderItemsMap = new Map<number, OrderProductsBulkItem[]>();
-    const productTotalQuantity: Record<number, number> = {};
     for (const item of bulkItems) {
       if (!activeIds.has(item.id)) continue;
       if (!orderItemsMap.has(item.id)) orderItemsMap.set(item.id, []);
       orderItemsMap.get(item.id)!.push(item);
-      productTotalQuantity[item.product.id] = (productTotalQuantity[item.product.id] || 0) + item.quantity;
     }
-    
+
     const useNewChina = Object.keys(chinaShippingPrices).length > 0;
     const useNewImport = Object.keys(importFeePrices).length > 0;
+    const useNewExtra = Object.keys(extraShippingPrices).length > 0;
     const useNewLocal = localShippingPrice.trim() !== "";
     const parsedLocal = parseFloat(localShippingPrice) || 0;
 
@@ -256,27 +275,23 @@ export default function Bill2UnitPrices() {
       let total = 0;
       let orderChinaShipping = 0;
       let orderImportFee = 0;
+      let orderExtraShipping = 0;
 
       for (const item of items) {
-        total += roundUp((numericPrices[item.product.id] ?? 0) * item.quantity);
-        if (useNewChina) {
-          const totalChina = parseFloat(chinaShippingPrices[item.product.id]) || 0;
-          const totalQty = productTotalQuantity[item.product.id] || 1;
-          orderChinaShipping += roundUp((totalChina / totalQty) * item.quantity);
-        }
-        if (useNewImport) {
-          const totalImport = parseFloat(importFeePrices[item.product.id]) || 0;
-          const totalQty = productTotalQuantity[item.product.id] || 1;
-          orderImportFee += roundUp((totalImport / totalQty) * item.quantity);
-        }
+        // Price keyed by item_id so same-variation different-flavor items price independently
+        total += roundUp((numericPrices[item.item_id] ?? 0) * item.quantity);
+        if (useNewChina) orderChinaShipping += parseFloat(chinaShippingPrices[item.item_id]) || 0;
+        if (useNewImport) orderImportFee += parseFloat(importFeePrices[item.item_id]) || 0;
+        if (useNewExtra) orderExtraShipping += parseFloat(extraShippingPrices[item.item_id]) || 0;
       }
       const info = activeBatchOrders.find((o) => o.id === orderId);
 
       if (!useNewChina) orderChinaShipping = info?.bill2?.china_shipping ?? 0;
       if (!useNewImport) orderImportFee = info?.bill2?.import_fee ?? 0;
+      if (!useNewExtra) orderExtraShipping = Object.values(info?.bill2?.extra_shipping_by_product ?? {}).reduce((a, b) => a + b, 0);
       const orderLocalShipping = useNewLocal ? parsedLocal : (info?.bill2?.local_shipping ?? 0);
 
-      const finalTotal = roundUp(total + orderChinaShipping + orderImportFee + orderLocalShipping);
+      const finalTotal = roundUp(total + orderChinaShipping + orderImportFee + orderExtraShipping + orderLocalShipping);
 
       return {
         orderId,
@@ -286,10 +301,11 @@ export default function Bill2UnitPrices() {
         itemCount: items.length,
         orderChinaShipping: useNewChina ? orderChinaShipping : undefined,
         orderImportFee: useNewImport ? orderImportFee : undefined,
+        orderExtraShipping: useNewExtra ? orderExtraShipping : undefined,
         orderLocalShipping: useNewLocal ? parsedLocal : undefined,
       };
     });
-  }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, localShippingPrice]);
+  }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, extraShippingPrices, localShippingPrice]);
 
   /** Read-only breakdown (incl. per-product lines) shown in the confirm preview — separate from
    * orderTotals above because handleSave relies on orderTotals' `undefined` sentinels to know
@@ -302,53 +318,58 @@ export default function Bill2UnitPrices() {
     }
     const activeIds = new Set(activeBatchOrders.map((o) => o.id));
     const orderItemsMap = new Map<number, OrderProductsBulkItem[]>();
-    const productTotalQuantity: Record<number, number> = {};
     for (const item of bulkItems) {
       if (!activeIds.has(item.id)) continue;
       if (!orderItemsMap.has(item.id)) orderItemsMap.set(item.id, []);
       orderItemsMap.get(item.id)!.push(item);
-      productTotalQuantity[item.product.id] = (productTotalQuantity[item.product.id] || 0) + item.quantity;
     }
 
     const useNewChina = Object.keys(chinaShippingPrices).length > 0;
     const useNewImport = Object.keys(importFeePrices).length > 0;
+    const useNewExtra = Object.keys(extraShippingPrices).length > 0;
     const useNewLocal = localShippingPrice.trim() !== "";
     const parsedLocal = parseFloat(localShippingPrice) || 0;
 
     return Array.from(orderItemsMap.entries()).map(([orderId, items]) => {
       const info = activeBatchOrders.find((o) => o.id === orderId);
-      let goods = 0, china = 0, importFee = 0;
+      let goods = 0, china = 0, importFee = 0, extraShipping = 0;
       const lines: PreviewProductLine[] = [];
 
       for (const item of items) {
-        const unitPrice = numericPrices[item.product.id] ?? 0;
+        const unitPrice = numericPrices[item.item_id] ?? 0;
         const goodsAmount = roundUp(unitPrice * item.quantity);
-        const chinaUnitTotal = parseFloat(chinaShippingPrices[item.product.id]) || 0;
-        const importUnitTotal = parseFloat(importFeePrices[item.product.id]) || 0;
-        const chinaQtyTotal = productTotalQuantity[item.product.id] || 1;
-        const chinaAmount = useNewChina ? roundUp((chinaUnitTotal / chinaQtyTotal) * item.quantity) : 0;
-        const importAmount = useNewImport ? roundUp((importUnitTotal / chinaQtyTotal) * item.quantity) : 0;
+        const chinaUnitTotal = parseFloat(chinaShippingPrices[item.item_id]) || 0;
+        const importUnitTotal = parseFloat(importFeePrices[item.item_id]) || 0;
+        const extraShippingUnitTotal = parseFloat(extraShippingPrices[item.item_id]) || 0;
+        const chinaAmount = useNewChina ? chinaUnitTotal : 0;
+        const importAmount = useNewImport ? importUnitTotal : 0;
+        const extraShippingAmount = useNewExtra ? extraShippingUnitTotal : 0;
 
         goods += goodsAmount;
         china += chinaAmount;
         importFee += importAmount;
+        extraShipping += extraShippingAmount;
 
         lines.push({
           productId: item.product.id,
-          productName: item.product.name,
+          itemId: item.item_id,
+          productName: item.name,
           qty: item.quantity,
           unitPrice,
           goodsAmount,
           chinaUnitTotal,
-          chinaQtyTotal,
+          chinaQtyTotal: item.quantity,
           chinaAmount,
           importUnitTotal,
           importAmount,
+          extraShippingUnitTotal,
+          extraShippingAmount,
         });
       }
 
       const finalChina = useNewChina ? china : (info?.bill2?.china_shipping ?? 0);
       const finalImport = useNewImport ? importFee : (info?.bill2?.import_fee ?? 0);
+      const finalExtra = useNewExtra ? extraShipping : Object.values(info?.bill2?.extra_shipping_by_product ?? {}).reduce((a, b) => a + b, 0);
       const finalLocal = useNewLocal ? parsedLocal : (info?.bill2?.local_shipping ?? 0);
 
       return {
@@ -358,11 +379,12 @@ export default function Bill2UnitPrices() {
         goods,
         china: finalChina,
         importFee: finalImport,
+        extraShipping: finalExtra,
         localShipping: finalLocal,
-        baseTotal: roundUp(goods + finalChina + finalImport + finalLocal),
+        baseTotal: roundUp(goods + finalChina + finalImport + finalExtra + finalLocal),
       };
     });
-  }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, localShippingPrice]);
+  }, [bulkItems, unitPrices, activeBatchOrders, chinaShippingPrices, importFeePrices, extraShippingPrices, localShippingPrice]);
 
   const pricedCount = Object.keys(unitPrices).length;
 
@@ -371,8 +393,9 @@ export default function Bill2UnitPrices() {
     if (recordChanged(unitPrices, savedUnitPrices.current)) return true;
     if (recordChanged(chinaShippingPrices, savedChinaShippingPrices.current)) return true;
     if (recordChanged(importFeePrices, savedImportFeePrices.current)) return true;
+    if (recordChanged(extraShippingPrices, savedExtraShippingPrices.current)) return true;
     return false;
-  }, [unitPrices, chinaShippingPrices, importFeePrices, localShippingPrice]);
+  }, [unitPrices, chinaShippingPrices, importFeePrices, extraShippingPrices, localShippingPrice]);
   const totalBill2 = orderTotals.reduce((s, o) => s + o.total, 0);
   const isNewBatch = activeBatchId === null;
   const activeBatchHasLiveOrder = !isNewBatch && activeBatchOrders.some((o) => o.bill2.status !== "draft");
@@ -385,12 +408,13 @@ export default function Bill2UnitPrices() {
 
   const productColumns = useMemo(
     () => getProductColumns(
-      unitPrices, setUnitPrices, 
-      chinaShippingPrices, setChinaShippingPrices, 
-      importFeePrices, setImportFeePrices, 
+      unitPrices, setUnitPrices,
+      chinaShippingPrices, setChinaShippingPrices,
+      importFeePrices, setImportFeePrices,
+      extraShippingPrices, setExtraShippingPrices,
       handleViewDetails
     ),
-    [unitPrices, chinaShippingPrices, importFeePrices, handleViewDetails]
+    [unitPrices, chinaShippingPrices, importFeePrices, extraShippingPrices, handleViewDetails]
   );
 
   const applyBatchPrices = useCallback((batchId: string | null, orders: OrderIF[]) => {
@@ -420,10 +444,13 @@ export default function Bill2UnitPrices() {
     };
     const china = sumByProduct((o) => o.bill2.china_shipping_by_product);
     const importFee = sumByProduct((o) => o.bill2.import_fee_by_product);
+    const extraShipping = sumByProduct((o) => o.bill2.extra_shipping_by_product);
     savedChinaShippingPrices.current = china;
     savedImportFeePrices.current = importFee;
+    savedExtraShippingPrices.current = extraShipping;
     setChinaShippingPrices(china);
     setImportFeePrices(importFee);
+    setExtraShippingPrices(extraShipping);
     setLocalShippingPrice("");
   }, []);
 
@@ -447,11 +474,19 @@ export default function Bill2UnitPrices() {
       setAllOrders(orders);
 
       if (orders.length > 0) {
-        const bulkRes: OrderProductsBulkResponse = await getProductsBulkByOrders({
-          orderIds: orders.map((o) => o.id),
-          perPage: 100,
-        });
-        setBulkItems(bulkRes?.data ?? []);
+        const orderIds = orders.map((o) => o.id);
+        const bulkRes: OrderProductsBulkResponse = await getProductsBulkByOrders({ orderIds, perPage: 100 });
+        let allItems = bulkRes?.data ?? [];
+        const { total_pages } = bulkRes.pagination;
+        if (total_pages > 1) {
+          const rest = await Promise.all(
+            Array.from({ length: total_pages - 1 }, (_, i) =>
+              getProductsBulkByOrders({ orderIds, perPage: 100, page: i + 2 })
+            )
+          );
+          for (const r of rest) allItems = allItems.concat(r?.data ?? []);
+        }
+        setBulkItems(allItems);
       } else {
         setBulkItems([]);
       }
@@ -522,26 +557,30 @@ export default function Bill2UnitPrices() {
             const orderPrices: Record<number, number> = {};
             const items = bulkItems.filter(i => i.id === info.orderId);
             for (const item of items) {
-              const price = numericPrices[item.product.id] ?? 0;
-              if (price > 0) orderPrices[item.product.id] = price;
+              const price = numericPrices[item.item_id] ?? 0;
+              if (price > 0) orderPrices[item.item_id] = price;
             }
 
-            // orderTotals only carries the summed china/import total (and only when this
-            // round actually changed it — undefined otherwise, so patchBill2 knows to leave
-            // the existing value alone). The per-product split lives in previewOrders.
             const preview = previewOrders.find((p) => p.orderId === info.orderId);
             let chinaByProduct: Record<number, number> | undefined;
             let importByProduct: Record<number, number> | undefined;
+            let extraShippingByProduct: Record<number, number> | undefined;
             if (info.orderChinaShipping !== undefined) {
               chinaByProduct = {};
               for (const line of preview?.items ?? []) {
-                if (line.chinaAmount > 0) chinaByProduct[line.productId] = line.chinaAmount;
+                if (line.chinaAmount > 0) chinaByProduct[line.itemId] = line.chinaAmount;
               }
             }
             if (info.orderImportFee !== undefined) {
               importByProduct = {};
               for (const line of preview?.items ?? []) {
-                if (line.importAmount > 0) importByProduct[line.productId] = line.importAmount;
+                if (line.importAmount > 0) importByProduct[line.itemId] = line.importAmount;
+              }
+            }
+            if (info.orderExtraShipping !== undefined) {
+              extraShippingByProduct = {};
+              for (const line of preview?.items ?? []) {
+                if (line.extraShippingAmount > 0) extraShippingByProduct[line.itemId] = line.extraShippingAmount;
               }
             }
 
@@ -560,7 +599,8 @@ export default function Bill2UnitPrices() {
               batchId,
               chinaByProduct,
               importByProduct,
-              info.orderLocalShipping
+              info.orderLocalShipping,
+              extraShippingByProduct
             );
             if (orderInfo.status === "paid-1") {
               await patchOrderStatus(info.orderId, "wc-pending-payment-2");
@@ -788,7 +828,7 @@ export default function Bill2UnitPrices() {
                 variant="primary"
                 size="sm"
                 onClick={openConfirm}
-                disabled={pricedCount === 0 || activeBatchOrders.length === 0 || (!isNewBatch && !hasChanges)}
+                disabled={activeBatchOrders.length === 0 || totalBill2 === 0 || (!isNewBatch && !hasChanges)}
                 className="w-full justify-center"
               >
                 {showDraftOption

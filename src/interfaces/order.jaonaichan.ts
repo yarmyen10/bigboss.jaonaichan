@@ -50,6 +50,7 @@ export interface Bill {
     china_shipping_by_product?: Record<number, number>
     import_fee_by_product?: Record<number, number>
     local_shipping?: number
+    extra_shipping_by_product?: Record<number, number>
 }
 
 /** bill1 / bill2 — summary version (ไม่มี paid_at) ใช้ใน bulk / flat */
@@ -63,6 +64,7 @@ export interface BillSummary {
     china_shipping_by_product?: Record<number, number>
     import_fee_by_product?: Record<number, number>
     local_shipping?: number
+    extra_shipping_by_product?: Record<number, number>
 }
 
 // =============================================================================
@@ -85,6 +87,7 @@ export interface OrderItemProduct {
     type: string
     name: string
     sku: string
+    variation?: OrderItemVariation[]
     price: number
     regular_price: number
     sale_price: number
@@ -118,6 +121,13 @@ export interface OrderItem {
     product: OrderItemProduct
 }
 
+export interface OrderItemEdit {
+    item_id?: number
+    name?: string
+    quantity: number
+    unit_price: number
+}
+
 // =============================================================================
 // Order  (แกนหลัก — ตรงกับ format_order())
 // =============================================================================
@@ -141,6 +151,7 @@ export interface Order {
     is_rts?: boolean
     linked_rts_order_id?: number | null
     parent_order_id?: number | null
+    lot_id?: number | null
 }
 
 // =============================================================================

@@ -57,6 +57,7 @@ const customerColumns: ColumnDef<CustomerListItem>[] = [
   {
     key: "username",
     label: "Username",
+    sortable: true,
     render: (val) => (
       <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{val as string || "—"}</span>
     ),
@@ -64,6 +65,7 @@ const customerColumns: ColumnDef<CustomerListItem>[] = [
   {
     key: "name",
     label: "Customer Name",
+    sortable: true,
     render: (_val, row) => (
       <div>
         <p className="text-sm font-medium text-black dark:text-white">{row.name}</p>
