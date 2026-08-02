@@ -88,6 +88,10 @@ function parseDMY(s: string): Date | undefined {
   return d && m && y ? new Date(y, m - 1, d) : undefined;
 }
 
+function fmtDMY(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
 const MONTHS = [
   { label: "All", value: "" },
   { label: "January", value: "1" },
@@ -127,6 +131,7 @@ function DateFilterDropdown({
       if (buttonRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
       if (fpRef.current?.calendarContainer?.contains(target)) return;
+      if ((target as Element).closest?.(".flatpickr-calendar")) return;
       setOpen(false);
     };
     document.addEventListener("mousedown", fn);
@@ -136,17 +141,29 @@ function DateFilterDropdown({
   // re-init flatpickr each time the panel mounts so defaultDate reflects current value
   useEffect(() => {
     if (!inputRef.current) return;
+    const defaultDates = [
+      parseDMY(valueRef.current.dateFrom),
+      parseDMY(valueRef.current.dateTo),
+    ].filter((d): d is Date => d !== undefined);
     const fp = flatpickr(inputRef.current, {
-      mode: "single",
+      mode: "range",
       dateFormat: "d/m/Y",
-      defaultDate: parseDMY(valueRef.current.date) ?? new Date(),
+      conjunction: " ~ ",
+      defaultDate: defaultDates.length ? defaultDates : undefined,
       monthSelectorType: "static",
       prevArrow:
         '<svg class="stroke-current" width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M12.5 15L7.5 10L12.5 5" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       nextArrow:
         '<svg class="stroke-current" width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M7.5 15L12.5 10L7.5 5" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      onChange: (_dates, dateStr) => {
-        onChangeRef.current({ ...valueRef.current, date: dateStr });
+      onChange: (_dates) => {
+        // fire only when range is complete or cleared — not on first-date selection
+        if (_dates.length !== 1) {
+          onChangeRef.current({
+            ...valueRef.current,
+            dateFrom: _dates[0] ? fmtDMY(_dates[0]) : "",
+            dateTo: _dates[1] ? fmtDMY(_dates[1]) : "",
+          });
+        }
       },
     });
     fpRef.current = Array.isArray(fp) ? fp[0] : fp;
@@ -158,7 +175,7 @@ function DateFilterDropdown({
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-  const isFiltered = value.date !== "" || value.month !== "" || value.year !== String(currentYear);
+  const isFiltered = value.dateFrom !== "" || value.dateTo !== "" || value.month !== "" || value.year !== String(currentYear);
   const btnRect = buttonRef.current?.getBoundingClientRect();
 
   return (
@@ -206,18 +223,18 @@ function DateFilterDropdown({
               options={MONTHS.map((m) => ({ value: m.value, label: m.label }))}
               placeholder={null}
               defaultValue={value.month}
-              onChange={(val) => onChange({ ...value, month: val, date: "" })}
+              onChange={(val) => onChange({ ...value, month: val, dateFrom: "", dateTo: "" })}
             />
           </div>
 
-          {/* Date */}
+          {/* Date Range */}
           <div className="mb-1">
             <div className="mb-1.5 flex items-center justify-between">
-              <Label>Date</Label>
-              {value.date && (
+              <Label>Date Range</Label>
+              {(value.dateFrom || value.dateTo) && (
                 <button
                   type="button"
-                  onClick={() => { fpRef.current?.clear(); onChange({ ...value, date: "" }); }}
+                  onClick={() => { fpRef.current?.clear(); onChange({ ...value, dateFrom: "", dateTo: "" }); }}
                   className="text-xs text-gray-400 transition-colors hover:text-red-500 dark:hover:text-red-400"
                 >
                   Clear
@@ -229,7 +246,7 @@ function DateFilterDropdown({
               <input
                 ref={inputRef}
                 readOnly
-                placeholder="dd/mm/yyyy"
+                placeholder="dd/mm/yyyy ~ dd/mm/yyyy"
                 className="h-9 w-full cursor-pointer rounded-lg border border-gray-300 bg-transparent pl-9 pr-3 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
               />
             </div>
@@ -240,7 +257,7 @@ function DateFilterDropdown({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { fpRef.current?.clear(); onChange({ month: "", year: String(currentYear), date: "" }); }}
+              onClick={() => { fpRef.current?.clear(); onChange({ month: "", year: String(currentYear), dateFrom: "", dateTo: "" }); }}
               className="mt-3 w-full !py-2 text-xs"
             >
               Reset filters
@@ -298,7 +315,9 @@ const getOrderColumns = (
           <p className="text-sm font-medium text-black dark:text-white">
             {row.customer.name}
           </p>
-          <p className="text-xs text-body text-gray-400 dark:text-gray-500">{row.customer.email}</p>
+          {row.customer.username && (
+            <p className="text-xs text-body text-gray-400 dark:text-gray-500">{row.customer.username}</p>
+          )}
         </div>
       ),
     },

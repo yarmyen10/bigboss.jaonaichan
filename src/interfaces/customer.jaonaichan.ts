@@ -24,3 +24,20 @@ export interface GetCustomersParams {
     perPage?: number
     search?: string
 }
+
+export interface ImportCustomerRow {
+    username: string
+    customer_name: string
+    phone: string
+    email?: string
+    status?: 'active' | 'inactive'
+}
+
+export interface ImportCustomersResponse {
+    success: boolean
+    message?: string
+    data?: {
+        created: number
+        skipped: { row: number; username: string; reason: string }[]
+    }
+}

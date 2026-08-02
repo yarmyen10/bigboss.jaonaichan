@@ -10,6 +10,10 @@ export interface GetOrdersParams {
     status?: string;
     /** exact date override — dd/mm/yyyy, takes precedence over month/year */
     createDate?: string;
+    /** range start — dd/mm/yyyy, takes priority over createDate */
+    createDateAfter?: string;
+    /** range end — dd/mm/yyyy */
+    createDateBefore?: string;
     createDateM?: number;
     createDateY?: number;
     unitPricesId?: string;
@@ -19,14 +23,17 @@ export interface GetOrdersParams {
 }
 
 export async function getOrders(params: GetOrdersParams = {}): Promise<OrderListResponse> {
-    const { page = 1, perPage = 10, status, createDate, createDateM, createDateY, unitPricesId, lotId, memberNo, username } = params;
+    const { page = 1, perPage = 10, status, createDate, createDateAfter, createDateBefore, createDateM, createDateY, unitPricesId, lotId, memberNo, username } = params;
     const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     if (status) qs.set("status", status);
     if (unitPricesId) qs.set("unit_prices_id", unitPricesId);
     if (lotId) qs.set("lot_id", String(lotId));
     if (memberNo) qs.set("member_no", String(memberNo));
     if (username) qs.set("username", username);
-    if (createDate) {
+    if (createDateAfter || createDateBefore) {
+        if (createDateAfter) qs.set("create_date_after", createDateAfter);
+        if (createDateBefore) qs.set("create_date_before", createDateBefore);
+    } else if (createDate) {
         qs.set("create_date", createDate);
     } else {
         if (createDateM) qs.set("create_date_m", String(createDateM));
@@ -208,6 +215,13 @@ export async function resetCustomerPassword(id: number, payload: { mode: 'phone'
     });
 }
 
+export async function importCustomers(rows: ImportCustomerRow[]): Promise<ImportCustomersResponse> {
+    return apiRequest('/jaonaichan/v1/customers/import', {
+        method: 'POST',
+        body: JSON.stringify({ customers: rows }),
+    });
+}
+
 // =========================================================================
 // Dashboard
 // =========================================================================
@@ -221,7 +235,7 @@ export async function getDashboardStats(year?: number): Promise<DashboardStats> 
 // Customers
 // =========================================================================
 
-import type { CustomerListResponse, GetCustomersParams } from '../interfaces/customer.jaonaichan';
+import type { CustomerListResponse, GetCustomersParams, ImportCustomerRow, ImportCustomersResponse } from '../interfaces/customer.jaonaichan';
 
 export async function getCustomers(params: GetCustomersParams = {}): Promise<CustomerListResponse> {
     const { page = 1, perPage = 20, search } = params;
@@ -480,15 +494,16 @@ export interface RtsShippingSettings {
     method_title: string;
     cost: number;
     instance_id: number | null;
+    min_amount: number;
 }
 
 export async function getRtsShippingSettings(): Promise<RtsShippingSettings> {
     return apiRequest('/jaonaichan/v1/settings/rts-shipping');
 }
 
-export async function updateRtsShippingSettings(cost: number): Promise<{ success: boolean; cost: number }> {
+export async function updateRtsShippingSettings(cost: number, minAmount: number): Promise<{ success: boolean; cost: number; min_amount: number }> {
     return apiRequest('/jaonaichan/v1/settings/rts-shipping', {
         method: 'POST',
-        body: JSON.stringify({ cost }),
+        body: JSON.stringify({ cost, min_amount: minAmount }),
     });
 }

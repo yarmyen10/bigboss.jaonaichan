@@ -11,7 +11,8 @@ export const TAB_STATUS: Record<string, string | undefined> = {
 export interface DateFilter {
   month: string;
   year: string;
-  date: string;
+  dateFrom: string; // dd/mm/yyyy
+  dateTo: string;   // dd/mm/yyyy
 }
 
 export function useOrderList() {
@@ -22,7 +23,8 @@ export function useOrderList() {
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => ({
     month: "",
     year: String(new Date().getFullYear()),
-    date: "",
+    dateFrom: "",
+    dateTo: "",
   }));
 
   const [statusTab, setStatusTab] = useState<string>("all");
@@ -72,8 +74,11 @@ export function useOrderList() {
     const PER_PAGE = 50;
     const baseParams = {
       perPage: PER_PAGE,
-      ...(filter.date
-        ? { createDate: filter.date }
+      ...(filter.dateFrom || filter.dateTo
+        ? {
+          ...(filter.dateFrom ? { createDateAfter: filter.dateFrom } : {}),
+          ...(filter.dateTo ? { createDateBefore: filter.dateTo } : {}),
+        }
         : {
           ...(filter.month ? { createDateM: Number(filter.month) } : {}),
           ...(filter.year ? { createDateY: Number(filter.year) } : {}),

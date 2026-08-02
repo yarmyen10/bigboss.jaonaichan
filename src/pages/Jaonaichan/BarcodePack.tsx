@@ -260,13 +260,14 @@ export default function BarcodePack() {
         try {
             const [y, m, d] = selectedDate.split('-');
             const createDate = `${d}/${m}/${y}`;
-            const res = await getOrders({ createDate, status: 'paid-2', perPage: 100 });
-            
+            const res = await getOrders({ createDate, status: 'paid-1,paid-2', perPage: 100 });
+
             const sorted = res.data
-                .filter((o) => o.status === 'paid-2')
+                .filter((o) => o.status === 'paid-2' || (o.status === 'paid-1' && o.is_rts))
                 .sort((a, b) => {
-                    const timeA = a.bill2?.paid_at ? new Date(a.bill2.paid_at).getTime() : 0;
-                    const timeB = b.bill2?.paid_at ? new Date(b.bill2.paid_at).getTime() : 0;
+                    const paidAt = (o: typeof a) => o.is_rts ? o.bill1?.paid_at : o.bill2?.paid_at;
+                    const timeA = paidAt(a) ? new Date(paidAt(a)!).getTime() : 0;
+                    const timeB = paidAt(b) ? new Date(paidAt(b)!).getTime() : 0;
                     return timeA - timeB;
                 });
             setOrders(sorted);
@@ -294,6 +295,17 @@ export default function BarcodePack() {
                 setSelectedOrder(orderDetail);
             } else {
                 setSelectedOrder(null);
+            }
+
+            const isPackable = orderDetail &&
+                (orderDetail.status === 'paid-2' ||
+                 (orderDetail.status === 'paid-1' && orderDetail.is_rts) ||
+                 PACKED_STATUSES.has(orderDetail.status));
+
+            if (!isPackable) {
+                setItemsError(`Order #${id} status "${orderDetail?.status ?? '?'}" — ไม่อยู่ในเงื่อนไขการแพ็ค`);
+                setItems([]);
+                return;
             }
 
             if (res.items.length === 0) {
@@ -337,15 +349,16 @@ export default function BarcodePack() {
         try {
             const isNum = /^\d+$/.test(val);
             const res = await getOrders({
-                status: 'paid-2',
+                status: 'paid-1,paid-2',
                 perPage: 100,
                 ...(isNum ? { memberNo: Number(val) } : { username: val }),
             });
             const sorted = res.data
-                .filter((o) => o.status === 'paid-2')
+                .filter((o) => o.status === 'paid-2' || (o.status === 'paid-1' && o.is_rts))
                 .sort((a, b) => {
-                    const timeA = a.bill2?.paid_at ? new Date(a.bill2.paid_at).getTime() : 0;
-                    const timeB = b.bill2?.paid_at ? new Date(b.bill2.paid_at).getTime() : 0;
+                    const paidAt = (o: typeof a) => o.is_rts ? o.bill1?.paid_at : o.bill2?.paid_at;
+                    const timeA = paidAt(a) ? new Date(paidAt(a)!).getTime() : 0;
+                    const timeB = paidAt(b) ? new Date(paidAt(b)!).getTime() : 0;
                     return timeA - timeB;
                 });
             setOrders(sorted);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import CardFrame from "../../components/common/CardFrame";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -8,13 +9,60 @@ import { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import { Order as OrderIF } from "../../interfaces/order.jaonaichan";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
-import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword, setCustomerStatus } from "../../services/jaonaichan";
+import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword, setCustomerStatus, importCustomers } from "../../services/jaonaichan";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
+import DatePicker from "../../components/form/date-picker";
 import OrderDetails from "../../components/jaonaichan/OrderDetails";
 import ListCard from "../../components/jaonaichan/ListCard";
+import { CalenderIcon, FileIcon, PlusIcon, SearchOneIcon } from "../../icons";
 
 const PHONE_RE = /^0\d{8,9}$/;
+
+interface ImportPreviewRow {
+  row: number;
+  username: string;
+  customer_name: string;
+  phone: string;
+  valid: boolean;
+  reason?: string;
+}
+
+// reads the first sheet, auto-detects Username/Name/Phone columns by header text
+// (handles trailing spaces / EN-TH label variants), and fixes phone numbers that
+// lost their leading 0 to Excel's number auto-formatting
+async function parseImportFile(file: File): Promise<ImportPreviewRow[]> {
+  const XLSX = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+  if (raw.length === 0) return [];
+
+  const keys = Object.keys(raw[0]);
+  const findKey = (...needles: string[]) =>
+    keys.find((k) => needles.some((n) => k.trim().toLowerCase().includes(n)));
+
+  const usernameKey = findKey("username");
+  const nameKey = findKey("customer name", "ชื่อ");
+  const phoneKey = findKey("phone", "เบอร์");
+
+  return raw
+    .map((r, i): ImportPreviewRow => {
+      const username = String(usernameKey ? r[usernameKey] : "").trim();
+      const customerName = String(nameKey ? r[nameKey] : "").trim();
+      let phone = String(phoneKey ? r[phoneKey] : "").replace(/\D/g, "");
+      if (phone.length === 9 && !phone.startsWith("0")) phone = "0" + phone;
+
+      let reason: string | undefined;
+      if (!username) reason = "ไม่มี Username";
+      else if (!customerName) reason = "ไม่มีชื่อลูกค้า";
+      else if (!PHONE_RE.test(phone)) reason = "เบอร์โทรศัพท์ไม่ถูกต้อง";
+
+      return { row: i + 2, username, customer_name: customerName, phone, valid: !reason, reason };
+    })
+    .filter((r) => r.username || r.customer_name || r.phone); // drop blank padding rows
+}
 
 const formatPhone = (v: string) => {
   const d = v.replace(/\D/g, "").slice(0, 10);
@@ -23,8 +71,24 @@ const formatPhone = (v: string) => {
   return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
 };
 
-const formatDate = (val: string | null) =>
-  val ? new Date(val).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" }) : null;
+const formatDate = (val: string | null) => {
+  if (!val) return null;
+  const d = new Date(val);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+};
+
+// "YYYY-MM-DD" <-> Date, avoiding UTC-shift issues from Date.toISOString()/parsing
+const isoToDate = (iso: string): Date | undefined => {
+  if (!iso) return undefined;
+  const [y, m, d] = iso.split("-").map(Number);
+  return y && m && d ? new Date(y, m - 1, d) : undefined;
+};
+const dateToIso = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 const validateCustomerForm = (f: { username: string; customer_name: string; phone: string }) => {
   if (!f.username.trim() || f.username.length > 50) return "Username ต้องไม่เกิน 50 ตัวอักษร";
@@ -52,6 +116,151 @@ const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) =>
       Inactive
     </span>
   );
+
+// member_date / last_order_date from backend are "YYYY-MM-DD HH:MM:SS" (MySQL datetime),
+// lexically comparable against ISO "YYYY-MM-DD" — the picker displays dd/mm/yyyy but
+// isoToDate/dateToIso keep the stored from/to values in ISO so string comparison still works
+function DateRangeFields({
+  idPrefix,
+  label,
+  from,
+  to,
+  onChange,
+}: {
+  idPrefix: string;
+  label: string;
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <div className="mb-2">
+        <DatePicker
+          id={`${idPrefix}-from`}
+          placeholder="จาก"
+          dateFormat="d/m/Y"
+          defaultDate={isoToDate(from)}
+          onChange={(dates) => onChange(dates[0] ? dateToIso(dates[0]) : "", to)}
+        />
+      </div>
+      <div>
+        <DatePicker
+          id={`${idPrefix}-to`}
+          placeholder="ถึง"
+          dateFormat="d/m/Y"
+          defaultDate={isoToDate(to)}
+          onChange={(dates) => onChange(from, dates[0] ? dateToIso(dates[0]) : "")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DateFiltersPanel({
+  memberFrom,
+  memberTo,
+  onMemberChange,
+  lastOrderFrom,
+  lastOrderTo,
+  onLastOrderChange,
+}: {
+  memberFrom: string;
+  memberTo: string;
+  onMemberChange: (from: string, to: string) => void;
+  lastOrderFrom: string;
+  lastOrderTo: string;
+  onLastOrderChange: (from: string, to: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const activeCount = [!!memberFrom || !!memberTo, !!lastOrderFrom || !!lastOrderTo].filter(Boolean).length;
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      if ((target as HTMLElement).closest?.(".flatpickr-calendar")) return; // flatpickr popup mounts to document.body
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
+  const btnRect = buttonRef.current?.getBoundingClientRect();
+
+  return (
+    <>
+      <Button
+        ref={buttonRef}
+        size="sm"
+        variant={activeCount > 0 ? "primary" : "outline"}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 font-medium transition"
+        startIcon={<CalenderIcon className="size-5 shrink-0" />}
+      >
+        <span className="hidden sm:inline">ตัวกรองวันที่</span>
+        {activeCount > 0 && (
+          <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-white/25 text-[10px] text-white">
+            {activeCount}
+          </span>
+        )}
+      </Button>
+
+      {open && btnRect && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            top: btnRect.bottom + 8,
+            right: window.innerWidth - btnRect.right,
+            zIndex: 9999,
+          }}
+          className="w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+        >
+          <DateRangeFields
+            key={`member-date-${resetKey}`}
+            idPrefix="member-date"
+            label="วันที่สมัคร"
+            from={memberFrom}
+            to={memberTo}
+            onChange={onMemberChange}
+          />
+          <div className="my-3 border-t border-gray-100 dark:border-white/[0.05]" />
+          <DateRangeFields
+            key={`last-order-date-${resetKey}`}
+            idPrefix="last-order-date"
+            label="Last Order"
+            from={lastOrderFrom}
+            to={lastOrderTo}
+            onChange={onLastOrderChange}
+          />
+          {activeCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onMemberChange("", "");
+                onLastOrderChange("", "");
+                setResetKey((k) => k + 1);
+              }}
+              className="mt-3 w-full !py-2 text-xs"
+            >
+              ล้างตัวกรองทั้งหมด
+            </Button>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 const customerColumns: ColumnDef<CustomerListItem>[] = [
   {
@@ -270,11 +479,96 @@ export default function Customers() {
     }
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isParsingImport, setIsParsingImport] = useState(false);
+  const [importParseError, setImportParseError] = useState("");
+  const [importRows, setImportRows] = useState<ImportPreviewRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+  const [importResult, setImportResult] = useState<{ created: number; skipped: { row: number; username: string; reason: string }[] } | null>(null);
+
+  const closeImportModal = () => {
+    setIsImportOpen(false);
+    setImportRows([]);
+    setImportResult(null);
+    setImportParseError("");
+    setImportProgress({ done: 0, total: 0 });
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file next time
+    if (!file) return;
+
+    setImportParseError("");
+    setImportResult(null);
+    setIsParsingImport(true);
+    setIsImportOpen(true);
+    try {
+      const rows = await parseImportFile(file);
+      setImportRows(rows);
+      if (rows.length === 0) setImportParseError("ไม่พบข้อมูลในไฟล์");
+    } catch {
+      setImportParseError("ไม่สามารถอ่านไฟล์นี้ได้ ตรวจสอบว่าเป็นไฟล์ .xlsx ที่ถูกต้อง");
+    } finally {
+      setIsParsingImport(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    const validRows = importRows.filter((r) => r.valid);
+    if (validRows.length === 0 || isImporting) return;
+
+    const CHUNK_SIZE = 100;
+    let created = 0;
+    const skipped: { row: number; username: string; reason: string }[] = [];
+
+    setIsImporting(true);
+    setImportProgress({ done: 0, total: validRows.length });
+    try {
+      for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+        const batch = validRows.slice(i, i + CHUNK_SIZE);
+        const res = await importCustomers(batch.map((r) => ({
+          username: r.username,
+          customer_name: r.customer_name,
+          phone: r.phone,
+        })));
+        if (res.data) {
+          created += res.data.created;
+          skipped.push(...res.data.skipped);
+        }
+        setImportProgress({ done: Math.min(i + CHUNK_SIZE, validRows.length), total: validRows.length });
+      }
+      setImportResult({ created, skipped });
+      loadCustomers();
+    } catch {
+      setImportParseError("เกิดข้อผิดพลาดระหว่างนำเข้า กรุณาลองใหม่");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // backend caps per_page at 100 (customers_api.php) — fetch all pages upfront so
+  // DataTableOne can paginate/search/sort client-side without refetching on every page turn
   const loadCustomers = async () => {
+    const PER_PAGE = 100;
     try {
       setIsLoading(true);
-      const res = await getCustomers();
-      setCustomers(Array.isArray(res?.data) ? res.data : []);
+      const first = await getCustomers({ page: 1, perPage: PER_PAGE });
+      const all = Array.isArray(first?.data) ? [...first.data] : [];
+      const totalPages = first?.pagination?.total_pages ?? 1;
+
+      if (totalPages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, i) => getCustomers({ page: i + 2, perPage: PER_PAGE }))
+        );
+        for (const r of rest) {
+          if (Array.isArray(r?.data)) all.push(...r.data);
+        }
+      }
+
+      setCustomers(all);
     } catch (error) {
       if (import.meta.env.DEV) console.error(error);
     } finally {
@@ -319,6 +613,47 @@ export default function Customers() {
 
   const columns = useMemo(() => customerColumns, []);
 
+  const [memberDateFrom, setMemberDateFrom] = useState("");
+  const [memberDateTo, setMemberDateTo] = useState("");
+  const [lastOrderFrom, setLastOrderFrom] = useState("");
+  const [lastOrderTo, setLastOrderTo] = useState("");
+
+  const inRange = (val: string | null, from: string, to: string) => {
+    if (!from && !to) return true;
+    if (!val) return false;
+    const d = val.slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  };
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter((c) =>
+      inRange(c.member_date, memberDateFrom, memberDateTo) &&
+      inRange(c.last_order_date, lastOrderFrom, lastOrderTo)
+    );
+  }, [customers, memberDateFrom, memberDateTo, lastOrderFrom, lastOrderTo]);
+
+  // mobile card view (< min-[1025px]) has its own search box, independent of
+  // DataTableOne's internal desktop search — see Customers.tsx plan notes
+  const [mobileSearch, setMobileSearch] = useState("");
+  const mobileFilteredCustomers = useMemo(() => {
+    const q = mobileSearch.trim().toLowerCase();
+    if (!q) return filteredCustomers;
+    return filteredCustomers.filter((c) =>
+      (c.username || "").toLowerCase().includes(q) ||
+      (c.name || "").toLowerCase().includes(q) ||
+      (c.email || "").toLowerCase().includes(q) ||
+      (c.phone || "").toLowerCase().includes(q)
+    );
+  }, [filteredCustomers, mobileSearch]);
+
+  const CARD_PAGE_SIZE = 10;
+  const [cardPage, setCardPage] = useState(1);
+  useEffect(() => { setCardPage(1); }, [mobileFilteredCustomers]);
+  const cardTotalPages = Math.max(1, Math.ceil(mobileFilteredCustomers.length / CARD_PAGE_SIZE));
+  const pagedCustomers = mobileFilteredCustomers.slice((cardPage - 1) * CARD_PAGE_SIZE, cardPage * CARD_PAGE_SIZE);
+
   return (
     <>
       <PageMeta
@@ -326,23 +661,146 @@ export default function Customers() {
         description="Customer list with order history and spend stats"
       />
       <PageBreadcrumb pageTitle="Customers" />
-      <CardFrame isLoading={isLoading}>
-        <DataTableOne<CustomerListItem>
-          title="Customers"
-          subtitle="ทะเบียนลูกค้าและสถิติการสั่งซื้อ"
-          columns={columns}
-          data={customers}
-          rowKey="id"
-          searchable="header"
-          exportable="header"
-          onRowClick={handleRowClick}
-          headerFilter={
-            <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-              เพิ่มลูกค้าใหม่
-            </Button>
-          }
-        />
-      </CardFrame>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleImportFileChange}
+      />
+      {/* Desktop table */}
+      <div className="hidden min-[1025px]:block">
+        <CardFrame isLoading={isLoading}>
+          <DataTableOne<CustomerListItem>
+            title="Customers"
+            subtitle="ทะเบียนลูกค้าและสถิติการสั่งซื้อ"
+            columns={columns}
+            data={filteredCustomers}
+            rowKey="id"
+            searchable="header"
+            exportable="header"
+            onRowClick={handleRowClick}
+            headerFilter={
+              <div className="flex flex-wrap gap-2">
+                <DateFiltersPanel
+                  memberFrom={memberDateFrom}
+                  memberTo={memberDateTo}
+                  onMemberChange={(from, to) => { setMemberDateFrom(from); setMemberDateTo(to); }}
+                  lastOrderFrom={lastOrderFrom}
+                  lastOrderTo={lastOrderTo}
+                  onLastOrderChange={(from, to) => { setLastOrderFrom(from); setLastOrderTo(to); }}
+                />
+                <Button size="sm" variant="outline" startIcon={<FileIcon className="size-5 shrink-0" />} onClick={() => fileInputRef.current?.click()}>
+                  <span className="hidden sm:inline">นำเข้าจาก Excel</span>
+                </Button>
+                <Button size="sm" startIcon={<PlusIcon className="size-5 shrink-0" />} onClick={() => setIsCreateOpen(true)}>
+                  <span className="hidden sm:inline">เพิ่มลูกค้าใหม่</span>
+                </Button>
+              </div>
+            }
+          />
+        </CardFrame>
+      </div>
+
+      {/* Mobile/tablet card list */}
+      <div className="min-[1025px]:hidden">
+        <div className="flex gap-2 mb-3">
+          <div className="relative flex-1">
+            <span className="absolute z-1 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+              <SearchOneIcon />
+            </span>
+            <Input
+              type="text"
+              value={mobileSearch}
+              onChange={(e) => setMobileSearch(e.target.value)}
+              placeholder="Search..."
+              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-11 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+            />
+          </div>
+          <DateFiltersPanel
+            memberFrom={memberDateFrom}
+            memberTo={memberDateTo}
+            onMemberChange={(from, to) => { setMemberDateFrom(from); setMemberDateTo(to); }}
+            lastOrderFrom={lastOrderFrom}
+            lastOrderTo={lastOrderTo}
+            onLastOrderChange={(from, to) => { setLastOrderFrom(from); setLastOrderTo(to); }}
+          />
+        </div>
+        <div className="flex gap-2 mb-3">
+          <Button size="sm" variant="outline" className="flex-1" startIcon={<FileIcon className="size-5 shrink-0" />} onClick={() => fileInputRef.current?.click()}>
+            นำเข้าจาก Excel
+          </Button>
+          <Button size="sm" className="flex-1" startIcon={<PlusIcon className="size-5 shrink-0" />} onClick={() => setIsCreateOpen(true)}>
+            เพิ่มลูกค้าใหม่
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12 text-sm text-gray-400">Loading…</div>
+        ) : mobileFilteredCustomers.length === 0 ? (
+          <div className="flex justify-center py-12 text-sm text-gray-400">No customers found</div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              {pagedCustomers.map((customer) => (
+                <div
+                  key={customer.id}
+                  onClick={() => handleRowClick(customer)}
+                  className="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 transition-colors active:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.02] dark:active:bg-white/[0.04]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 shrink-0 rounded-full bg-brand-500/10 text-brand-600 flex items-center justify-center text-sm font-bold uppercase ring-1 ring-brand-500/20">
+                        {getInitial(customer.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-black dark:text-white truncate">{customer.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">@{customer.username}</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={customer.status} />
+                  </div>
+
+                  <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{customer.phone || "—"}</p>
+
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">Orders: <span className="font-medium text-gray-800 dark:text-gray-200">{customer.order_count}</span></span>
+                    <span className="font-semibold text-black dark:text-white">฿{Number(customer.total_spend).toLocaleString()}</span>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+                    <span>Member: {formatDate(customer.member_date) ?? "—"}</span>
+                    <span>Last order: {formatDate(customer.last_order_date) ?? "—"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {cardTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 px-1">
+                <span className="text-xs text-gray-400">
+                  {(cardPage - 1) * CARD_PAGE_SIZE + 1}–{Math.min(cardPage * CARD_PAGE_SIZE, mobileFilteredCustomers.length)} of {mobileFilteredCustomers.length}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    disabled={cardPage === 1}
+                    onClick={() => setCardPage((p) => p - 1)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    disabled={cardPage === cardTotalPages}
+                    onClick={() => setCardPage((p) => p + 1)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <Modal
         isOpen={isOpen}
@@ -576,6 +1034,107 @@ export default function Customers() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={isImportOpen}
+        onClose={closeImportModal}
+        className="max-w-lg m-4 w-full"
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">นำเข้าลูกค้าจาก Excel</h3>
+
+          {isParsingImport ? (
+            <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">กำลังอ่านไฟล์…</p>
+          ) : importParseError ? (
+            <div className="space-y-4">
+              <p className="text-sm text-red-500">{importParseError}</p>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={closeImportModal}>ปิด</Button>
+              </div>
+            </div>
+          ) : importResult ? (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                นำเข้าสำเร็จ <span className="font-semibold text-green-600 dark:text-green-400">{importResult.created}</span> รายการ
+                {importResult.skipped.length > 0 && (
+                  <> · ข้าม <span className="font-semibold text-amber-600 dark:text-amber-400">{importResult.skipped.length}</span> รายการ</>
+                )}
+              </p>
+              {importResult.skipped.length > 0 && (
+                <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-100 dark:border-white/[0.05]">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">แถว</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Username</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">เหตุผล</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                      {importResult.skipped.map((s) => (
+                        <tr key={s.row}>
+                          <td className="px-3 py-1.5 text-gray-500 dark:text-gray-400">{s.row}</td>
+                          <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">{s.username || "—"}</td>
+                          <td className="px-3 py-1.5 text-red-500">{s.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex justify-end pt-2">
+                <Button size="sm" onClick={closeImportModal}>ปิด</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                พบ <span className="font-semibold text-gray-900 dark:text-white">{importRows.length}</span> แถว —{" "}
+                <span className="font-semibold text-green-600 dark:text-green-400">{importRows.filter((r) => r.valid).length}</span> รายการพร้อมนำเข้า
+                {importRows.some((r) => !r.valid) && (
+                  <>, <span className="font-semibold text-red-500">{importRows.filter((r) => !r.valid).length}</span> รายการมีปัญหา (จะถูกข้าม)</>
+                )}
+              </p>
+
+              {importRows.some((r) => !r.valid) && (
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-100 dark:border-white/[0.05]">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">แถว</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Username</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">ปัญหา</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                      {importRows.filter((r) => !r.valid).map((r) => (
+                        <tr key={r.row}>
+                          <td className="px-3 py-1.5 text-gray-500 dark:text-gray-400">{r.row}</td>
+                          <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">{r.username || "—"}</td>
+                          <td className="px-3 py-1.5 text-red-500">{r.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {isImporting ? (
+                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                  กำลังนำเข้า {importProgress.done}/{importProgress.total}…
+                </p>
+              ) : (
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" size="sm" onClick={closeImportModal}>ยกเลิก</Button>
+                  <Button size="sm" disabled={importRows.filter((r) => r.valid).length === 0} onClick={handleConfirmImport}>
+                    นำเข้า {importRows.filter((r) => r.valid).length} รายการ
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Modal>
 
       <OrderDetails

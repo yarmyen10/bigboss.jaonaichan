@@ -13,6 +13,7 @@ type SaveStatus = "idle" | "saving" | "success" | "error";
 export default function RtsShippingSettings() {
     const [isLoading, setIsLoading] = useState(false);
     const [cost, setCost] = useState("");
+    const [minAmount, setMinAmount] = useState("");
     const [methodTitle, setMethodTitle] = useState("");
     const [zoneName, setZoneName] = useState("");
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -25,6 +26,7 @@ export default function RtsShippingSettings() {
         getRtsShippingSettings()
             .then((data) => {
                 setCost(String(data.cost));
+                setMinAmount(String(data.min_amount));
                 setMethodTitle(data.method_title);
                 setZoneName(data.zone_name);
             })
@@ -35,8 +37,9 @@ export default function RtsShippingSettings() {
     const handleSave = async () => {
         setSaveStatus("saving");
         try {
-            const res = await updateRtsShippingSettings(parseFloat(cost) || 0);
+            const res = await updateRtsShippingSettings(parseFloat(cost) || 0, parseFloat(minAmount) || 0);
             setCost(String(res.cost));
+            setMinAmount(String(res.min_amount));
             setSaveStatus("success");
             setTimeout(() => setSaveStatus("idle"), 3000);
         } catch (e) {
@@ -83,6 +86,20 @@ export default function RtsShippingSettings() {
                             />
                             <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                                 ค่านี้จะถูกอัปเดตใน WooCommerce โดยตรง — ออเดอร์ RTS ใหม่จะใช้ค่านี้ทันที
+                            </p>
+                        </div>
+
+                        <div>
+                            <Label htmlFor="rts-min-amount">ยอดสั่งซื้อขั้นต่ำสำหรับส่งฟรี (บาท)</Label>
+                            <Input
+                                id="rts-min-amount"
+                                type="number"
+                                placeholder="0"
+                                value={minAmount}
+                                onChange={(e) => setMinAmount(e.target.value)}
+                            />
+                            <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                                ถ้ายอดสินค้า RTS ในตะกร้าครบหรือเกินจำนวนนี้ ค่าส่งจะเป็น 0 บาท — ใส่ 0 เพื่อปิดเงื่อนไขนี้
                             </p>
                         </div>
 
