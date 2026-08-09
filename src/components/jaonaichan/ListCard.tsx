@@ -11,16 +11,19 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cod: "Cash on Delivery",
 };
 
+const PACKED_STATUSES = new Set(['packed', 'wait-tracking', 'tracked', 'wait-shipping', 'shipped']);
+
 interface ListCardProps {
   order: Order;
   onView?: (order: Order) => void;
   onInvoice?: (orderId: number) => void;
   onUpdateStatus?: (order: Order) => void;
+  onPack?: (order: Order) => void;
   /** ซ่อน progress bar + payment method สำหรับ context แคบ (เช่น customer modal) */
   compact?: boolean;
 }
 
-export default function ListCard({ order, onView, onInvoice, onUpdateStatus, compact = false }: ListCardProps) {
+export default function ListCard({ order, onView, onInvoice, onUpdateStatus, onPack, compact = false }: ListCardProps) {
   const statusDetail = ORDER_STATUS_DETAILS[order.status] ?? { color: "light", text: order.status };
 
   let displayTotal = Number(order.total);
@@ -43,7 +46,7 @@ export default function ListCard({ order, onView, onInvoice, onUpdateStatus, com
     : pct < 100 ? "bg-teal-500 dark:bg-teal-400"
     : "bg-emerald-500 dark:bg-emerald-400";
 
-  const hasActions = onView || onInvoice || onUpdateStatus;
+  const hasActions = onView || onInvoice || onUpdateStatus || onPack;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-white/[0.02]">
@@ -128,6 +131,14 @@ export default function ListCard({ order, onView, onInvoice, onUpdateStatus, com
               className="flex-1 rounded-lg border border-brand-200 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-700/40 dark:text-brand-400 dark:hover:bg-brand-500/10"
             >
               Status
+            </button>
+          )}
+          {onPack && (
+            <button
+              onClick={() => onPack(order)}
+              className="flex-1 rounded-lg border border-teal-200 py-1.5 text-xs font-medium text-teal-600 hover:bg-teal-50 dark:border-teal-700/40 dark:text-teal-400 dark:hover:bg-teal-500/10"
+            >
+              {PACKED_STATUSES.has(order.status) ? "View Pack" : "Pack"}
             </button>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, ReactNode } from 'react';
+import { useSearchParams } from 'react-router';
 import { Html5Qrcode } from 'html5-qrcode';
 import Button from '../../components/ui/button/Button';
 import Badge from '../../components/ui/badge/Badge';
@@ -141,6 +142,7 @@ export default function BarcodePack() {
     const [manualBarcode, setManualBarcode] = useState('');
     const [cameraFailed, setCameraFailed] = useState(false);
     const manualInputRef = useRef<HTMLInputElement>(null);
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const itemsRef = useRef<EnhancedBarcodeOrderItem[]>([]);
@@ -368,6 +370,16 @@ export default function BarcodePack() {
             setLoadingOrders(false);
         }
     };
+
+    // Auto-load from URL ?orderId=X when navigated from Order page
+    useEffect(() => {
+        const id = Number(searchParams.get('orderId'));
+        if (!id) return;
+        setOrderId(String(id));
+        setSearchParams(p => { p.delete('orderId'); return p; }, { replace: true });
+        void loadItemsForOrderId(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleLoadItemsManual = async () => {
         const id = Number(orderId.trim());

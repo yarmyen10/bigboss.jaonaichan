@@ -16,7 +16,7 @@ import { ORDER_STATUS_DETAILS, STATUS_PROGRESS } from "../../config/orderStatus.
 import ListCard from "../../components/jaonaichan/ListCard";
 import SmartSearchInput from "../../components/jaonaichan/SmartSearchInput";
 import { TabOption } from "../../components/ui/tabs";
-import { CalenderIcon, CheckCircleIcon, MoreDotIcon, BoxIcon, PencilIcon, TrashBinIcon } from "../../icons";
+import { CalenderIcon, CheckCircleIcon, MoreDotIcon, BoxIcon, BoxCubeIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import Button from "../../components/ui/button/Button";
 import Select from "../../components/form/Select";
 import Label from "../../components/form/Label";
@@ -40,6 +40,9 @@ import BillPreviewTable from "../../components/jaonaichan/BillPreviewTable";
 
 
 type PaymentMethod = "promptpay_qr" | "bank_transfer" | "cod";
+
+const PACK_READY = new Set(['paid-2', 'paid-1']);
+const PACKED_STATUSES = new Set(['packed', 'wait-tracking', 'tracked', 'wait-shipping', 'shipped']);
 
 const STATUS_ORDER = [
   "waiting-transfer",
@@ -460,6 +463,15 @@ const getOrderColumns = (
                   >
                     Update Status
                   </DropdownItem>
+                  {(PACK_READY.has(row.status) && (row.status !== 'paid-1' || !!row.is_rts)) || PACKED_STATUSES.has(row.status) ? (
+                    <DropdownItem
+                      onItemClick={() => { setOpenDropdownId(null); navigate(`/barcode-pack?orderId=${row.id}`); }}
+                      className="flex w-full items-center gap-1.5 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                    >
+                      <BoxCubeIcon className="size-4 shrink-0" />
+                      {PACKED_STATUSES.has(row.status) ? "View Pack" : "Pack Order"}
+                    </DropdownItem>
+                  ) : null}
                 </Dropdown>
               </div>,
               document.body
@@ -865,6 +877,11 @@ export default function Order() {
                   onView={handleViewMore}
                   onInvoice={(id) => navigate(`/jaonaichan/invoice/${id}`)}
                   onUpdateStatus={(o) => handleOpenUpdateStatus([o])}
+                  onPack={
+                    (PACK_READY.has(order.status) && (order.status !== 'paid-1' || !!order.is_rts)) || PACKED_STATUSES.has(order.status)
+                      ? (o) => navigate(`/barcode-pack?orderId=${o.id}`)
+                      : undefined
+                  }
                 />
               ))}
             </div>
