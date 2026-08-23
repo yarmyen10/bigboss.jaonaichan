@@ -17,6 +17,8 @@ export default function PromptPaySettings() {
     const [slipokKey, setSlipokKey] = useState("");
     const [slipokBranchId, setSlipokBranchId] = useState("");
     const [slipokEndpoint, setSlipokEndpoint] = useState("");
+    const [qrMode, setQrMode] = useState<"phone" | "biller">("phone");
+    const [billerId, setBillerId] = useState("");
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
     const hasInitialized = useRef(false);
 
@@ -28,6 +30,8 @@ export default function PromptPaySettings() {
             setSlipokKey(config.slipok_key ?? "");
             setSlipokBranchId(config.slipok_branch_id ?? "");
             setSlipokEndpoint(config.slipok_endpoint ?? "");
+            setQrMode(config.qr_mode ?? "phone");
+            setBillerId(config.biller_id ?? "");
         } catch (error) {
             if (import.meta.env.DEV) console.error(error);
         } finally {
@@ -44,7 +48,7 @@ export default function PromptPaySettings() {
     const handleSave = async () => {
         setSaveStatus("saving");
         try {
-            await updatePromptPayConfig({ phone: phone.trim(), slipok_key: slipokKey.trim(), slipok_branch_id: slipokBranchId.trim(), slipok_endpoint: slipokEndpoint.trim() });
+            await updatePromptPayConfig({ phone: phone.trim(), slipok_key: slipokKey.trim(), slipok_branch_id: slipokBranchId.trim(), slipok_endpoint: slipokEndpoint.trim(), qr_mode: qrMode, biller_id: billerId.trim() });
             setSaveStatus("success");
             setTimeout(() => setSaveStatus("idle"), 3000);
         } catch (error) {
@@ -69,6 +73,27 @@ export default function PromptPaySettings() {
 
                     <div className="space-y-5 max-w-md">
                         <div>
+                            <Label>ประเภท QR</Label>
+                            <div className="mt-1.5 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setQrMode("phone")}
+                                    className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${qrMode === "phone" ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400" : "border-gray-200 text-gray-500 hover:border-gray-300 dark:border-gray-700"}`}
+                                >
+                                    เบอร์โทร (PromptPay)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setQrMode("biller")}
+                                    className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${qrMode === "biller" ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400" : "border-gray-200 text-gray-500 hover:border-gray-300 dark:border-gray-700"}`}
+                                >
+                                    K-Shop
+                                </button>
+                            </div>
+                        </div>
+
+                        {qrMode === "phone" && (
+                        <div>
                             <Label htmlFor="promptpay-phone">เบอร์ PromptPay</Label>
                             <Input
                                 id="promptpay-phone"
@@ -81,6 +106,23 @@ export default function PromptPaySettings() {
                                 เบอร์โทรที่ผูกกับ PromptPay
                             </p>
                         </div>
+                        )}
+
+                        {qrMode === "biller" && (
+                        <div>
+                            <Label htmlFor="biller-id">K-Shop Biller ID</Label>
+                            <Input
+                                id="biller-id"
+                                type="text"
+                                placeholder="KB000002147245"
+                                value={billerId}
+                                onChange={(e) => setBillerId(e.target.value)}
+                            />
+                            <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                                เลขอ้างอิงจาก K-Shop / Biller QR
+                            </p>
+                        </div>
+                        )}
 
                         <div>
                             <Label htmlFor="slipok-branch-id">SlipOK Branch ID</Label>
