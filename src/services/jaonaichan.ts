@@ -194,7 +194,7 @@ export async function createCustomer(payload: { username: string; customer_name:
     });
 }
 
-export async function updateCustomer(id: number, payload: { username: string; customer_name: string; phone: string; email?: string }): Promise<{ success: boolean; data?: any; message?: string }> {
+export async function updateCustomer(id: number, payload: { username: string; customer_name: string; phone: string; email?: string; remark?: string }): Promise<{ success: boolean; data?: any; message?: string }> {
     return apiRequest(`/jaonaichan/v1/customers/${id}`, {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -262,6 +262,10 @@ import type {
     BarcodeListResponse,
     BarcodeDeleteResponse,
     TrackingParcel,
+    GetImportProductsResponse,
+    SetOrderQtyResponse,
+    UpdateBarcodeQtyResponse,
+    RemoveBarcodeImportResponse,
 } from '../interfaces/barcode.jaonaichan';
 
 const BARCODE_PACK_ENDPOINT = '/jaonaichan/v1/barcode-pack';
@@ -339,6 +343,34 @@ export async function deleteBarcode(id: number): Promise<BarcodeDeleteResponse> 
     return apiRequest(BARCODE_IMPORT_ENDPOINT, {
         method: 'POST',
         body: JSON.stringify({ action: 'delete_barcode', id }),
+    });
+}
+
+export async function getImportProducts(): Promise<GetImportProductsResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'get_import_products' }),
+    });
+}
+
+export async function setImportOrderQty(targetId: number, qty: number): Promise<SetOrderQtyResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'set_order_qty', target_id: targetId, qty }),
+    });
+}
+
+export async function updateImportBarcodeQty(targetId: number, code: string, qty: number): Promise<UpdateBarcodeQtyResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'update_barcode_qty', target_id: targetId, code, qty }),
+    });
+}
+
+export async function removeImportBarcode(targetId: number, code: string): Promise<RemoveBarcodeImportResponse> {
+    return apiRequest(BARCODE_IMPORT_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'remove_barcode', target_id: targetId, code }),
     });
 }
 

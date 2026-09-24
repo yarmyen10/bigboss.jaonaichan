@@ -8,6 +8,7 @@ export interface CustomerListItem {
     phone: string
     role?: string
     status: 'active' | 'inactive'
+    remark?: string
     order_count: number
     total_spend: number
     member_date: string | null

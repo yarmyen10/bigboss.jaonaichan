@@ -365,7 +365,7 @@ export default function Customers() {
   const { isOpen, openModal, closeModal } = useModal();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ username: "", customer_name: "", email: "", phone: "" });
+  const [editForm, setEditForm] = useState({ username: "", customer_name: "", email: "", phone: "", remark: "" });
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState("");
 
@@ -467,7 +467,7 @@ export default function Customers() {
       const res = await updateCustomer(selectedCustomer.id, editForm);
       if (res.success) {
         setIsEditing(false);
-        setSelectedCustomer(prev => prev ? { ...prev, name: editForm.customer_name, username: editForm.username, email: editForm.email, phone: editForm.phone } : null);
+        setSelectedCustomer(prev => prev ? { ...prev, name: editForm.customer_name, username: editForm.username, email: editForm.email, phone: editForm.phone, remark: editForm.remark } : null);
         loadCustomers();
       } else {
         setUpdateError(res.message || "เกิดข้อผิดพลาด");
@@ -597,6 +597,7 @@ export default function Customers() {
       customer_name: customer.name,
       email: customer.email,
       phone: customer.phone || "",
+      remark: customer.remark || "",
     });
 
     openModal();
@@ -837,6 +838,16 @@ export default function Customers() {
                         <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">อีเมล</label>
                         <Input type="email" disabled={isUpdating} value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} />
                       </div>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">Remark <span className="text-xs text-gray-400">(ลูกค้าไม่เห็นข้อมูลนี้)</span></label>
+                      <textarea
+                        rows={3}
+                        disabled={isUpdating}
+                        value={editForm.remark}
+                        onChange={e => setEditForm(p => ({...p, remark: e.target.value}))}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      />
                     </div>
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" size="sm" disabled={isUpdating} onClick={(e) => { e.preventDefault(); setIsEditing(false); }}>ยกเลิก</Button>

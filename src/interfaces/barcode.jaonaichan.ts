@@ -76,3 +76,50 @@ export interface BarcodeDeleteResponse {
     success: boolean;
     message?: string;
 }
+
+// =========================================================================
+// Barcode Import v2 — product list UI
+// =========================================================================
+
+export interface ImportBarcode {
+    code: string;
+    received_qty: number;
+    last_scan_at: string;
+}
+
+export interface ImportVariant {
+    variant_id: number;
+    name: string;
+    sku: string;
+    order_qty: number;
+    barcodes: ImportBarcode[];
+}
+
+export interface ImportProduct {
+    product_id: number;
+    name: string;
+    sku: string;
+    image_url: string;
+    category: string;
+    type: 'simple' | 'variable';
+    order_qty: number;
+    barcodes: ImportBarcode[];
+    variants: ImportVariant[];
+}
+
+export interface GetImportProductsResponse {
+    products: ImportProduct[];
+}
+
+export interface SetOrderQtyResponse {
+    success: boolean;
+}
+
+export interface UpdateBarcodeQtyResponse {
+    success: boolean;
+    received_qty: number;
+}
+
+export interface RemoveBarcodeImportResponse {
+    success: boolean;
+}
