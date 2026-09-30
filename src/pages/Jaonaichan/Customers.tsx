@@ -8,10 +8,12 @@ import DataTableOne, { ColumnDef } from "../../components/tables/DataTable/DataT
 import { CustomerListItem } from "../../interfaces/customer.jaonaichan";
 import { Order as OrderIF } from "../../interfaces/order.jaonaichan";
 import { Modal } from "../../components/ui/modal";
+import { ModalPanel, ModalHeader, ModalBody, ModalFooter } from "../../components/ui/modal/ModalSections";
 import { useModal } from "../../hooks/useModal";
 import { getCustomers, getCustomerOrders, createCustomer, updateCustomer, resetCustomerPassword, setCustomerStatus, importCustomers } from "../../services/jaonaichan";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
+import Label from "../../components/form/Label";
 import DatePicker from "../../components/form/date-picker";
 import OrderDetails from "../../components/jaonaichan/OrderDetails";
 import ListCard from "../../components/jaonaichan/ListCard";
@@ -635,7 +637,7 @@ export default function Customers() {
     );
   }, [customers, memberDateFrom, memberDateTo, lastOrderFrom, lastOrderTo]);
 
-  // mobile card view (< min-[1025px]) has its own search box, independent of
+  // mobile card view (< lg) has its own search box, independent of
   // DataTableOne's internal desktop search — see Customers.tsx plan notes
   const [mobileSearch, setMobileSearch] = useState("");
   const mobileFilteredCustomers = useMemo(() => {
@@ -670,7 +672,7 @@ export default function Customers() {
         onChange={handleImportFileChange}
       />
       {/* Desktop table */}
-      <div className="hidden min-[1025px]:block">
+      <div className="hidden lg:block">
         <CardFrame isLoading={isLoading}>
           <DataTableOne<CustomerListItem>
             title="Customers"
@@ -704,7 +706,7 @@ export default function Customers() {
       </div>
 
       {/* Mobile/tablet card list */}
-      <div className="min-[1025px]:hidden">
+      <div className="lg:hidden">
         <div className="flex gap-2 mb-3">
           <div className="relative flex-1">
             <span className="absolute z-1 top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
@@ -808,26 +810,30 @@ export default function Customers() {
         onClose={closeModal}
         className="max-w-5xl m-4 w-full"
       >
-        <div className="p-6">
-          {selectedCustomer && (
-            <>
-              <div className="mb-5">
-                {isEditing ? (
-                  <form onSubmit={handleUpdateSubmit} className="space-y-4 pr-12 sm:pr-24">
-                    {updateError && <div className="text-sm text-red-500">{updateError}</div>}
+        {selectedCustomer && (
+          <ModalPanel>
+            <ModalHeader>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{isEditing ? "แก้ไขลูกค้า" : "ข้อมูลลูกค้า"}</h3>
+              {isEditing && <p className="text-sm text-gray-500 mt-1">{selectedCustomer.name}</p>}
+            </ModalHeader>
+
+            <ModalBody className="space-y-6">
+              {isEditing ? (
+                <>
+                  <form onSubmit={handleUpdateSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">Username</label>
+                        <Label>Username</Label>
                         <Input required maxLength={50} disabled={isUpdating} value={editForm.username} onChange={e => setEditForm(p => ({...p, username: e.target.value}))} />
                       </div>
                       <div>
-                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">Customer Name</label>
+                        <Label>Customer Name</Label>
                         <Input required maxLength={100} disabled={isUpdating} value={editForm.customer_name} onChange={e => setEditForm(p => ({...p, customer_name: e.target.value}))} />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">เบอร์โทรศัพท์</label>
+                        <Label>เบอร์โทรศัพท์</Label>
                         <Input required maxLength={12} disabled={isUpdating} value={editForm.phone}
                           onChange={e => setEditForm(p => ({...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10)}))}
                           onFocus={() => setEditForm(p => ({...p, phone: p.phone.replace(/\D/g, "")}))}
@@ -835,12 +841,12 @@ export default function Customers() {
                         />
                       </div>
                       <div>
-                        <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">อีเมล</label>
+                        <Label>อีเมล</Label>
                         <Input type="email" disabled={isUpdating} value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} />
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500 dark:text-gray-400 block mb-1">Remark <span className="text-xs text-gray-400">(ลูกค้าไม่เห็นข้อมูลนี้)</span></label>
+                      <Label>Remark <span className="text-xs text-gray-400">(ลูกค้าไม่เห็นข้อมูลนี้)</span></Label>
                       <textarea
                         rows={3}
                         disabled={isUpdating}
@@ -849,118 +855,115 @@ export default function Customers() {
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                       />
                     </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button variant="outline" size="sm" disabled={isUpdating} onClick={(e) => { e.preventDefault(); setIsEditing(false); }}>ยกเลิก</Button>
-                      <Button size="sm" onClick={handleUpdateSubmit} disabled={isUpdating}>{isUpdating ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}</Button>
-                    </div>
-
-                    {/* Reset Password */}
-                    <div className="pt-4 border-t border-gray-100 dark:border-white/[0.05]">
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">รีเซ็ตรหัสผ่าน</p>
-                      {resetSuccess && <p className="text-xs text-green-600 dark:text-green-400 mb-2">{resetSuccess}</p>}
-                      {resetError && <p className="text-xs text-red-500 mb-2">{resetError}</p>}
-                      {resetMode === 'idle' && (
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => { setResetMode('phone'); setResetError(""); setResetSuccess(""); }}>
-                            ใช้เบอร์โทร
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setResetMode('manual'); setResetError(""); setResetSuccess(""); }}>
-                            กรอกเอง
-                          </Button>
-                        </div>
-                      )}
-                      {resetMode === 'phone' && (
-                        <div className="flex gap-2 items-center">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">รหัสผ่านใหม่ = <span className="font-medium text-gray-700 dark:text-gray-200">{editForm.phone.replace(/\D/g, "")}</span></p>
-                          <Button size="sm" disabled={isResetting} onClick={() => handleResetPassword('phone')}>{isResetting ? "กำลังรีเซ็ต..." : "ยืนยัน"}</Button>
-                          <Button size="sm" variant="outline" onClick={() => { setResetMode('idle'); setResetError(""); }}>ยกเลิก</Button>
-                        </div>
-                      )}
-                      {resetMode === 'manual' && (
-                        <div className="flex gap-2 items-start">
-                          <Input placeholder="รหัสผ่านใหม่ (≥6 ตัว)" value={resetPassword} onChange={e => setResetPassword(e.target.value)} disabled={isResetting} />
-                          <Button size="sm" disabled={isResetting} onClick={() => handleResetPassword('manual')}>{isResetting ? "กำลังรีเซ็ต..." : "ยืนยัน"}</Button>
-                          <Button size="sm" variant="outline" onClick={() => { setResetMode('idle'); setResetPassword(""); setResetError(""); }}>ยกเลิก</Button>
-                        </div>
-                      )}
-                    </div>
                   </form>
-                ) : (
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pr-12 sm:pr-24">
-                    <div className="flex items-center gap-5">
-                      {/* Avatar */}
-                      <div className="w-16 h-16 shrink-0 rounded-full bg-brand-500/10 text-brand-600 flex items-center justify-center text-2xl font-bold uppercase ring-1 ring-brand-500/20">
-                        {getInitial(selectedCustomer.name)}
-                      </div>
 
-                      {/* Info */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                            {selectedCustomer.name}
-                          </h4>
-                          <StatusBadge status={selectedCustomer.status} />
-                          <button
-                            onClick={() => setIsEditing(true)}
-                            className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 transition-colors"
-                          >
-                            แก้ไข
-                          </button>
-                          <button
-                            onClick={handleToggleStatus}
-                            disabled={isTogglingStatus}
-                            className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors disabled:opacity-50 ${
-                              selectedCustomer.status === 'active'
-                                ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20'
-                                : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20'
-                            }`}
-                          >
-                            {isTogglingStatus ? "..." : selectedCustomer.status === 'active' ? 'ระงับ' : 'เปิดใช้งาน'}
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">@{selectedCustomer.username}</p>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500 dark:text-gray-400">
-                          <span className="flex items-center gap-1.5">
-                            <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                            {selectedCustomer.email}
-                          </span>
-                          {selectedCustomer.phone && (
-                            <span className="flex items-center gap-1.5">
-                              <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                              {selectedCustomer.phone}
-                            </span>
-                          )}
-                        </div>
+                  {/* Reset Password — outside the <form>: <Button> has no type, so inside a form it is a submit button */}
+                  <div className="pt-4 border-t border-gray-100 dark:border-white/[0.05]">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">รีเซ็ตรหัสผ่าน</p>
+                    {resetSuccess && <p className="text-xs text-green-600 dark:text-green-400 mb-2">{resetSuccess}</p>}
+                    {resetError && <p className="text-xs text-red-500 mb-2">{resetError}</p>}
+                    {resetMode === 'idle' && (
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { setResetMode('phone'); setResetError(""); setResetSuccess(""); }}>
+                          ใช้เบอร์โทร
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { setResetMode('manual'); setResetError(""); setResetSuccess(""); }}>
+                          กรอกเอง
+                        </Button>
                       </div>
+                    )}
+                    {resetMode === 'phone' && (
+                      <div className="flex gap-2 items-center">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">รหัสผ่านใหม่ = <span className="font-medium text-gray-700 dark:text-gray-200">{editForm.phone.replace(/\D/g, "")}</span></p>
+                        <Button size="sm" disabled={isResetting} onClick={() => handleResetPassword('phone')}>{isResetting ? "กำลังรีเซ็ต..." : "ยืนยัน"}</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setResetMode('idle'); setResetError(""); }}>ยกเลิก</Button>
+                      </div>
+                    )}
+                    {resetMode === 'manual' && (
+                      <div className="flex gap-2 items-start">
+                        <Input placeholder="รหัสผ่านใหม่ (≥6 ตัว)" value={resetPassword} onChange={e => setResetPassword(e.target.value)} disabled={isResetting} />
+                        <Button size="sm" disabled={isResetting} onClick={() => handleResetPassword('manual')}>{isResetting ? "กำลังรีเซ็ต..." : "ยืนยัน"}</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setResetMode('idle'); setResetPassword(""); setResetError(""); }}>ยกเลิก</Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="flex items-center gap-4">
+                    {/* Avatar */}
+                    <div className="w-16 h-16 shrink-0 rounded-full bg-brand-500/10 text-brand-600 flex items-center justify-center text-2xl font-bold uppercase ring-1 ring-brand-500/20">
+                      {getInitial(selectedCustomer.name)}
                     </div>
 
-                    {/* Stats */}
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                      <div className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-800/50 dark:border-gray-700/50">
-                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Total Orders</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-white leading-none">
-                          {selectedCustomer.order_count}
-                        </p>
+                    {/* Info */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="text-xl font-bold text-gray-900 dark:text-white">
+                          {selectedCustomer.name}
+                        </h4>
+                        <StatusBadge status={selectedCustomer.status} />
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 transition-colors"
+                        >
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={handleToggleStatus}
+                          disabled={isTogglingStatus}
+                          className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors disabled:opacity-50 ${
+                            selectedCustomer.status === 'active'
+                              ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20'
+                              : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20'
+                          }`}
+                        >
+                          {isTogglingStatus ? "..." : selectedCustomer.status === 'active' ? 'ระงับ' : 'เปิดใช้งาน'}
+                        </button>
                       </div>
-                      <div className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-brand-50 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20">
-                        <p className="text-xs font-medium text-brand-600 dark:text-brand-400 mb-0.5">Total Spend</p>
-                        <p className="text-lg font-bold text-brand-700 dark:text-brand-300 leading-none">
-                          ฿{selectedCustomer.total_spend.toLocaleString()}
-                        </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">@{selectedCustomer.username}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                          {selectedCustomer.email}
+                        </span>
+                        {selectedCustomer.phone && (
+                          <span className="flex items-center gap-1.5">
+                            <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                            {selectedCustomer.phone}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              <div className="px-1">
+                  {/* Stats */}
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-800/50 dark:border-gray-700/50">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Total Orders</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white leading-none">
+                        {selectedCustomer.order_count}
+                      </p>
+                    </div>
+                    <div className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-brand-50 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20">
+                      <p className="text-xs font-medium text-brand-600 dark:text-brand-400 mb-0.5">Total Spend</p>
+                      <p className="text-lg font-bold text-brand-700 dark:text-brand-300 leading-none">
+                        ฿{selectedCustomer.total_spend.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* the body scrolls as a whole, so no nested max-h scroll here */}
+              <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Order History</p>
                 {isOrdersLoading ? (
                   <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
                 ) : customerOrders.length === 0 ? (
                   <div className="py-8 text-center text-sm text-gray-400">No orders found</div>
                 ) : (
-                  <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+                  <div className="flex flex-col gap-2">
                     {customerOrders.map((order) => (
                       <ListCard
                         key={order.id}
@@ -973,9 +976,17 @@ export default function Customers() {
                   </div>
                 )}
               </div>
-            </>
-          )}
-        </div>
+            </ModalBody>
+
+            {isEditing && (
+              <ModalFooter>
+                {updateError && <p className="w-full text-sm text-red-600 dark:text-red-400 sm:mr-auto sm:w-auto">{updateError}</p>}
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none" disabled={isUpdating} onClick={(e) => { e.preventDefault(); setIsEditing(false); }}>ยกเลิก</Button>
+                <Button size="sm" className="flex-1 sm:flex-none" onClick={handleUpdateSubmit} disabled={isUpdating}>{isUpdating ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}</Button>
+              </ModalFooter>
+            )}
+          </ModalPanel>
+        )}
       </Modal>
 
       <Modal
@@ -983,67 +994,64 @@ export default function Customers() {
         onClose={() => setIsCreateOpen(false)}
         className="max-w-lg m-4 w-full"
       >
-        <form onSubmit={handleCreateSubmit} className="flex flex-col">
-          <div className="px-6 py-5 border-b border-gray-100 dark:border-white/[0.05]">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">เพิ่มลูกค้าใหม่</h3>
-            <p className="text-sm text-gray-500 mt-1">กรอกข้อมูลพื้นฐานเพื่อสร้างบัญชีลูกค้า (รหัสผ่านคือเบอร์โทรศัพท์)</p>
-          </div>
+        <form onSubmit={handleCreateSubmit}>
+          <ModalPanel>
+            <ModalHeader>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">เพิ่มลูกค้าใหม่</h3>
+              <p className="text-sm text-gray-500 mt-1">กรอกข้อมูลพื้นฐานเพื่อสร้างบัญชีลูกค้า (รหัสผ่านคือเบอร์โทรศัพท์)</p>
+            </ModalHeader>
 
-          <div className="p-6 space-y-5">
-            {createError && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">
-                {createError}
+            <ModalBody className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label>Username *</Label>
+                  <Input required placeholder="username" maxLength={50} disabled={isCreating} value={createForm.username} onChange={(e) => setCreateForm(prev => ({...prev, username: e.target.value}))} />
+                </div>
+                <div>
+                  <Label>Customer Name *</Label>
+                  <Input required placeholder="ชื่อลูกค้า" maxLength={100} disabled={isCreating} value={createForm.customer_name} onChange={(e) => setCreateForm(prev => ({...prev, customer_name: e.target.value}))} />
+                </div>
               </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">Username *</label>
-                <Input required placeholder="username" maxLength={50} disabled={isCreating} value={createForm.username} onChange={(e) => setCreateForm(prev => ({...prev, username: e.target.value}))} />
+                <Label>เบอร์โทรศัพท์ (Phone) *</Label>
+                <Input required placeholder="081-234-5678" maxLength={12} value={createForm.phone}
+                  disabled={isCreating}
+                  onChange={(e) => setCreateForm(prev => ({...prev, phone: e.target.value.replace(/\D/g, "").slice(0, 10)}))}
+                  onFocus={() => setCreateForm(prev => ({...prev, phone: prev.phone.replace(/\D/g, "")}))}
+                  onBlur={() => setCreateForm(prev => ({...prev, phone: formatPhone(prev.phone)}))}
+                />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">Customer Name *</label>
-                <Input required placeholder="ชื่อลูกค้า" maxLength={100} disabled={isCreating} value={createForm.customer_name} onChange={(e) => setCreateForm(prev => ({...prev, customer_name: e.target.value}))} />
+                <Label>อีเมล (Email)</Label>
+                <Input type="email" placeholder="example@email.com" disabled={isCreating} value={createForm.email} onChange={(e) => setCreateForm(prev => ({...prev, email: e.target.value}))} />
               </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">เบอร์โทรศัพท์ (Phone) *</label>
-              <Input required placeholder="081-234-5678" maxLength={12} value={createForm.phone}
-                disabled={isCreating}
-                onChange={(e) => setCreateForm(prev => ({...prev, phone: e.target.value.replace(/\D/g, "").slice(0, 10)}))}
-                onFocus={() => setCreateForm(prev => ({...prev, phone: prev.phone.replace(/\D/g, "")}))}
-                onBlur={() => setCreateForm(prev => ({...prev, phone: formatPhone(prev.phone)}))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">อีเมล (Email)</label>
-              <Input type="email" placeholder="example@email.com" disabled={isCreating} value={createForm.email} onChange={(e) => setCreateForm(prev => ({...prev, email: e.target.value}))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300">สถานะ</label>
-              <div className="flex gap-2">
-                <button type="button"
-                  onClick={() => setCreateForm(prev => ({...prev, status: 'active'}))}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${createForm.status === 'active' ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-400' : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
-                >
-                  Active
-                </button>
-                <button type="button"
-                  onClick={() => setCreateForm(prev => ({...prev, status: 'inactive'}))}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${createForm.status === 'inactive' ? 'bg-gray-100 border-gray-400 text-gray-700 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-300' : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
-                >
-                  Inactive
-                </button>
+              <div>
+                <Label>สถานะ</Label>
+                <div className="flex gap-2">
+                  <button type="button"
+                    onClick={() => setCreateForm(prev => ({...prev, status: 'active'}))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${createForm.status === 'active' ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-400' : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
+                  >
+                    Active
+                  </button>
+                  <button type="button"
+                    onClick={() => setCreateForm(prev => ({...prev, status: 'inactive'}))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${createForm.status === 'inactive' ? 'bg-gray-100 border-gray-400 text-gray-700 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-300' : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
+                  >
+                    Inactive
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
+            </ModalBody>
 
-          <div className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.05] flex justify-end gap-3 bg-gray-50/50 dark:bg-transparent rounded-b-2xl">
-            <Button variant="outline" disabled={isCreating} onClick={(e) => { e.preventDefault(); setIsCreateOpen(false); }}>ยกเลิก</Button>
-            <Button onClick={handleCreateSubmit} disabled={isCreating}>
-              {isCreating ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-            </Button>
-          </div>
+            <ModalFooter>
+              {createError && <p className="w-full text-sm text-red-600 dark:text-red-400 sm:mr-auto sm:w-auto">{createError}</p>}
+              <Button variant="outline" className="flex-1 sm:flex-none" disabled={isCreating} onClick={(e) => { e.preventDefault(); setIsCreateOpen(false); }}>ยกเลิก</Button>
+              <Button className="flex-1 sm:flex-none" onClick={handleCreateSubmit} disabled={isCreating}>
+                {isCreating ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+              </Button>
+            </ModalFooter>
+          </ModalPanel>
         </form>
       </Modal>
 
