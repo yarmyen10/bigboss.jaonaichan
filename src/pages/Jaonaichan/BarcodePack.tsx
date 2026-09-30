@@ -235,17 +235,32 @@ export default function BarcodePack() {
         setValidating(true);
         try {
             const res = await validateBarcode(barcode);
+            // apiRequest does not throw on a 404, so an unknown / already-packed barcode arrives here as an error body
+            if (typeof res.product_id !== 'number') {
+                const err = res as unknown as { code?: string; message?: string };
+                setScanResult({ ok: false, name: err.code === 'barcode_not_found' ? 'ไม่พบบาร์โค้ดนี้ หรือถูกแพ็คไปแล้ว' : err.message });
+                return;
+            }
             const matched = itemsRef.current.find(i => i.product_id === res.product_id);
             if (!matched) {
                 setScanResult({ ok: false, name: `Product ID ${res.product_id} not in this order` });
                 return;
             }
-            const scannedCount = scannedRef.current[res.product_id]?.length ?? 0;
-            if (scannedCount >= matched.qty) {
+            // Check AND update in one synchronous block (no await in between). Two scans can be in flight at once and
+            // scannedRef is otherwise only refreshed after React re-renders, so both would read the old count (2/1).
+            const current = scannedRef.current[res.product_id] ?? [];
+            if (current.length >= matched.qty) {
                 setScanResult({ ok: false, name: `${res.product_name} scanned enough already (${matched.qty}/${matched.qty})` });
                 return;
             }
-            setScanned(prev => ({ ...prev, [res.product_id]: [...(prev[res.product_id] ?? []), barcode] }));
+            // one barcode = one unit: the server packs a barcode only once, so a repeat must not count toward the quantity
+            if (current.includes(barcode)) {
+                setScanResult({ ok: false, name: `${res.product_name} — บาร์โค้ดนี้สแกนไปแล้ว` });
+                return;
+            }
+            const next = { ...scannedRef.current, [res.product_id]: [...current, barcode] };
+            scannedRef.current = next;
+            setScanned(next);
             setScanResult({ ok: true, name: res.product_name });
         } catch {
             setScanResult({ ok: false });
