@@ -37,6 +37,15 @@ const isQueueable = (o: { status: string; is_rts?: boolean }) =>
     o.status === 'packed' ||
     o.status === 'wait-tracking';
 
+// confirm_pack refuses (HTTP 4xx, nothing written) with one of these codes — see Barcode_Pack_API::confirm_pack
+const CONFIRM_PACK_ERRORS: Record<string, string> = {
+    pack_over_quantity:    'สแกนเกินจำนวนที่สั่ง หรือแพ็คไปแล้ว กรุณาสแกนใหม่',
+    barcode_wrong_product: 'มีบาร์โค้ดที่ไม่ตรงกับสินค้าในรายการนี้ กรุณาสแกนใหม่',
+    barcode_not_found:     'ไม่พบบาร์โค้ดนี้ หรือถูกแพ็คไปแล้ว กรุณาสแกนใหม่',
+    order_not_packable:    'ออเดอร์นี้อยู่ในสถานะที่แพ็คไม่ได้',
+    pack_busy:             'ระบบกำลังประมวลผลออเดอร์นี้อยู่ กรุณากดยืนยันอีกครั้ง',
+};
+
 const CARRIERS: { value: TrackingParcel['carrier']; label: string; short: string; bg: string; text: string; ring: string }[] = [
     { value: 'kerry',    label: 'Kerry Express',  short: 'KEX',   bg: 'bg-[#E30013]', text: 'text-white', ring: 'ring-[#E30013]' },
     { value: 'flash',    label: 'Flash Express',  short: 'FLASH', bg: 'bg-[#FF6B00]', text: 'text-white', ring: 'ring-[#FF6B00]' },
@@ -453,7 +462,13 @@ export default function BarcodePack() {
         setConfirming(true);
         try {
             const packedId = selectedOrder.id;
-            await confirmPack(packedId, scanned, selectedLotId ?? undefined);
+            const res = await confirmPack(packedId, scanned, selectedLotId ?? undefined);
+            if (!res.success) {
+                // apiRequest does not throw on 4xx: the server refused and consumed nothing, so do NOT clear the order as packed
+                setToast(CONFIRM_PACK_ERRORS[res.code ?? ''] ?? `แพ็คไม่สำเร็จ${res.message ? `: ${res.message}` : ''}`);
+                if (res.code !== 'pack_busy') void loadItemsForOrderId(packedId, selectedOrder);   // drop the refused scans; busy keeps them for a retry
+                return;
+            }
             setLastPackedOrderId(packedId);
             setParcels([{ carrier: 'kerry', number: '' }]);
             setItems([]);

@@ -16,6 +16,9 @@ export interface ValidateBarcodeResponse {
 
 export interface ConfirmPackResponse {
     success: boolean;
+    // a refused request is a WP_Error body ({ code, message, data }) with HTTP 4xx — apiRequest returns it instead of throwing
+    code?: string;
+    message?: string;
 }
 
 export interface TrackingParcel {
