@@ -151,7 +151,8 @@ function EditModal({ initial, onClose, onSaved }: {
     const [scanInput, setScanInput] = useState('');
     const [saving, setSaving] = useState(false);
     const [savingQty, setSavingQty] = useState(false);
-    const [qtyDraft, setQtyDraft] = useState(0);
+    // '' = the user emptied the field to retype: show it empty, never treat it as 0 / never save it
+    const [qtyDraft, setQtyDraft] = useState<number | ''>(0);
     const [continuous, setContinuous] = useState(false);
     const [cameraOpen, setCameraOpen] = useState(false);
     const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -176,6 +177,7 @@ function EditModal({ initial, onClose, onSaved }: {
     const currentOrderQty = activeVariant ? activeVariant.order_qty : product.order_qty;
     const currentReceived = sumReceived(currentBarcodes);
     const currentStatus = getStatus(currentReceived, currentOrderQty);
+    const qtyNum = qtyDraft === '' ? currentOrderQty : qtyDraft;   // base for the − / + buttons while the field is empty
 
     // sync qty draft when switching tabs
     useEffect(() => {
@@ -260,6 +262,13 @@ function EditModal({ initial, onClose, onSaved }: {
     }
 
     // ── order qty ─────────────────────────────────────────────────────────────
+
+    // typing in the field: an emptied field is "about to retype", not a change — otherwise parseInt('') || 0 saved 0
+    // (overwriting the real order qty) 600ms after the user cleared the field and paused
+    function handleQtyInput(raw: string) {
+        if (raw === '') { setQtyDraft(''); return; }
+        handleQtyChange(parseInt(raw) || 0);
+    }
 
     function handleQtyChange(val: number) {
         if (val < 0) return;
@@ -446,19 +455,20 @@ function EditModal({ initial, onClose, onSaved }: {
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
-                                            onClick={() => handleQtyChange(Math.max(0, qtyDraft - 1))}
+                                            onClick={() => handleQtyChange(Math.max(0, qtyNum - 1))}
                                             className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                                         >−</button>
                                         <input
                                             type="number"
                                             min={0}
                                             value={qtyDraft}
-                                            onChange={e => handleQtyChange(parseInt(e.target.value) || 0)}
+                                            onChange={e => handleQtyInput(e.target.value)}
+                                            onBlur={() => { if (qtyDraft === '') setQtyDraft(currentOrderQty); }}
                                             className="h-9 w-20 rounded-lg border border-gray-300 bg-white text-center text-lg font-bold text-gray-800 outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                                         />
                                         <button
                                             type="button"
-                                            onClick={() => handleQtyChange(qtyDraft + 1)}
+                                            onClick={() => handleQtyChange(qtyNum + 1)}
                                             className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                                         >+</button>
                                         <span className="text-sm text-gray-500">ชิ้น</span>
