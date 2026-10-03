@@ -82,6 +82,7 @@ const navItems: NavItem[] = [
       { name: "PromptPay QR", path: "/jaonaichan/settings/promptpay", pro: false },
       { name: "Social Login", path: "/jaonaichan/settings/social-login", pro: false },
       { name: "RTS Shipping", path: "/jaonaichan/settings/rts-shipping", pro: false },
+      { name: "Banner Management", path: "/jaonaichan/settings/banners", pro: false },
     ],
   },
   {

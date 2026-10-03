@@ -3,6 +3,7 @@ import { OrderDetailResponse, OrderItemEdit, OrderListResponse, OrderProductsBul
 import type { DashboardStats } from '../interfaces/dashboard.jaonaichan';
 import { PatchProfilePayload, PatchProfileResponse, UserProfile } from "../interfaces/profile.jaonaichan";
 import type { InvoiceLineItem } from "../interfaces/invoice.jaonaichan";
+import type { Banner, BannerListResponse, BannerUploadResponse } from "../interfaces/banner.jaonaichan";
 
 export interface GetOrdersParams {
     page?: number;
@@ -538,4 +539,28 @@ export async function updateRtsShippingSettings(cost: number, minAmount: number)
         method: 'POST',
         body: JSON.stringify({ cost, min_amount: minAmount }),
     });
+}
+
+// =========================================================================
+// Shop banners (Banner Management)
+// =========================================================================
+
+export async function getBanners(): Promise<BannerListResponse> {
+    return apiRequest('/jaonaichan/v1/banners');
+}
+
+/** replaces the whole list; the order of the array is the display order */
+export async function saveBanners(banners: Banner[]): Promise<BannerListResponse> {
+    return apiRequest('/jaonaichan/v1/banners', {
+        method: 'PUT',
+        body: JSON.stringify({ banners }),
+    });
+}
+
+/** multipart — apiFetch (not apiRequest) so the browser sets the boundary itself */
+export async function uploadBannerImage(file: File): Promise<BannerUploadResponse> {
+    const body = new FormData();
+    body.append('file', file);
+    const res = await apiFetch('/jaonaichan/v1/banners/upload', { method: 'POST', body });
+    return res.json();
 }

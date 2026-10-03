@@ -15,6 +15,7 @@ import NotFound from "./pages/OtherPage/NotFound";
 const Home = lazy(() => import("./pages/Dashboard/Home"));
 const Order = lazy(() => import("./pages/Jaonaichan/Order"));
 const Bill2UnitPrices = lazy(() => import("./pages/Jaonaichan/Bill2UnitPrices"));
+const BannerManagement = lazy(() => import("./pages/Jaonaichan/BannerManagement"));
 const BarcodePack = lazy(() => import("./pages/Jaonaichan/BarcodePack"));
 const BarcodeImport = lazy(() => import("./pages/Jaonaichan/BarcodeImport"));
 const BarcodeManagement = lazy(() => import("./pages/Jaonaichan/BarcodeManagement"));
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="/jaonaichan/settings/promptpay" element={<PromptPaySettings />} />
               <Route path="/jaonaichan/settings/social-login" element={<SocialLoginSettings />} />
               <Route path="/jaonaichan/settings/rts-shipping" element={<RtsShippingSettings />} />
+              <Route path="/jaonaichan/settings/banners" element={<BannerManagement />} />
 
               {/* Others Page */}
               <Route path="/profile" element={<UserProfiles />} />
