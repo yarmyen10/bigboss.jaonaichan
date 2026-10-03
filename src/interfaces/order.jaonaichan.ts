@@ -82,6 +82,13 @@ export interface ProductAttribute {
     values: string[]
 }
 
+export interface ProductCategoryTerm {
+    id: number
+    name: string
+    parent_id: number
+    parent_name: string
+}
+
 export interface OrderItemProduct {
     id: number
     type: string
@@ -94,6 +101,10 @@ export interface OrderItemProduct {
     stock: number | null
     stock_status: string
     categories: string[]
+    /** the PARENT product (a variation's id/name differ); categories above are the parent's too */
+    parent_id?: number
+    parent_name?: string
+    category_terms?: ProductCategoryTerm[]
     tags: string[]
     attributes: ProductAttribute[]
     permalink: string
