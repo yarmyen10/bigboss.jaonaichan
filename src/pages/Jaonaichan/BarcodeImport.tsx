@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Modal } from '../../components/ui/modal';
+import { ModalPanel, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/modal/ModalSections';
 import Badge from '../../components/ui/badge/Badge';
 import Button from '../../components/ui/button/Button';
 import {
@@ -50,11 +51,20 @@ function productLastScan(p: ImportProduct) {
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status, received, orderQty }: { status: Status; received: number; orderQty: number }) {
-    if (status === 'none') return <Badge color="error" size="sm">⚠ ไม่มี barcode</Badge>;
+// compact: a variant tab with an order qty shows "⚠ 0/3" instead of the wide "⚠ ไม่มี barcode"
+function StatusBadge({ status, received, orderQty, compact = false }: { status: Status; received: number; orderQty: number; compact?: boolean }) {
+    if (status === 'none') return <Badge color="error" size="sm">{compact && orderQty > 0 ? `⚠ 0/${orderQty}` : '⚠ ไม่มี barcode'}</Badge>;
     if (status === 'incomplete') return <Badge color="warning" size="sm">📦 {received}/{orderQty}</Badge>;
     if (status === 'complete') return <Badge color="success" size="sm">✓ {received}/{orderQty}</Badge>;
     return <Badge color="amber" size="sm">⇧ {received}/{orderQty} (+{received - orderQty})</Badge>;
+}
+
+// the receipt summary already shows received / ordered in big numbers, so its chip says what is missing ("ขาด 3")
+function ShortageChip({ received, orderQty }: { received: number; orderQty: number }) {
+    if (orderQty === 0) return <StatusBadge status={getStatus(received, orderQty)} received={received} orderQty={orderQty} />;
+    if (received < orderQty) return <Badge color={received === 0 ? 'error' : 'warning'} size="sm">ขาด {orderQty - received}</Badge>;
+    if (received === orderQty) return <Badge color="success" size="sm">✓ ครบ</Badge>;
+    return <Badge color="amber" size="sm">⇧ เกิน +{received - orderQty}</Badge>;
 }
 
 // ─── ProgressBar ─────────────────────────────────────────────────────────────
@@ -160,6 +170,9 @@ function EditModal({ initial, onClose, onSaved }: {
     const scanInputRef = useRef<HTMLInputElement>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const qtyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // the order qty typed but not yet sent, with the variant it was typed for (the tab can change before the debounce fires)
+    const pendingQtyRef = useRef<{ tid: number; val: number } | null>(null);
+    const tabsRef = useRef<HTMLDivElement>(null);
     const savingRef = useRef(false);
 
     // refs for camera callback (avoid stale closures)
@@ -176,7 +189,6 @@ function EditModal({ initial, onClose, onSaved }: {
     const currentBarcodes = activeVariant ? activeVariant.barcodes : product.barcodes;
     const currentOrderQty = activeVariant ? activeVariant.order_qty : product.order_qty;
     const currentReceived = sumReceived(currentBarcodes);
-    const currentStatus = getStatus(currentReceived, currentOrderQty);
     const qtyNum = qtyDraft === '' ? currentOrderQty : qtyDraft;   // base for the − / + buttons while the field is empty
 
     // sync qty draft when switching tabs
@@ -191,20 +203,13 @@ function EditModal({ initial, onClose, onSaved }: {
         return () => clearTimeout(t);
     }, []);
 
-    // ESC to close
+    // keep the active tab in view when there are more flavours than fit the row
     useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
-        document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        (tabsRef.current?.children[activeVariantIdx] as HTMLElement | undefined)?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+    }, [activeVariantIdx]);
 
-    // cleanup debounce on unmount
-    useEffect(() => {
-        return () => {
-            if (qtyDebounceRef.current) clearTimeout(qtyDebounceRef.current);
-        };
-    }, []);
+    // an order qty still waiting for its debounce is sent when the modal goes away (✕, เสร็จ, Esc, route change) instead of being dropped
+    useEffect(() => () => flushQty(), []);
 
     const showToast = (msg: string, ok: boolean) => {
         setToast({ msg, ok });
@@ -215,6 +220,11 @@ function EditModal({ initial, onClose, onSaved }: {
         onSaved(productRef.current);
         onClose();
     };
+
+    function switchTab(i: number) {
+        flushQty();   // the qty typed on the tab we are leaving goes out now, to that tab's variant
+        setActiveVariantIdx(i);
+    }
 
     // ── scan ──────────────────────────────────────────────────────────────────
 
@@ -282,16 +292,19 @@ function EditModal({ initial, onClose, onSaved }: {
             : { ...prev, order_qty: val }
         );
 
+        pendingQtyRef.current = { tid: isVar ? p.variants[vi].variant_id : p.product_id, val };
         if (qtyDebounceRef.current) clearTimeout(qtyDebounceRef.current);
-        qtyDebounceRef.current = setTimeout(async () => {
-            const lp = productRef.current;
-            const lvi = activeVariantIdxRef.current;
-            const latIsVar = lp.type === 'variable';
-            const latTid = latIsVar ? lp.variants[lvi].variant_id : lp.product_id;
-            setSavingQty(true);
-            try { await setImportOrderQty(latTid, val); } catch { /* silent */ }
-            finally { setSavingQty(false); }
-        }, 600);
+        qtyDebounceRef.current = setTimeout(flushQty, 600);
+    }
+
+    // send the pending order qty now (debounce fired, tab switched, or the modal is closing)
+    function flushQty() {
+        if (qtyDebounceRef.current) { clearTimeout(qtyDebounceRef.current); qtyDebounceRef.current = null; }
+        const pending = pendingQtyRef.current;
+        if (!pending) return;
+        pendingQtyRef.current = null;
+        setSavingQty(true);
+        setImportOrderQty(pending.tid, pending.val).catch(() => { /* silent */ }).finally(() => setSavingQty(false));
     }
 
     // ── barcode list actions ──────────────────────────────────────────────────
@@ -371,52 +384,39 @@ function EditModal({ initial, onClose, onSaved }: {
 
     return (
         <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 z-50 hidden bg-black/40 sm:block"
-                onClick={handleClose}
-            />
-
-            {/* Panel — full-screen mobile, centered sm+ */}
-            <div className="fixed inset-0 z-50 flex items-stretch sm:items-center sm:justify-center sm:p-4">
-                <div className="relative flex h-full w-full flex-col bg-white dark:bg-gray-900 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl sm:overflow-hidden">
-
-                    {/* Header */}
-                    <div className="flex flex-shrink-0 items-center gap-3 border-b border-gray-200 p-4 dark:border-gray-700">
-                        <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                            {product.image_url
-                                ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
-                                : <div className="flex h-full items-center justify-center text-2xl">🛍</div>}
+            {/* min-w-0: the tab row's nowrap content would otherwise stop the panel shrinking below the screen width */}
+            <Modal isOpen onClose={handleClose} className="m-4 w-full min-w-0 max-w-2xl">
+                <ModalPanel>
+                    <ModalHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                                {product.image_url
+                                    ? <img src={product.image_url} alt="" className="h-full w-full object-cover" />
+                                    : <div className="flex h-full items-center justify-center text-2xl">🛍</div>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                {isVariable && <p className="text-xs text-gray-500">{product.variants.length} รสชาติ</p>}
+                                <h2 className="line-clamp-2 break-words font-semibold text-gray-800 dark:text-white/90">{product.name}</h2>
+                                {product.sku && <p className="text-xs text-gray-400">SKU: {product.sku}</p>}
+                            </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                            {isVariable && <p className="text-xs text-gray-500">{product.variants.length} รสชาติ</p>}
-                            <p className="truncate font-semibold text-gray-800 dark:text-white/90">{product.name}</p>
-                            {product.sku && <p className="text-xs text-gray-400">SKU: {product.sku}</p>}
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleClose}
-                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M18 6 6 18M6 6l12 12" strokeWidth={2} strokeLinecap="round" />
-                            </svg>
-                        </button>
-                    </div>
+                    </ModalHeader>
 
                     {/* Overall progress — variable only */}
                     {isVariable && (
-                        <div className="flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-800/50">
+                        <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 bg-gray-50 px-4 py-3 dark:border-white/[0.05] dark:bg-gray-800/50 sm:px-6">
                             <span className="shrink-0 text-xs text-gray-500">รวมทุกรสชาติ</span>
                             <div className="flex-1"><ProgressBar received={overallReceived} orderQty={overallOrderQty} /></div>
                             <span className="shrink-0 text-sm font-bold text-gray-800 dark:text-white">{overallReceived}/{overallOrderQty}</span>
                         </div>
                     )}
 
-                    {/* Variant tabs */}
+                    {/* Variant tabs — scroll sideways when there are more flavours than fit */}
                     {isVariable && (
                         <div
-                            className="flex flex-shrink-0 gap-0 overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 dark:border-gray-700 dark:bg-gray-800/50"
+                            ref={tabsRef}
+                            role="tablist"
+                            className="flex shrink-0 overflow-x-auto border-b border-gray-100 bg-gray-50 px-2 dark:border-white/[0.05] dark:bg-gray-800/50 sm:px-4"
                             style={{ scrollbarWidth: 'none' }}
                         >
                             {product.variants.map((v, i) => {
@@ -426,37 +426,38 @@ function EditModal({ initial, onClose, onSaved }: {
                                     <button
                                         key={v.variant_id}
                                         type="button"
-                                        onClick={() => setActiveVariantIdx(i)}
-                                        className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+                                        role="tab"
+                                        aria-selected={i === activeVariantIdx}
+                                        onClick={() => switchTab(i)}
+                                        className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-[13px] font-medium transition-colors ${
                                             i === activeVariantIdx
                                                 ? 'border-brand-500 text-brand-600 dark:text-brand-400'
                                                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                         }`}
                                     >
                                         {v.name}
-                                        <StatusBadge status={vs} received={vr} orderQty={v.order_qty} />
+                                        <StatusBadge status={vs} received={vr} orderQty={v.order_qty} compact />
                                     </button>
                                 );
                             })}
                         </div>
                     )}
 
-                    {/* Scrollable body — 1-col mobile, 2-col sm+ */}
-                    <div className="flex-1 overflow-y-auto">
-                        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+                    <ModalBody>
+                        {/* 1 column on phone/tablet, qty+summary | scan side by side from lg */}
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
-                            {/* Left: order qty + progress */}
-                            <div className="space-y-3">
-                                {/* Order qty */}
-                                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                        จำนวนที่สั่งซื้อ {savingQty && <span className="ml-1 font-normal normal-case">บันทึก…</span>}
-                                    </p>
+                            <div className="space-y-4">
+                                {/* 1 · order qty */}
+                                <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                        1 · จำนวนที่สั่ง {savingQty && <span className="ml-1 font-normal normal-case">บันทึก…</span>}
+                                    </h3>
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
                                             onClick={() => handleQtyChange(Math.max(0, qtyNum - 1))}
-                                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                                         >−</button>
                                         <input
                                             type="number"
@@ -464,41 +465,41 @@ function EditModal({ initial, onClose, onSaved }: {
                                             value={qtyDraft}
                                             onChange={e => handleQtyInput(e.target.value)}
                                             onBlur={() => { if (qtyDraft === '') setQtyDraft(currentOrderQty); }}
-                                            className="h-9 w-20 rounded-lg border border-gray-300 bg-white text-center text-lg font-bold text-gray-800 outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                            className="h-10 w-20 rounded-lg border border-gray-300 bg-white text-center text-lg font-bold text-gray-800 outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => handleQtyChange(qtyNum + 1)}
-                                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                                         >+</button>
                                         <span className="text-sm text-gray-500">ชิ้น</span>
                                     </div>
-                                </div>
+                                </section>
 
-                                {/* Progress */}
-                                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">สรุปการรับ</p>
+                                {/* 2 · receipt summary */}
+                                <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">2 · สรุปการรับ</h3>
                                     <div className="mb-2 flex items-baseline justify-between">
                                         <div>
                                             <span className="text-3xl font-extrabold text-gray-800 dark:text-white">{currentReceived}</span>
                                             <span className="text-lg text-gray-400"> / {currentOrderQty}</span>
                                         </div>
-                                        <StatusBadge status={currentStatus} received={currentReceived} orderQty={currentOrderQty} />
+                                        <ShortageChip received={currentReceived} orderQty={currentOrderQty} />
                                     </div>
                                     <ProgressBar received={currentReceived} orderQty={currentOrderQty} />
-                                </div>
+                                </section>
                             </div>
 
-                            {/* Right: scan */}
-                            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                                <div className="mb-3 flex items-center justify-between">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">สแกนบาร์โค้ด</p>
+                            {/* 3 · scan */}
+                            <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                <div className="mb-3 flex items-center justify-between gap-2">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">3 · สแกนบาร์โค้ด</h3>
                                     {/* Multi-scan toggle */}
                                     <button
                                         type="button"
                                         onClick={() => setContinuous(c => !c)}
                                         title={continuous ? 'โหมดต่อเนื่อง' : 'โหมดทีละอัน'}
-                                        className={`flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium transition-colors ${
+                                        className={`flex h-10 items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors ${
                                             continuous
                                                 ? 'bg-brand-500 text-white'
                                                 : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
@@ -512,7 +513,7 @@ function EditModal({ initial, onClose, onSaved }: {
                                 </div>
 
                                 {/* Scan input row */}
-                                <div className="mb-3 flex gap-2">
+                                <div className="mb-2 flex gap-2">
                                     <input
                                         ref={scanInputRef}
                                         type="text"
@@ -521,13 +522,13 @@ function EditModal({ initial, onClose, onSaved }: {
                                         onKeyDown={e => { if (e.key === 'Enter') void handleScan(scanInput); }}
                                         placeholder="ยิงหรือพิมพ์ barcode…"
                                         disabled={saving}
-                                        className="h-11 flex-1 rounded-xl border-2 border-dashed border-brand-400 bg-brand-50/30 px-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-brand-500 disabled:opacity-50 dark:border-brand-500/50 dark:bg-brand-500/10 dark:text-white"
+                                        className="h-11 min-w-0 flex-1 rounded-xl border-2 border-dashed border-brand-400 bg-brand-50/30 px-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-brand-500 disabled:opacity-50 dark:border-brand-500/50 dark:bg-brand-500/10 dark:text-white"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => { setScanInput(''); setCameraOpen(true); }}
                                         title="เปิดกล้อง"
-                                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                                     >
                                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeWidth={2} />
@@ -535,66 +536,65 @@ function EditModal({ initial, onClose, onSaved }: {
                                         </svg>
                                     </button>
                                 </div>
-
-                                {saving && (
-                                    <p className="mb-3 text-xs text-gray-400">กำลังบันทึก…</p>
-                                )}
+                                <p className="mb-3 text-xs text-gray-500">สแกนซ้ำ = +1 อัตโนมัติ{saving && ' · กำลังบันทึก…'}</p>
 
                                 {/* Barcode list */}
                                 {currentBarcodes.length > 0 ? (
                                     <div className="space-y-2">
-                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                                             สแกนแล้ว ({currentBarcodes.length} รายการ)
                                         </p>
                                         {currentBarcodes.map(b => (
-                                            <div key={b.code} className="flex items-center gap-2 rounded-lg border border-gray-100 p-2.5 dark:border-gray-700">
-                                                <div className="min-w-0 flex-1">
+                                            <div key={b.code} data-row className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 p-3 dark:border-gray-700">
+                                                <div className="min-w-0 flex-1 basis-32">
                                                     <p className="truncate font-mono text-sm font-semibold text-gray-800 dark:text-white">{b.code}</p>
-                                                    <p className="text-[11px] text-gray-500">
-                                                        {new Date(b.last_scan_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                                                    <p className="text-xs text-gray-500">
+                                                        {new Date(b.last_scan_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · +{b.received_qty} ครั้ง
                                                     </p>
                                                 </div>
-                                                <div className="flex items-center gap-1">
+                                                <div className="ml-auto flex items-center gap-2">
                                                     <button
                                                         type="button"
+                                                        disabled={b.received_qty <= 1}
                                                         onClick={() => void handleUpdateQty(b.code, b.received_qty - 1)}
-                                                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                                                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 disabled:opacity-40 dark:bg-gray-700 dark:text-gray-300"
                                                     >−</button>
-                                                    <span className="w-7 text-center text-sm font-bold text-gray-800 dark:text-white">{b.received_qty}</span>
+                                                    <span className="w-8 text-center text-sm font-bold text-gray-800 dark:text-white">{b.received_qty}</span>
                                                     <button
                                                         type="button"
                                                         onClick={() => void handleUpdateQty(b.code, b.received_qty + 1)}
-                                                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                                                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                                                     >+</button>
+                                                    <button
+                                                        type="button"
+                                                        aria-label="ลบ"
+                                                        onClick={() => void handleRemoveBarcode(b.code)}
+                                                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40"
+                                                    >
+                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" strokeWidth={2} strokeLinecap="round" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => void handleRemoveBarcode(b.code)}
-                                                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40"
-                                                >
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" strokeWidth={2} strokeLinecap="round" />
-                                                    </svg>
-                                                </button>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-center text-sm text-gray-400 py-4">ยังไม่มี barcode</p>
+                                    <p className="py-4 text-center text-sm text-gray-400">ยังไม่มี barcode</p>
                                 )}
-                            </div>
+                            </section>
                         </div>
-                    </div>
+                    </ModalBody>
 
-                    {/* Toast */}
-                    {toast && (
-                        <div className={`absolute bottom-4 left-4 right-4 z-10 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${toast.ok ? 'bg-green-500' : 'bg-red-500'}`}>
-                            <span>{toast.ok ? '✓' : '✗'}</span>
-                            <span>{toast.msg}</span>
-                        </div>
-                    )}
-                </div>
-            </div>
+                    {/* scan result lives beside the button (reserved line, so the list does not jump when it appears) */}
+                    <ModalFooter>
+                        <p role="status" className={`min-h-5 w-full text-sm sm:w-auto sm:flex-1 ${toast?.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {toast ? `${toast.ok ? '✓' : '✗'} ${toast.msg}` : ''}
+                        </p>
+                        <Button onClick={handleClose} className="flex-1 sm:min-w-32 sm:flex-none">เสร็จ</Button>
+                    </ModalFooter>
+                </ModalPanel>
+            </Modal>
 
             {/* Camera sub-modal */}
             <Modal isOpen={cameraOpen} onClose={() => setCameraOpen(false)} showCloseButton={false} className="max-w-sm mx-4">
