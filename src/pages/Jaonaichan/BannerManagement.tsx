@@ -23,6 +23,15 @@ const DEFAULT_SECS = 5;
 const fmtDate = (iso: string) => (iso ? new Date(iso) : new Date()).toLocaleDateString("en-GB");
 const stem = (name: string) => name.replace(/\.[^.]+$/, "");
 /** same rule as the server: empty, an http(s) URL or a site path ("/shop") */
+const HEADING_MAX = 60;
+const SUBHEADING_MAX = 120;
+const CTA_MAX = 24;
+/** the button goes to the Banner Link: a label without a link is refused (same rule as the server) */
+const ctaNeedsLink = (b: Banner) => b.ctaLabel.trim() !== "" && b.link.trim() === "";
+/** a heading is at most 2 lines */
+const twoLines = (v: string) => v.replace(/\r/g, "").split("\n").slice(0, 2).join("\n");
+/** an older server does not send the text fields */
+const withText = (list: Banner[]): Banner[] => list.map(b => ({ ...b, heading: b.heading ?? "", subheading: b.subheading ?? "", ctaLabel: b.ctaLabel ?? "" }));
 const linkOk = (l: string) => l.trim() === "" || /^https?:\/\/\S+$/i.test(l.trim()) || (l.trim().startsWith("/") && !l.trim().startsWith("//") && !/[\s<>"]/.test(l.trim()));
 
 /** same rule as the server: 0 (the Shop slider does not move by itself) or a whole number of seconds, 2–60; null = not valid */
@@ -34,7 +43,7 @@ const secsOf = (v: string) => {
 };
 
 function newBanner(n: number): Banner {
-  return { id: `new-${Math.random().toString(36).slice(2, 9)}`, title: `Banner ${n}`, description: NO_IMAGE_TEXT, isActive: false, image: null, link: "", updatedAt: new Date().toISOString() };
+  return { id: `new-${Math.random().toString(36).slice(2, 9)}`, title: `Banner ${n}`, description: NO_IMAGE_TEXT, isActive: false, image: null, link: "", heading: "", subheading: "", ctaLabel: "", updatedAt: new Date().toISOString() };
 }
 
 // ─── one card ────────────────────────────────────────────────────────────────
@@ -59,6 +68,7 @@ function BannerCard({ banner: b, open, dirty, error, uploading, onToggleOpen, on
   const [over, setOver] = useState(false);
   const bodyId = `banner-body-${b.id}`;
   const badLink = !linkOk(b.link);
+  const badCta = ctaNeedsLink(b);
 
   return (
     <article
@@ -142,6 +152,36 @@ function BannerCard({ banner: b, open, dirty, error, uploading, onToggleOpen, on
             {error && <p role="alert" className="mt-2 text-sm text-error-600">{error}</p>}
           </div>
 
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-800 dark:text-white/90">ข้อความบนแบนเนอร์ <span className="font-normal text-gray-400">(optional)</span></p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">แสดงซ้อนบนรูปในหน้า Shop · ข้อความสั้นอ่านง่ายบนมือถือ · ถ้ามีข้อความอยู่ในรูปแล้วไม่ต้องกรอก</p>
+            </div>
+            <div>
+              <Label htmlFor={`heading-${b.id}`}>หัวข้อ</Label>
+              <textarea
+                id={`heading-${b.id}`}
+                rows={2}
+                maxLength={HEADING_MAX}
+                value={b.heading}
+                onChange={e => onChange({ heading: twoLines(e.target.value) })}
+                placeholder="เช่น ติดต่อสอบถาม แอดมิน (ขึ้นบรรทัดใหม่ได้ 1 ครั้ง)"
+                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90"
+              />
+            </div>
+            <div>
+              <Label htmlFor={`subheading-${b.id}`}>คำโปรย</Label>
+              <Input id={`subheading-${b.id}`} maxLength={SUBHEADING_MAX} value={b.subheading} onChange={e => onChange({ subheading: e.target.value })} placeholder="เช่น มีคำถามเกี่ยวกับสินค้า? ทักได้เลย 24/7" />
+            </div>
+            <div>
+              <Label htmlFor={`cta-${b.id}`}>ข้อความปุ่ม</Label>
+              <Input id={`cta-${b.id}`} maxLength={CTA_MAX} value={b.ctaLabel} error={badCta} onChange={e => onChange({ ctaLabel: e.target.value })} placeholder="เช่น แชทกับเรา →" />
+              {badCta
+                ? <p role="alert" className="mt-2 text-sm text-error-600">ใส่ข้อความปุ่มได้เมื่อมี Banner Link — ปุ่มพาไปลิงก์นั้น</p>
+                : <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">ปุ่มพาไปที่ Banner Link · ถ้าเว้นว่าง ทั้งรูปจะกดไปที่ลิงก์</p>}
+            </div>
+          </div>
+
           <div>
             <label htmlFor={`link-${b.id}`} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Banner Link <span className="font-normal text-gray-400">(optional)</span></label>
             <div className="relative">
@@ -196,8 +236,8 @@ export default function BannerManagement() {
     try {
       const res = await getBanners();
       if (!res.success || !res.data) throw new Error(res.message || "load failed");
-      setBanners(res.data);
-      setSaved(res.data);
+      setBanners(withText(res.data));
+      setSaved(withText(res.data));
       const s = res.settings?.intervalSeconds ?? DEFAULT_SECS;
       setSecs(String(s));
       setSavedSecs(s);
@@ -280,7 +320,7 @@ export default function BannerManagement() {
 
   const save = async () => {
     if (secsNum === null) { document.getElementById("banner-interval")?.focus(); return; }   // the message under the field says what is wrong
-    const badLink = banners.findIndex(b => !linkOk(b.link));
+    const badLink = banners.findIndex(b => !linkOk(b.link) || ctaNeedsLink(b));
     if (badLink >= 0) { setOpenIds(o => new Set(o).add(banners[badLink].id)); return; }
     setSaving(true);
     try {
@@ -288,8 +328,8 @@ export default function BannerManagement() {
       if (!res.success || !res.data) { setResult({ variant: "error", message: res.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่" }); return; }
       const idMap = new Map(banners.map((b, i) => [b.id, res.data![i]?.id]));   // new-… ids became real ids: keep the cards open
       setOpenIds(o => new Set([...o].map(id => idMap.get(id) ?? id)));
-      setBanners(res.data);
-      setSaved(res.data);
+      setBanners(withText(res.data));
+      setSaved(withText(res.data));
       const s = res.settings?.intervalSeconds ?? secsNum;
       setSecs(String(s));
       setSavedSecs(s);

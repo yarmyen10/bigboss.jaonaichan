@@ -8,6 +8,10 @@ export interface Banner {
     image: { url: string; name?: string } | null;
     /** empty, an http(s) URL or a site path such as "/shop" */
     link: string;
+    /** text drawn over the picture on the Shop page (the mock's .banner-content). heading: up to 2 lines, 60 characters; subheading: 120; ctaLabel: 24 — the button goes to `link`, so it needs one */
+    heading: string;
+    subheading: string;
+    ctaLabel: string;
     /** ISO date */
     updatedAt: string;
 }
