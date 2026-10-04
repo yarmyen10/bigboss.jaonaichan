@@ -3,7 +3,7 @@ import { OrderDetailResponse, OrderItemEdit, OrderListResponse, OrderProductsBul
 import type { DashboardStats } from '../interfaces/dashboard.jaonaichan';
 import { PatchProfilePayload, PatchProfileResponse, UserProfile } from "../interfaces/profile.jaonaichan";
 import type { InvoiceLineItem } from "../interfaces/invoice.jaonaichan";
-import type { Banner, BannerListResponse, BannerUploadResponse } from "../interfaces/banner.jaonaichan";
+import type { Banner, BannerListResponse, BannerSettings, BannerUploadResponse } from "../interfaces/banner.jaonaichan";
 
 export interface GetOrdersParams {
     page?: number;
@@ -549,11 +549,11 @@ export async function getBanners(): Promise<BannerListResponse> {
     return apiRequest('/jaonaichan/v1/banners');
 }
 
-/** replaces the whole list; the order of the array is the display order */
-export async function saveBanners(banners: Banner[]): Promise<BannerListResponse> {
+/** replaces the whole list (the order of the array is the display order) and the settings, in one save */
+export async function saveBanners(banners: Banner[], settings: BannerSettings): Promise<BannerListResponse> {
     return apiRequest('/jaonaichan/v1/banners', {
         method: 'PUT',
-        body: JSON.stringify({ banners }),
+        body: JSON.stringify({ banners, settings }),
     });
 }
 

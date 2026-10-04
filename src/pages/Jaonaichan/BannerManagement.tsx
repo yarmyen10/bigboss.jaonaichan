@@ -5,6 +5,8 @@ import { CSS } from "@dnd-kit/utilities";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import PageSpinner from "../../components/common/PageSpinner";
+import Input from "../../components/form/input/InputField";
+import Label from "../../components/form/Label";
 import Badge from "../../components/ui/badge/Badge";
 import Button from "../../components/ui/button/Button";
 import { AlertModal } from "../../components/ui/modal/AlertModal";
@@ -16,11 +18,20 @@ import { getBanners, saveBanners, uploadBannerImage } from "../../services/jaona
 const ACCEPT = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 2 * 1024 * 1024;
 const NO_IMAGE_TEXT = "ยังไม่ได้แนบรูป";
+const DEFAULT_SECS = 5;
 
 const fmtDate = (iso: string) => (iso ? new Date(iso) : new Date()).toLocaleDateString("en-GB");
 const stem = (name: string) => name.replace(/\.[^.]+$/, "");
 /** same rule as the server: empty, an http(s) URL or a site path ("/shop") */
 const linkOk = (l: string) => l.trim() === "" || /^https?:\/\/\S+$/i.test(l.trim()) || (l.trim().startsWith("/") && !l.trim().startsWith("//") && !/[\s<>"]/.test(l.trim()));
+
+/** same rule as the server: 0 (the Shop slider does not move by itself) or a whole number of seconds, 2–60; null = not valid */
+const secsOf = (v: string) => {
+  const t = v.trim();
+  if (!/^\d{1,2}$/.test(t)) return null;
+  const n = Number(t);
+  return n === 0 || (n >= 2 && n <= 60) ? n : null;
+};
 
 function newBanner(n: number): Banner {
   return { id: `new-${Math.random().toString(36).slice(2, 9)}`, title: `Banner ${n}`, description: NO_IMAGE_TEXT, isActive: false, image: null, link: "", updatedAt: new Date().toISOString() };
@@ -175,6 +186,8 @@ export default function BannerManagement() {
   const [confirm, setConfirm] = useState<null | { kind: "delete"; id: string } | { kind: "discard" }>(null);
   const [result, setResult] = useState<{ variant: "success" | "error"; message: string } | null>(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [secs, setSecs] = useState(String(DEFAULT_SECS));   // seconds between two slides on the Shop page (as typed)
+  const [savedSecs, setSavedSecs] = useState(DEFAULT_SECS);
   const started = useRef(false);
 
   const load = useCallback(async () => {
@@ -185,6 +198,9 @@ export default function BannerManagement() {
       if (!res.success || !res.data) throw new Error(res.message || "load failed");
       setBanners(res.data);
       setSaved(res.data);
+      const s = res.settings?.intervalSeconds ?? DEFAULT_SECS;
+      setSecs(String(s));
+      setSavedSecs(s);
       setOpenIds(new Set(res.data[0] ? [res.data[0].id] : []));   // the first card starts open, like the mock
       setErrors({});
     } catch (err) {
@@ -206,7 +222,9 @@ export default function BannerManagement() {
   const deleted = saved.filter(s => !banners.some(b => b.id === s.id)).length;
   const kept = banners.filter(b => savedById.has(b.id)).map(b => b.id).join();
   const reordered = kept !== saved.filter(s => banners.some(b => b.id === s.id)).map(s => s.id).join();
-  const changes = changedIds.size + deleted + (reordered ? 1 : 0);
+  const secsNum = secsOf(secs);
+  const badSecs = secsNum === null;
+  const changes = changedIds.size + deleted + (reordered ? 1 : 0) + (secsNum !== savedSecs ? 1 : 0);
   const dirty = changes > 0;
 
   useEffect(() => {
@@ -261,16 +279,20 @@ export default function BannerManagement() {
   };
 
   const save = async () => {
+    if (secsNum === null) { document.getElementById("banner-interval")?.focus(); return; }   // the message under the field says what is wrong
     const badLink = banners.findIndex(b => !linkOk(b.link));
     if (badLink >= 0) { setOpenIds(o => new Set(o).add(banners[badLink].id)); return; }
     setSaving(true);
     try {
-      const res = await saveBanners(banners);
+      const res = await saveBanners(banners, { intervalSeconds: secsNum });
       if (!res.success || !res.data) { setResult({ variant: "error", message: res.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่" }); return; }
       const idMap = new Map(banners.map((b, i) => [b.id, res.data![i]?.id]));   // new-… ids became real ids: keep the cards open
       setOpenIds(o => new Set([...o].map(id => idMap.get(id) ?? id)));
       setBanners(res.data);
       setSaved(res.data);
+      const s = res.settings?.intervalSeconds ?? secsNum;
+      setSecs(String(s));
+      setSavedSecs(s);
       setErrors({});
       setJustSaved(true);
     } catch (err) {
@@ -312,6 +334,25 @@ export default function BannerManagement() {
           </div>
         ) : (
           <>
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-semibold text-gray-800 dark:text-white/90">เวลาเปลี่ยนสไลด์</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">หน้า Shop เลื่อนไปแบนเนอร์ถัดไปเองทุกกี่วินาที (2–60) · ใส่ 0 = ไม่เลื่อนเอง ผู้เข้าชมกดลูกศรหรือจุดเอง</p>
+                </div>
+                <div>
+                  <Label htmlFor="banner-interval" className="sr-only">เวลาเปลี่ยนสไลด์ (วินาที)</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-28">
+                      <Input id="banner-interval" type="number" min="0" max="60" step={1} value={secs} error={badSecs} onChange={e => { setJustSaved(false); setSecs(e.target.value); }} />
+                    </div>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">วินาที</span>
+                  </div>
+                  {badSecs && <p role="alert" className="mt-2 text-sm text-error-600">ใส่ 0 (ไม่เลื่อนเอง) หรือจำนวนเต็ม 2–60</p>}
+                </div>
+              </div>
+            </section>
+
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={banners.map(b => b.id)} strategy={verticalListSortingStrategy}>
                 <div role="list" className="space-y-4">

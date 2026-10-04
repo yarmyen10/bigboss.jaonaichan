@@ -12,6 +12,9 @@ export interface Banner {
     updatedAt: string;
 }
 
+/** Settings saved with the list. `intervalSeconds`: seconds between two slides on the Shop page — 0 = the slider does not move by itself, otherwise a whole number 2–60 */
+export interface BannerSettings { intervalSeconds: number }
+
 /** a success body, or WordPress' error body ({ code, message, data: { status, index } }) — apiRequest does not throw on 4xx */
-export interface BannerListResponse { success?: boolean; data?: Banner[]; code?: string; message?: string }
+export interface BannerListResponse { success?: boolean; data?: Banner[]; settings?: BannerSettings; code?: string; message?: string }
 export interface BannerUploadResponse { success?: boolean; url?: string; name?: string; id?: number; code?: string; message?: string }
