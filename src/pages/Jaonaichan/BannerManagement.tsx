@@ -46,6 +46,16 @@ function newBanner(n: number): Banner {
   return { id: `new-${Math.random().toString(36).slice(2, 9)}`, title: `Banner ${n}`, description: NO_IMAGE_TEXT, isActive: false, image: null, link: "", heading: "", subheading: "", ctaLabel: "", updatedAt: new Date().toISOString() };
 }
 
+/** hint on the left, "typed / limit" on the right — the fields stop accepting characters at the limit, so say how close it is */
+function Count({ n, max, hint }: { n: number; max: number; hint?: string }) {
+  return (
+    <p className="mt-1.5 flex justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+      <span>{hint}</span>
+      <span data-count className={n >= max ? "font-medium text-warning-600" : ""}>{n}/{max}</span>
+    </p>
+  );
+}
+
 // ─── one card ────────────────────────────────────────────────────────────────
 
 interface CardProps {
@@ -165,20 +175,22 @@ function BannerCard({ banner: b, open, dirty, error, uploading, onToggleOpen, on
                 maxLength={HEADING_MAX}
                 value={b.heading}
                 onChange={e => onChange({ heading: twoLines(e.target.value) })}
-                placeholder="เช่น ติดต่อสอบถาม แอดมิน (ขึ้นบรรทัดใหม่ได้ 1 ครั้ง)"
+                placeholder="เช่น ติดต่อสอบถาม แอดมิน"
                 className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90"
               />
+              <Count n={b.heading.length} max={HEADING_MAX} hint="ขึ้นบรรทัดใหม่ได้ 1 ครั้ง (สูงสุด 2 บรรทัด)" />
             </div>
             <div>
               <Label htmlFor={`subheading-${b.id}`}>คำโปรย</Label>
               <Input id={`subheading-${b.id}`} maxLength={SUBHEADING_MAX} value={b.subheading} onChange={e => onChange({ subheading: e.target.value })} placeholder="เช่น มีคำถามเกี่ยวกับสินค้า? ทักได้เลย 24/7" />
+              <Count n={b.subheading.length} max={SUBHEADING_MAX} />
             </div>
             <div>
               <Label htmlFor={`cta-${b.id}`}>ข้อความปุ่ม</Label>
               <Input id={`cta-${b.id}`} maxLength={CTA_MAX} value={b.ctaLabel} error={badCta} onChange={e => onChange({ ctaLabel: e.target.value })} placeholder="เช่น แชทกับเรา →" />
               {badCta
                 ? <p role="alert" className="mt-2 text-sm text-error-600">ใส่ข้อความปุ่มได้เมื่อมี Banner Link — ปุ่มพาไปลิงก์นั้น</p>
-                : <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">ปุ่มพาไปที่ Banner Link · ถ้าเว้นว่าง ทั้งรูปจะกดไปที่ลิงก์</p>}
+                : <Count n={b.ctaLabel.length} max={CTA_MAX} hint="ปุ่มพาไปที่ Banner Link · ถ้าเว้นว่าง ทั้งรูปจะกดไปที่ลิงก์" />}
             </div>
           </div>
 
@@ -226,6 +238,7 @@ export default function BannerManagement() {
   const [confirm, setConfirm] = useState<null | { kind: "delete"; id: string } | { kind: "discard" }>(null);
   const [result, setResult] = useState<{ variant: "success" | "error"; message: string } | null>(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [tried, setTried] = useState(false);   // Save was pressed while something stopped it
   const [secs, setSecs] = useState(String(DEFAULT_SECS));   // seconds between two slides on the Shop page (as typed)
   const [savedSecs, setSavedSecs] = useState(DEFAULT_SECS);
   const started = useRef(false);
@@ -266,6 +279,18 @@ export default function BannerManagement() {
   const badSecs = secsNum === null;
   const changes = changedIds.size + deleted + (reordered ? 1 : 0) + (secsNum !== savedSecs ? 1 : 0);
   const dirty = changes > 0;
+
+  // what stops a save, in page order — the rules the server enforces too. After a refused Save the bar says which one, and the cursor goes to the field.
+  const problems = useMemo(() => {
+    const out: { id: string; field: string; text: string }[] = [];
+    if (secsNum === null) out.push({ id: "", field: "banner-interval", text: "เวลาเปลี่ยนสไลด์: ใส่ 0 (ไม่เลื่อนเอง) หรือจำนวนเต็ม 2–60" });
+    banners.forEach(b => {
+      if (!linkOk(b.link)) out.push({ id: b.id, field: `link-${b.id}`, text: `${b.title}: ลิงก์ต้องขึ้นต้นด้วย http(s):// หรือ /` });
+      if (ctaNeedsLink(b)) out.push({ id: b.id, field: `cta-${b.id}`, text: `${b.title}: ใส่ข้อความปุ่มได้เมื่อมี Banner Link — ปุ่มพาไปลิงก์นั้น` });
+    });
+    return out;
+  }, [banners, secsNum]);
+  useEffect(() => { if (problems.length === 0) setTried(false); }, [problems]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -319,9 +344,14 @@ export default function BannerManagement() {
   };
 
   const save = async () => {
-    if (secsNum === null) { document.getElementById("banner-interval")?.focus(); return; }   // the message under the field says what is wrong
-    const badLink = banners.findIndex(b => !linkOk(b.link) || ctaNeedsLink(b));
-    if (badLink >= 0) { setOpenIds(o => new Set(o).add(banners[badLink].id)); return; }
+    const first = problems[0];
+    if (secsNum === null || first) {
+      setTried(true);
+      if (first?.id) setOpenIds(o => new Set(o).add(first.id));
+      // the card may have only just opened: give it a moment, then take the cursor — and with it the screen — to the field
+      setTimeout(() => { const el = document.getElementById(first?.field ?? "banner-interval"); el?.focus(); }, 60);   // (focusing scrolls it into view)
+      return;
+    }
     setSaving(true);
     try {
       const res = await saveBanners(banners, { intervalSeconds: secsNum });
@@ -334,6 +364,7 @@ export default function BannerManagement() {
       setSecs(String(s));
       setSavedSecs(s);
       setErrors({});
+      setTried(false);
       setJustSaved(true);
     } catch (err) {
       if (import.meta.env.DEV) console.error(err);
@@ -343,7 +374,8 @@ export default function BannerManagement() {
     }
   };
 
-  const statusText = justSaved ? "บันทึกเรียบร้อย" : dirty ? `มีการเปลี่ยนแปลง ${changes} รายการที่ยังไม่ได้บันทึก` : "ยังไม่มีการเปลี่ยนแปลง";
+  const blocked = tried && problems.length > 0;
+  const statusText = blocked ? `บันทึกไม่ได้ — ${problems[0].text}` : justSaved ? "บันทึกเรียบร้อย" : dirty ? `มีการเปลี่ยนแปลง ${changes} รายการที่ยังไม่ได้บันทึก` : "ยังไม่มีการเปลี่ยนแปลง";
 
   return (
     <>
@@ -424,8 +456,8 @@ export default function BannerManagement() {
         )}
 
         <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-800 dark:bg-gray-900">
-          <p role="status" className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dirty ? "bg-warning-500" : justSaved ? "bg-success-500" : "bg-gray-300"}`} />
+          <p role="status" className={`flex items-center gap-2 text-sm ${blocked ? "text-error-600" : "text-gray-600 dark:text-gray-300"}`}>
+            <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${blocked ? "bg-error-500" : dirty ? "bg-warning-500" : justSaved ? "bg-success-500" : "bg-gray-300"}`} />
             {statusText}
           </p>
           <div className="flex gap-3">
